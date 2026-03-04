@@ -1,0 +1,74 @@
+stages:
+  - validate
+  - test
+  - build
+  - publish
+
+variables:
+  NODE_IMAGE: node:22-alpine
+
+lint:
+  stage: validate
+  image: $NODE_IMAGE
+  script:
+    - npm ci
+    - npm run lint
+    - npm run typecheck
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+
+test:
+  stage: test
+  image: $NODE_IMAGE
+  script:
+    - npm ci
+    - npm run test:coverage
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+
+build:
+  stage: build
+  image: $NODE_IMAGE
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+
+publish-npm:
+  stage: publish
+  image: $NODE_IMAGE
+  only:
+    - tags
+  script:
+    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
+    - npm publish --access public
+  when: manual
+
+publish-docker:
+  stage: publish
+  image: docker:latest
+  services:
+    - docker:dind
+  only:
+    - tags
+  script:
+    - docker build -t kadam/mcp-server:$CI_COMMIT_TAG -t kadam/mcp-server:latest .
+    - docker login -u $DOCKER_USER -p $DOCKER_PASS
+    - docker push kadam/mcp-server:$CI_COMMIT_TAG
+    - docker push kadam/mcp-server:latest
+  when: manual

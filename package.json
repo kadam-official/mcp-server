@@ -1,0 +1,67 @@
+{
+  "name": "@kadam/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Kadam ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents",
+  "type": "module",
+  "bin": {
+    "kadam-mcp-server": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "vite build",
+    "start": "node dist/index.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write 'src/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "kadam",
+    "advertising",
+    "ad-network",
+    "campaigns",
+    "ai-agent",
+    "cursor",
+    "claude"
+  ],
+  "author": "Kadam",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.sdev.pw/kadam/api-mcp"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "pino": "^9.6.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "@types/node": "^22.13.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.0.0",
+    "mcp-testing-kit": "^0.2.0",
+    "prettier": "^3.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^6.1.0",
+    "vite-node": "^3.0.0",
+    "vitest": "^3.0.0"
+  }
+}

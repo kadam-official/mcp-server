@@ -1,0 +1,26 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@anthropic-ai/mcp-registry@latest/dist/schema.json",
+  "name": "net.kadam/mcp-server",
+  "description": "MCP server for Kadam ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents",
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registry_name": "npm",
+      "name": "@kadam/mcp-server",
+      "version": "0.1.0",
+      "runtime": "node",
+      "environment_variables": [
+        {
+          "name": "KADAM_ADV_API_KEY",
+          "description": "Advertiser API key from partners.kadam.net",
+          "required": false
+        },
+        {
+          "name": "KADAM_PUB_API_KEY",
+          "description": "Publisher API key from pub.kadam.net",
+          "required": false
+        }
+      ]
+    }
+  ]
+}
