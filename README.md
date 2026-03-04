@@ -1,93 +1,271 @@
-# api-mcp
+# @kadam/mcp-server
 
+MCP server for [Kadam](https://kadam.net) ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents.
 
+Built on the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), the open standard for connecting LLMs to external tools and data.
 
-## Getting started
+## Quick Start
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### Cursor / Claude Desktop
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Add to your MCP config (`.cursor/mcp.json` or `claude_desktop_config.json`):
 
-## Add your files
+```json
+{
+  "mcpServers": {
+    "kadam": {
+      "command": "npx",
+      "args": ["-y", "@kadam/mcp-server"],
+      "env": {
+        "KADAM_ADV_API_KEY": "your-advertiser-api-key",
+        "KADAM_PUB_API_KEY": "your-publisher-api-key"
+      }
+    }
+  }
+}
+```
 
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### Docker
+
+```bash
+docker run -i --rm \
+  -e KADAM_ADV_API_KEY=your-key \
+  registry.sdev.pw/kadam/api-mcp:latest
+```
+
+### npm global
+
+```bash
+npm install -g @kadam/mcp-server
+KADAM_ADV_API_KEY=your-key kadam-mcp-server
+```
+
+## Configuration
+
+| Variable | Required | Description |
+|---|---|---|
+| `KADAM_ADV_API_KEY` | One of two | Advertiser API key from [partners.kadam.net](https://partners.kadam.net) -> Profile -> API |
+| `KADAM_PUB_API_KEY` | One of two | Publisher API key from [pub.kadam.net](https://pub.kadam.net) -> Profile -> API |
+| `KADAM_ADV_API_BASE` | No | Advertiser API URL (default: `https://partners.kadam.net/api/v1`) |
+| `KADAM_PUB_API_BASE` | No | Publisher API URL (default: `https://pub.kadam.net/api`) |
+| `LOG_LEVEL` | No | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `info`) |
+
+At least one API key must be provided. Tools for both products are always listed (for discoverability), but calling a tool without the corresponding key returns a clear setup instruction.
+
+## Tools (27)
+
+### Advertiser Tools (18)
+
+Requires `KADAM_ADV_API_KEY`.
+
+#### Campaigns
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_adv_list_campaigns` | List campaigns with filters (folder, status, type, date, search) and pagination | readOnly |
+| `kadam_adv_create_campaign` | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences) | — |
+| `kadam_adv_update_campaign` | Update any campaign fields by ID | — |
+| `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived) for comma-separated IDs | idempotent |
+
+#### Campaign Folders
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_adv_list_campaign_folders` | List folders with campaign counts and budgets | readOnly |
+| `kadam_adv_create_campaign_folder` | Create a new folder (name min 4 chars) | — |
+| `kadam_adv_update_campaign_folder` | Update folder budgets and distribution | — |
+
+#### Creatives
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_adv_list_creatives` | List creatives by campaign, status, or search query | readOnly |
+| `kadam_adv_create_creative` | Create creative for a campaign (goes through moderation) | — |
+| `kadam_adv_update_creative` | Update creative fields | — |
+| `kadam_adv_set_creative_status` | Bulk status change for creatives | idempotent |
+
+#### Audiences
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_adv_list_audiences` | List audiences with search and sorting | readOnly |
+| `kadam_adv_get_audience` | Get detailed audience info by ID | readOnly |
+| `kadam_adv_create_audience` | Create audience (pixel, code, fingerprint, or S2S) | — |
+| `kadam_adv_update_audience` | Update audience settings | — |
+| `kadam_adv_delete_audience` | Delete audience permanently (requires `confirm: true`) | destructive |
+
+#### Finance & Statistics
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_adv_list_finance_operations` | Transaction history (deposits, charges, refunds) | readOnly |
+| `kadam_adv_get_stats` | Unified statistics — 3 report types via `reportType` param: `custom` (report builder with dimension/metric mapping), `sites` (per-site breakdown), `postbacks` (conversion logs) | readOnly |
+
+### Publisher Tools (9)
+
+Requires `KADAM_PUB_API_KEY`.
+
+#### Sites (Sources)
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_pub_list_sources` | List publisher sites with stats | readOnly |
+| `kadam_pub_create_source` | Add a new site (starts verification flow) | — |
+| `kadam_pub_get_source` | Get detailed site info | readOnly |
+| `kadam_pub_update_source` | Update site name | — |
+| `kadam_pub_set_source_status` | Change site status (active/paused/archived/unarchived) | idempotent |
+
+#### Ad Units
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_pub_list_ad_units` | List ad units for a site, filter by format (native/banner/push/popunder/inpagepush) | readOnly |
+| `kadam_pub_set_ad_unit_status` | Change ad unit status (active/paused/archived/restored) | idempotent |
+
+#### User & Statistics
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_pub_get_user_info` | Get publisher account info and balance | readOnly |
+| `kadam_pub_get_stats` | Publisher statistics with human-readable dimension/metric mapping | readOnly |
+
+## Resources (7)
+
+Static reference data the agent can read before calling tools:
+
+| URI | Description |
+|---|---|
+| `kadam://reference/campaign-types` | All ad format types with IDs, features, pricing, and creative specs |
+| `kadam://reference/pricing-models` | CPC, CPM, CPV, CPA Target with IDs and descriptions |
+| `kadam://reference/creative-formats` | Creative requirements per campaign type |
+| `kadam://reference/ad-unit-types` | Publisher ad unit formats with IDs |
+| `kadam://reference/site-states` | Publisher site lifecycle states |
+| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools |
+| `kadam://reference/api-overview` | General Kadam API capabilities overview |
+
+## Prompts (4)
+
+Pre-built workflow templates that guide the agent through multi-step operations:
+
+| Prompt | Description | Arguments |
+|---|---|---|
+| `kadam_launch_campaign` | Step-by-step campaign creation (check types -> create folder -> create campaign -> add creatives) | `type`, `name`, `url`, `budget` |
+| `kadam_campaign_performance` | Campaign performance analysis with optimization recommendations | `campaignId`, `period` |
+| `kadam_optimize_sites` | Analyze site performance and suggest blacklist/whitelist changes | `campaignId`, `minClicks`, `maxCPA` |
+| `kadam_account_overview` | Full account overview — campaigns, spend, top performers | — |
+
+## Architecture
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.sdev.pw/kadam/api-mcp.git
-git branch -M main
-git push -uf origin main
+src/
+├── index.ts                  # Entry point, server instructions, transport
+├── config.ts                 # Zod-validated env config with cache
+├── errors.ts                 # AuthError class
+├── logger.ts                 # Pino structured logging (stderr)
+├── output-formatter.ts       # Text formatting + 50KB truncation
+├── middleware/
+│   └── tool-wrapper.ts       # Auth, error handling, logging middleware
+├── api/
+│   ├── http-client.ts        # Generic HTTP client with retry/429/timeout
+│   ├── partners-client.ts    # Advertiser API (lazy singleton)
+│   └── pub-client.ts         # Publisher API (lazy singleton)
+├── utils/
+│   ├── pagination.ts         # Shared pagination extraction
+│   ├── cache-once.ts         # Generic async cache-once utility
+│   └── dimension-mapper.ts   # Stats dimension name→ID resolution
+├── types/
+│   ├── common.ts             # Shared types (ApiListResponse, ReportConfig)
+│   ├── advertiser.ts         # Campaign, Creative, Audience types + maps
+│   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
+│   └── tool-module.ts        # ToolModule interface
+├── tools/
+│   ├── advertiser/           # 18 tools across 6 modules
+│   └── publisher/            # 9 tools across 4 modules
+├── resources/                # 7 static reference resources
+└── prompts/                  # 4 workflow prompts
 ```
 
-## Integrate with your tools
+### Key Design Decisions
 
-* [Set up project integrations](https://gitlab.sdev.pw/kadam/api-mcp/-/settings/integrations)
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 27 tools
+- **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
+- **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
+- **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
+- **Tool annotations** — `readOnlyHint`, `destructiveHint`, `idempotentHint` to guide agent behavior
+- **Server instructions** — usage patterns and constraints sent to the LLM on connection
+- **Dimension mapping** — stats tools accept human-readable names ("clicks", "spend") and resolve them to API IDs internally
 
-## Collaborate with your team
+## Development
 
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Prerequisites
 
-## Test and Deploy
+- Node.js >= 18
+- npm
 
-Use the built-in continuous integration in GitLab.
+### Setup
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+```bash
+git clone ssh://git@gitlab.sdev.pw:56777/kadam/api-mcp.git
+cd api-mcp
+npm install
+cp .env.example .env  # Fill in your API keys
+```
 
-***
+### Commands
 
-# Editing this README
+```bash
+npm run dev             # Watch mode with tsx
+npm run build           # Production build with Vite
+npm run start           # Run built server
+npm run typecheck       # TypeScript check
+npm run lint            # ESLint
+npm run format          # Prettier
+npm test                # Run 82 tests
+npm run test:coverage   # Tests with V8 coverage
+npm run inspect         # MCP Inspector (visual debugger)
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### Testing
 
-## Suggestions for a good README
+82 tests across 12 files using Vitest + MCP SDK InMemoryTransport:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+- **Unit tests** — output formatter, config, HTTP client (mocked fetch)
+- **Middleware tests** — ToolWrapper auth, error formatting, logging
+- **Integration tests** — full server with all 27 tools, 7 resources, 4 prompts via in-memory MCP client
+- **Tool handler tests** — each tool module with mocked API clients
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+npm test
+# Test Files  12 passed (12)
+#      Tests  82 passed (82)
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### MCP Inspector
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) provides a visual interface for testing:
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+npm run build
+npm run inspect
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## Deployment
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### Docker
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+docker build -t kadam-mcp-server .
+docker run -i --rm -e KADAM_ADV_API_KEY=... kadam-mcp-server
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### CI/CD
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+The `.gitlab-ci.yml` pipeline includes:
+- **lint** — ESLint + TypeScript check
+- **test** — Vitest with coverage
+- **build** — Vite production build
+- **publish** — npm publish + Docker push (manual trigger)
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT
