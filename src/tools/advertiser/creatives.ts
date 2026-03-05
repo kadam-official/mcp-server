@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import * as api from "../../api/partners-client.js";
@@ -32,22 +34,41 @@ function formatCreativeRow(row: CreativeRow, index: number): string {
   return `${index + 1}. [ID: ${id}] "${title}" | ${campaignInfo} | Status: ${status} | Views: ${row.views} | Clicks: ${row.clicks}`;
 }
 
-interface DownloadedFile {
+interface LoadedFile {
   blob: Blob;
   filename: string;
   width: number;
   height: number;
 }
 
-async function downloadFile(url: string): Promise<DownloadedFile> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to download file from ${url}: HTTP ${response.status}`);
+function isLocalPath(source: string): boolean {
+  return source.startsWith("/") || source.startsWith("~") || source.startsWith("file://");
+}
+
+async function loadFile(source: string): Promise<LoadedFile> {
+  let buffer: ArrayBuffer;
+  let filename: string;
+
+  if (isLocalPath(source)) {
+    const filePath = source.startsWith("file://")
+      ? new URL(source).pathname
+      : source.startsWith("~")
+        ? source.replace("~", process.env.HOME || "")
+        : source;
+    const nodeBuffer = await readFile(filePath);
+    buffer = nodeBuffer.buffer.slice(nodeBuffer.byteOffset, nodeBuffer.byteOffset + nodeBuffer.byteLength);
+    filename = basename(filePath);
+  } else {
+    const response = await fetch(source);
+    if (!response.ok) {
+      throw new Error(`Failed to download file from ${source}: HTTP ${response.status}`);
+    }
+    buffer = await response.arrayBuffer();
+    const urlPath = new URL(source).pathname;
+    filename = urlPath.split("/").pop() || "file";
   }
-  const buffer = await response.arrayBuffer();
+
   const blob = new Blob([buffer]);
-  const urlPath = new URL(url).pathname;
-  const filename = urlPath.split("/").pop() || "file";
   const { width, height } = parseImageDimensions(new Uint8Array(buffer));
   return { blob, filename, width, height };
 }
@@ -134,7 +155,7 @@ export const creativesModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_create_creative",
-        description: `Create a new creative for a campaign. The API uses multipart/form-data with file uploads.
+        description: `Create a new creative for a campaign. Accepts both URLs (http/https) and local file paths for images/video.
 
 Campaign type determines required fields:
 - Push / In-Page Push: title, text, url, imageUrl (icon 192x192+), mainImageUrl (492x328+)
@@ -143,7 +164,7 @@ Campaign type determines required fields:
 - Video: title, url, videoUrl (MP4 file)
 - Popunder: does NOT support separate creatives (campaign URL = ad)
 
-All images are downloaded from provided URLs and uploaded to the API as files.`,
+Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Downloads/banner.jpg).`,
         product: "advertiser",
         annotations: { readOnlyHint: false },
       },
@@ -152,9 +173,9 @@ All images are downloaded from provided URLs and uploaded to the API as files.`,
         url: z.string().url().describe("Landing page URL for the creative"),
         title: z.string().optional().describe("Creative title (required for push/inpage/native/video, max 30 chars for push, 75 for native)"),
         text: z.string().optional().describe("Creative text/description (required for push/inpage, max 45 chars)"),
-        imageUrl: z.string().url().optional().describe("URL of icon image to upload (push: 192x192+, native: 500x500+, banner: exact size)"),
-        mainImageUrl: z.string().url().optional().describe("URL of main/rectangle image (push/inpage: 492x328+, native: 492x328+). Not needed for banner/video."),
-        videoUrl: z.string().url().optional().describe("URL of MP4 video file (video campaigns only)"),
+        imageUrl: z.string().optional().describe("Icon/image source: URL or local file path (push: 192x192+, native: 500x500+, banner: exact size)"),
+        mainImageUrl: z.string().optional().describe("Main/rectangle image source: URL or local path (push/inpage: 492x328+, native: 492x328+). Not needed for banner/video."),
+        videoUrl: z.string().optional().describe("Video source: URL or local file path to MP4 (video campaigns only)"),
         sizeId: z.number().optional().describe("Banner size ID (required for banner). Common: 25=300x250, 35=728x90, 75=160x600, 80=320x50, 300=300x600"),
         pauseAfterModeration: z.boolean().optional().default(true).describe("Pause creative after it passes moderation (default: true for safety)"),
         bid: z.number().optional().describe("Custom bid for this creative (overrides campaign bid)"),
@@ -183,7 +204,7 @@ All images are downloaded from provided URLs and uploaded to the API as files.`,
         });
 
         if (args.imageUrl) {
-          const file = await downloadFile(args.imageUrl);
+          const file = await loadFile(args.imageUrl);
           fd.set("image", file.blob, file.filename);
           if (file.width > 0) {
             fd.set("imageCrop", JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }));
@@ -191,7 +212,7 @@ All images are downloaded from provided URLs and uploaded to the API as files.`,
         }
 
         if (args.mainImageUrl) {
-          const file = await downloadFile(args.mainImageUrl);
+          const file = await loadFile(args.mainImageUrl);
           fd.set("rectangleImage", file.blob, file.filename);
           if (file.width > 0) {
             fd.set("rectangleImageCrop", JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }));
@@ -199,7 +220,7 @@ All images are downloaded from provided URLs and uploaded to the API as files.`,
         }
 
         if (args.videoUrl) {
-          const file = await downloadFile(args.videoUrl);
+          const file = await loadFile(args.videoUrl);
           fd.set("image", file.blob, file.filename);
         }
 

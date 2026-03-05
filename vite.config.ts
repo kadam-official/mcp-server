@@ -1,28 +1,26 @@
-/// <reference types="vitest" />
 import { defineConfig } from "vite";
-import { resolve } from "path";
+import { builtinModules } from "node:module";
 
 export default defineConfig({
-  test: {
-    globals: true,
-  },
   build: {
     target: "node18",
     lib: {
-      entry: resolve(__dirname, "src/index.ts"),
+      entry: "src/index.ts",
       formats: ["es"],
       fileName: "index",
     },
     rollupOptions: {
       external: [
-        /^node:/,
-        /^@modelcontextprotocol/,
+        ...builtinModules,
+        ...builtinModules.map((m) => `node:${m}`),
+        "@modelcontextprotocol/sdk",
+        /^@modelcontextprotocol\/sdk\//,
         "pino",
+        /^pino\//,
+        "pino-pretty",
         "zod",
       ],
     },
-    outDir: "dist",
-    emptyOutDir: true,
     sourcemap: true,
     minify: false,
   },
