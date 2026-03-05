@@ -6,14 +6,11 @@ import {
   formatTable,
   formatEntityList,
   clampPerPage,
-  formatNumber,
-  formatPercent,
 } from "../../output-formatter.js";
-import type { ReportDataResponse } from "../../types/common.js";
-import type { ApiListResponse } from "../../types/common.js";
+import type { ReportDataResponse, ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { cacheOnce } from "../../utils/cache-once.js";
-import { mapToDimensionIds } from "../../utils/dimension-mapper.js";
+import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
 
 const getReportConfig = cacheOnce(() => api.getReportConfig());
 
@@ -50,6 +47,14 @@ function resolvePeriodToDates(
   }
 }
 
+function extractCellValue(cell: unknown): string {
+  if (cell == null) return "";
+  if (typeof cell === "object" && cell !== null && "value" in cell) {
+    return String((cell as { value: unknown }).value ?? "");
+  }
+  return String(cell);
+}
+
 export const statsModule: ToolModule = {
   product: "advertiser",
   register(wrapper: ToolWrapper) {
@@ -57,7 +62,7 @@ export const statsModule: ToolModule = {
       {
         name: "kadam_adv_get_stats",
         description:
-          "Unified advertiser statistics. Use reportType to select: 'custom' (default) for full report builder, 'sites' for per-site breakdown, 'postbacks' for conversion logs. For custom reports, the server maps human-readable dimension/metric names to API IDs internally.",
+          "Unified advertiser statistics. Use reportType to select: 'custom' (default) for full report builder, 'sites' for per-site breakdown, 'postbacks' for conversion logs. For custom reports use human-readable names like 'spend,clicks,impressions,ctr' for metrics and 'day,campaign,country' for groupBy.",
         product: "advertiser",
         annotations: { readOnlyHint: true },
       },
@@ -96,35 +101,46 @@ export const statsModule: ToolModule = {
 
         if (args.reportType === "custom") {
           const config = await getReportConfig();
-          const groupIds = mapToDimensionIds(args.groupBy, config.groups);
-          const metricIds = mapToDimensionIds(args.metrics, config.metrics);
+          const groupIds = resolveGroupIds(args.groupBy, config);
+          const metricIds = resolveMetricIds(args.metrics, config);
+
+          if (metricIds.length === 0) {
+            return "No valid metrics found. Available: spend, clicks, views/impressions, ctr, cpc, cpm, cpa, conversions, holds, rejects, cr, roi, income";
+          }
+
+          const customFilters: unknown[] = [];
+          if (args.campaignIds != null) {
+            customFilters.push({ id: "advertiser_campaign", type: "list", list: args.campaignIds.split(",").map(Number) });
+          }
+
           const params: Record<string, unknown> = {
-            groups: groupIds.length > 0 ? groupIds : undefined,
-            metrics: metricIds.length > 0 ? metricIds : undefined,
-            dateFrom: df,
-            dateTo: dt,
+            groups: groupIds.length > 0 ? groupIds : ["time_day"],
+            metrics: metricIds,
+            filters: {
+              dateFrom: df,
+              dateTo: dt,
+              filters: customFilters,
+            },
             page: args.page,
             perPage,
             ...(args.sortBy != null && { sortBy: args.sortBy }),
             ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
-            ...(args.campaignIds != null && {
-              campaignIds: args.campaignIds,
-            }),
-            ...(args.countries != null && { countries: args.countries }),
           };
-          const res = (await api.getReportData(
-            params,
-          )) as ReportDataResponse;
-          const rows = res.data ?? [];
+          const res = (await api.getReportData(params)) as ReportDataResponse;
+          const rows = res.rows ?? [];
+          if (rows.length === 0) {
+            return `No data for ${df} to ${dt}.`;
+          }
           const allKeys = new Set<string>();
           for (const row of rows) {
-            for (const k of Object.keys(row)) allKeys.add(k);
+            for (const k of Object.keys(row)) if (k !== "id") allKeys.add(k);
           }
           const headers = [...allKeys];
           const tableRows = rows.map((row) =>
-            headers.map((h) => String(row[h] ?? "")),
+            headers.map((h) => extractCellValue(row[h])),
           );
-          const title = `Stats (${df} to ${dt}, page ${(res.meta?.page ?? 1)}/${res.meta?.pages ?? 1})`;
+          const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
+          const title = `Stats (${df} to ${dt}, page ${res.page ?? 1}/${totalPages})`;
           return formatTable({ headers, rows: tableRows }, title);
         }
 
@@ -146,26 +162,17 @@ export const statsModule: ToolModule = {
             }),
           };
           const res = (await api.getSiteStats(params)) as ApiListResponse;
-          const items = (res.data ?? []) as Array<{
-            siteName?: string;
-            site?: string;
-            impressions?: number;
-            clicks?: number;
-            ctr?: number;
-            spend?: number;
-            moneyOut?: number;
-          }>;
+          const items = (res.rows ?? []) as Record<string, unknown>[];
           const pagination = extractPagination(res);
           const formatSiteRow = (
-            s: (typeof items)[0],
+            s: Record<string, unknown>,
             i: number,
           ): string => {
-            const name = s.siteName ?? s.site ?? "—";
-            const imp = s.impressions ?? 0;
-            const clk = s.clicks ?? 0;
-            const ctrVal = s.ctr ?? (imp > 0 ? (clk / imp) * 100 : 0);
-            const spend = s.spend ?? s.moneyOut ?? 0;
-            return `${i + 1}. ${name} | imp: ${formatNumber(imp)} | clk: ${formatNumber(clk)} | CTR: ${formatPercent(ctrVal)} | spend: ${formatNumber(spend)}`;
+            const parts = Object.entries(s)
+              .filter(([k]) => k !== "checkbox" && k !== "isInBlackList" && k !== "hasBid")
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(" | ");
+            return `${i + 1}. ${parts}`;
           };
           return formatEntityList(
             items,
@@ -188,7 +195,7 @@ export const statsModule: ToolModule = {
           const res = (await api.getPostbackStats(
             params,
           )) as ApiListResponse;
-          const items = (res.data ?? []) as Record<string, unknown>[];
+          const items = (res.rows ?? []) as Record<string, unknown>[];
           const pagination = extractPagination(res);
           const formatPostbackRow = (
             p: Record<string, unknown>,

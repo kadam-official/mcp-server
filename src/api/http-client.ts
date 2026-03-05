@@ -145,8 +145,8 @@ export class HttpClient {
           );
         }
 
-        const data = (await response.json()) as T;
-        return data;
+        const json = (await response.json()) as Record<string, unknown>;
+        return unwrapApiResponse<T>(json);
       } catch (error) {
         if (error instanceof ApiError) throw error;
 
@@ -217,7 +217,8 @@ export class HttpClient {
           );
         }
 
-        return (await response.json()) as T;
+        const json = (await response.json()) as Record<string, unknown>;
+        return unwrapApiResponse<T>(json);
       } catch (error) {
         if (error instanceof ApiError) throw error;
 
@@ -245,6 +246,27 @@ function tryParseJson(text: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function unwrapApiResponse<T>(json: Record<string, unknown>): T {
+  if ("success" in json && json.success === false) {
+    const msg = json.msg;
+    let message = "API request failed";
+    if (msg && typeof msg === "object" && !Array.isArray(msg)) {
+      const parts: string[] = [];
+      for (const [key, val] of Object.entries(msg as Record<string, unknown>)) {
+        if (Array.isArray(val)) parts.push(`${key}: ${val.join(", ")}`);
+        else if (typeof val === "string") parts.push(val);
+        else parts.push(`${key}: ${JSON.stringify(val)}`);
+      }
+      if (parts.length) message = parts.join("; ");
+    } else if (typeof msg === "string") {
+      message = msg;
+    }
+    throw new ApiError(message, (json.code as number) ?? 0);
+  }
+  if ("data" in json) return json.data as T;
+  return json as T;
 }
 
 function formatApiError(status: number, parsed: unknown, raw: string): string {

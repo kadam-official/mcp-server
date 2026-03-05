@@ -5,56 +5,170 @@ import * as api from "../../api/partners-client.js";
 import {
   formatEntityList,
   clampPerPage,
-  formatNumber,
 } from "../../output-formatter.js";
-import {
-  CAMPAIGN_TYPE_MAP,
-  CAMPAIGN_TYPE_NAME,
-  PRICING_MODEL_MAP,
-} from "../../types/advertiser.js";
-import type { Campaign } from "../../types/advertiser.js";
-import type { CampaignCreateParams } from "../../api/partners-client.js";
+import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 const STATUS_ACTION_MAP = {
-  active: "turn-on",
-  paused: "turn-off",
+  active: "activate",
+  paused: "pause",
   archived: "archive",
 } as const;
 
-function formatCampaignRow(c: Campaign, index: number): string {
-  const typeName = CAMPAIGN_TYPE_NAME[c.type] ?? `Type ${c.type}`;
-  const budget =
-    c.dayMoneyLimit > 0
-      ? `${formatNumber(c.dayMoneyLimit)}/day`
-      : c.commonMoneyLimit > 0
-        ? `${formatNumber(c.commonMoneyLimit)} total`
-        : "—";
-  return `${index + 1}. [ID: ${c.id}] "${c.name}" (${typeName}, ${c.status}) Budget: ${budget} | Bid: ${formatNumber(c.bid)}`;
+interface CampaignRow {
+  campaign: {
+    id: number;
+    name: string;
+    state: { id: string; label: string };
+    type: { id: string; label: string };
+    folder: { id: number; name: string };
+    model: string;
+    active: number;
+    total: number;
+    reason?: string | null;
+    url: string;
+  };
+  dayMoneyLimit: string;
+  views: string;
+  clicks: string;
+  moneyOut: string;
 }
+
+function formatCampaignRow(row: CampaignRow, index: number): string {
+  const c = row.campaign;
+  return `${index + 1}. [ID: ${c.id}] "${c.name}" (${c.type?.label ?? c.type?.id}, ${c.state?.label ?? c.state?.id}) Budget: ${row.dayMoneyLimit}/day | Model: ${c.model} | Creatives: ${c.active}/${c.total}`;
+}
+
+const CONNECTION_TYPE_MAP: Record<string, number> = {
+  cellular: 1,
+  wifi: 2,
+  all: 3,
+};
 
 function mapCampaignFields(fields: Record<string, unknown>): Record<string, unknown> {
   const mapped: Record<string, unknown> = {};
-  const fieldMap: Record<string, string> = {
-    pricingModel: "cpType",
-    dailyBudget: "dayMoneyLimit",
-    totalBudget: "commonMoneyLimit",
-    evenDistribution: "isEvenDistribution",
-  };
 
   for (const [key, value] of Object.entries(fields)) {
     if (value == null) continue;
-    if (key === "type" && typeof value === "string") {
-      mapped.type = CAMPAIGN_TYPE_MAP[value] ?? value;
-    } else if (key === "pricingModel" && typeof value === "string") {
-      mapped.cpType = PRICING_MODEL_MAP[value] ?? value;
-    } else if (key in fieldMap) {
-      mapped[fieldMap[key]!] = value;
-    } else {
-      mapped[key] = value;
+    switch (key) {
+      case "type":
+        mapped.type = typeof value === "string" ? (CAMPAIGN_TYPE_MAP[value] ?? value) : value;
+        break;
+      case "pricingModel":
+        mapped.cpType = typeof value === "string" ? (PRICING_MODEL_MAP[value] ?? value) : value;
+        break;
+      case "dailyBudget":
+        mapped.dayMoneyLimit = value;
+        break;
+      case "totalBudget":
+        mapped.commonMoneyLimit = value;
+        break;
+      case "evenDistribution":
+        mapped.isEvenDistribution = value;
+        break;
+      case "bid": {
+        const bidVal = value as number;
+        const cpType = mapped.cpType ?? fields.pricingModel;
+        if (cpType === 4 || cpType === "cpa_target") {
+          mapped.bids = [{ leadCost: bidVal, countries: [] }];
+        } else {
+          mapped.bids = [{ bid: bidVal, leadCost: 0, countries: [] }];
+        }
+        break;
+      }
+      case "bidCountry":
+        break;
+      case "connectionType":
+        mapped.connectionType = typeof value === "string" ? (CONNECTION_TYPE_MAP[value] ?? 3) : value;
+        break;
+      case "devices":
+        if (typeof value === "string") mapped.devices = value.split(",").map(s => s.trim());
+        break;
+      case "os":
+        if (typeof value === "string") mapped.platforms = value.split(",").map(s => s.trim());
+        break;
+      case "browsers":
+        if (typeof value === "string") mapped.browsers = value.split(",").map(s => s.trim());
+        break;
+      case "countries":
+        if (typeof value === "string") mapped.countries = value.split(",").map(s => s.trim());
+        break;
+      case "audienceIncludeIds":
+      case "audienceExcludeIds":
+        break;
+      default:
+        mapped[key] = value;
     }
   }
+
+  const includeIds = fields.audienceIncludeIds;
+  const excludeIds = fields.audienceExcludeIds;
+  mapped.audiences = {
+    mode: 20,
+    include: typeof includeIds === "string" ? includeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
+    exclude: typeof excludeIds === "string" ? excludeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
+  };
+
+  const defaults: Record<string, unknown> = {
+    connectionType: 3,
+    categories: [1001],
+    browsers: [2, 4],
+    disableProxy: 1,
+    sites: { mode: 0, list: [] },
+    ips: { mode: 0, list: [] },
+    newAudiences: [],
+    cities: { mode: 0, list: [] },
+    isps: { mode: 0, list: [] },
+    materialViews: { count: 0, days: 0 },
+    campaignView: { count: 0, days: 0 },
+    postConversion: { audiences: [], windowLength: null, countFirstConversionOnly: false, countLastCampaignOnly: false },
+    commonMoneyLimit: 0,
+    isEvenDistribution: 0,
+    totalLossLimit: 0,
+    minBlockViews: 0,
+    maxBlockViews: 0,
+    dayClickLimit: 0,
+    dayConversionsLimit: 0,
+    isConversionFromPostback: 0,
+    allowMultiAds: 0,
+    time: {
+      mode: 1,
+      list: Array.from({ length: 7 }, (_, i) => ({
+        day: i + 1,
+        hours: Array.from({ length: 24 }, (_, h) => h),
+      })),
+    },
+    timezone: 0,
+    startDate: null,
+    stopDate: null,
+    autorules: [],
+    proxies: [],
+    conversion: null,
+    platformVersions: null,
+    devices: null,
+    languages: null,
+  };
+  for (const [k, v] of Object.entries(defaults)) {
+    if (mapped[k] === undefined) mapped[k] = v;
+  }
+
+  const typeId = mapped.type as number;
+  // push types (30, 100): subAges, isNeedSecondPush
+  if ([30, 100].includes(typeId)) {
+    if (mapped.subAges === undefined) mapped.subAges = [1, 2, 3, 4];
+    if (mapped.isNeedSecondPush === undefined) mapped.isNeedSecondPush = 0;
+  }
+  // native (10), banner (20): gender, age, allowMultiAds
+  if ([10, 20].includes(typeId)) {
+    if (mapped.gender === undefined) mapped.gender = 3;
+    if (mapped.age === undefined) mapped.age = null;
+  }
+  // popunder (40): isPauseAfterModerate
+  if (typeId === 40) {
+    if (mapped.isPauseAfterModerate === undefined) mapped.isPauseAfterModerate = 0;
+  }
+
   return mapped;
 }
 
@@ -102,7 +216,7 @@ export const campaignsModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
         const res = (await api.listCampaigns(params)) as ApiListResponse;
-        const items = (res.data ?? []) as Campaign[];
+        const items = (res.rows ?? []) as CampaignRow[];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,
@@ -125,8 +239,8 @@ export const campaignsModule: ToolModule = {
         name: z.string().min(1).describe("Campaign name shown in dashboard"),
         url: z.string().url().describe("Landing page URL"),
         folderId: z.number().describe("Campaign folder ID"),
-        pricingModel: z.enum(["cpc", "cpm", "cpv", "cpa_target"]).describe("Pricing model"),
-        bid: z.number().positive().describe("Bid amount in USD (e.g. 0.05)"),
+        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).describe("Pricing model: cpc, cpm, or cpa_target. Note: popunder only supports cpc/cpa_target; banner/native/push support cpc/cpm; push also supports cpa_target"),
+        bid: z.number().positive().describe("Bid amount in USD (e.g. 0.05). For cpa_target this is the target CPA cost"),
         bidCountry: z.string().optional().default("ALL").describe("Country for bid, 'ALL' for global"),
         dailyBudget: z.number().positive().describe("Daily spending limit in USD"),
         countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
@@ -150,22 +264,25 @@ export const campaignsModule: ToolModule = {
         frequencyCapViews: z.number().optional().describe("Max ad views per user in the cap period"),
         frequencyCapHours: z.number().optional().describe("Frequency cap period in hours"),
         impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
+        categories: z.string().optional().describe("Comma-separated category IDs (default: 1001=General)"),
         secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
         pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
       },
       async (args) => {
-        const { type, pricingModel, ...rest } = args;
-        const mappedData = mapCampaignFields({ type, pricingModel, ...rest }) as CampaignCreateParams;
-        const campaign = (await api.createCampaign(mappedData)) as Campaign;
-        const typeName = CAMPAIGN_TYPE_NAME[campaign.type] ?? `Type ${campaign.type}`;
-        return `Campaign created: [ID: ${campaign.id}] "${campaign.name}" (${typeName}) in folder #${args.folderId}`;
+        const mappedArgs = { ...args } as Record<string, unknown>;
+        if (args.categories) {
+          mappedArgs.categories = args.categories.split(",").map((s: string) => parseInt(s.trim(), 10));
+        }
+        const mappedData = mapCampaignFields(mappedArgs);
+        const result = (await api.createCampaign(mappedData as Record<string, unknown>)) as { id: number };
+        return `Campaign created: [ID: ${result.id}] "${args.name}" in folder #${args.folderId}`;
       },
     );
 
     wrapper.register(
       {
         name: "kadam_adv_update_campaign",
-        description: "Update an existing campaign. Pass id and any fields to change.",
+        description: "Update an existing campaign. WARNING: the Kadam API requires ALL campaign fields for updates (no partial update). This tool may fail if only some fields are provided. Use set_campaign_status for status changes instead.",
         product: "advertiser",
       },
       {
@@ -174,7 +291,7 @@ export const campaignsModule: ToolModule = {
         name: z.string().min(1).optional().describe("Campaign name shown in dashboard"),
         url: z.string().url().optional().describe("Landing page URL"),
         folderId: z.number().optional().describe("Campaign folder ID"),
-        pricingModel: z.enum(["cpc", "cpm", "cpv", "cpa_target"]).optional().describe("Pricing model"),
+        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).optional().describe("Pricing model"),
         bid: z.number().positive().optional().describe("Bid amount in USD (e.g. 0.05)"),
         bidCountry: z.string().optional().describe("Country for bid, 'ALL' for global"),
         dailyBudget: z.number().positive().optional().describe("Daily spending limit in USD"),
@@ -204,7 +321,7 @@ export const campaignsModule: ToolModule = {
       },
       async (args) => {
         const { id, ...rest } = args;
-        const mappedData = mapCampaignFields(rest);
+        const mappedData = mapCampaignFields(rest as Record<string, unknown>);
         await api.updateCampaign(id, mappedData);
         return `Campaign #${id} updated successfully.`;
       },
@@ -227,7 +344,7 @@ export const campaignsModule: ToolModule = {
           .split(",")
           .map((s) => parseInt(s.trim(), 10))
           .filter((n) => !Number.isNaN(n));
-        const action = STATUS_ACTION_MAP[args.status];
+        const action = STATUS_ACTION_MAP[args.status] as "activate" | "pause" | "archive";
         await api.setCampaignStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;

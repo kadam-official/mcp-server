@@ -5,19 +5,9 @@ export function extractPagination(res: ApiListResponse): {
   totalPages: number;
   totalRows: number;
 } {
-  const meta = res.meta ?? res.pagination;
-  if (!meta) {
-    return { page: 1, totalPages: 1, totalRows: (res.data ?? []).length };
-  }
-  const page =
-    (meta as { current_page?: number; page?: number }).current_page ??
-    (meta as { page?: number }).page ??
-    1;
-  const totalPages =
-    (meta as { last_page?: number; pages?: number }).last_page ??
-    (meta as { pages?: number }).pages ??
-    1;
-  const totalRows =
-    (meta as { total?: number }).total ?? (res.data ?? []).length;
+  const totalRows = res.totalRows ?? res.rows.length;
+  const page = res.page ?? 1;
+  const perPage = res.perPage ?? 25;
+  const totalPages = perPage > 0 ? Math.ceil(totalRows / perPage) : 1;
   return { page, totalPages, totalRows };
 }

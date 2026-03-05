@@ -2,36 +2,11 @@ import { HttpClient } from "./http-client.js";
 import { getConfig, requireAdvKey } from "../config.js";
 import type {
   Audience,
-  Campaign,
   CampaignFolder,
   Creative,
-  FinanceOperation,
 } from "../types/advertiser.js";
 import type { ApiListResponse, ReportConfig, ReportDataResponse } from "../types/common.js";
 
-export interface CampaignListParams {
-  page?: number;
-  perPage?: number;
-  folderId?: number;
-  status?: string;
-  type?: number | string;
-  searchQuery?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  sortField?: string;
-  sortOrder?: "asc" | "desc";
-}
-
-export interface CampaignCreateParams {
-  type: number;
-  name: string;
-  url: string;
-  folderId: number;
-  cpType: number;
-  bid: number;
-  dayMoneyLimit: number;
-  [key: string]: unknown;
-}
 
 export interface ReportDataParams {
   groups?: string[];
@@ -64,47 +39,43 @@ export function resetClient(): void {
   _client = null;
 }
 
-export async function listCampaigns(params: CampaignListParams): Promise<ApiListResponse> {
+export async function listCampaigns(params: Record<string, unknown>): Promise<ApiListResponse> {
   return getClient().post<ApiListResponse>("/campaigns", params);
 }
 
-export async function createCampaign(data: CampaignCreateParams): Promise<Campaign> {
-  return getClient().post<Campaign>("/campaigns/create", data);
+export async function createCampaign(data: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return getClient().post<Record<string, unknown>>("/campaigns/create", data);
 }
 
 export async function updateCampaign(
   id: number,
   data: Record<string, unknown>,
-): Promise<Campaign> {
-  return getClient().put<Campaign>(`/campaigns/${id}`, data);
+): Promise<Record<string, unknown>> {
+  return getClient().put<Record<string, unknown>>(`/campaigns/${id}/update`, data);
 }
 
 export async function setCampaignStatus(
   ids: number[],
-  action: "turn-on" | "turn-off" | "archive",
+  action: "activate" | "pause" | "archive",
 ): Promise<unknown> {
-  return getClient().post(`/campaigns/${action}`, { ids });
-}
-
-export async function getCampaignOptions(): Promise<Record<string, unknown>> {
-  return getClient().options("/campaigns/create");
+  return getClient().post(`/campaigns/${action}`, { campaignIds: ids });
 }
 
 export async function listCampaignFolders(
   params: Record<string, unknown>,
 ): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/campaign-folders", params);
+  return getClient().post<ApiListResponse>("/campaigns/folders", params);
 }
 
 export async function createCampaignFolder(name: string): Promise<CampaignFolder> {
-  return getClient().post<CampaignFolder>("/campaign-folders", { name });
+  return getClient().post<CampaignFolder>("/campaigns/folders/create", { name });
 }
 
 export async function updateCampaignFolder(
   id: number,
   data: Record<string, unknown>,
 ): Promise<CampaignFolder> {
-  return getClient().put<CampaignFolder>(`/campaign-folders/${id}/settings`, data);
+  return getClient().put<CampaignFolder>(`/campaigns/folders/${id}/settings`, data);
 }
 
 export async function listAudiences(params: Record<string, unknown>): Promise<ApiListResponse> {
@@ -150,9 +121,9 @@ export async function updateCreative(
 
 export async function setCreativeStatus(
   ids: number[],
-  action: "activate" | "paused" | "archive",
+  action: "activate" | "pause" | "archive",
 ): Promise<unknown> {
-  return getClient().post(`/materials/${action}`, { ids });
+  return getClient().post(`/materials/${action}`, { adsIds: ids });
 }
 
 export async function listFinanceOperations(
@@ -178,7 +149,7 @@ export async function getReportFilters(
 }
 
 export async function getSiteStats(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/stats/site", params);
+  return getClient().post<ApiListResponse>("/stats/sites", params);
 }
 
 export async function getPostbackStats(params: Record<string, unknown>): Promise<ApiListResponse> {

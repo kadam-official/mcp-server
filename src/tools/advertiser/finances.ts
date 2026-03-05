@@ -5,18 +5,22 @@ import * as api from "../../api/partners-client.js";
 import {
   formatEntityList,
   clampPerPage,
-  formatNumber,
 } from "../../output-formatter.js";
-import type { FinanceOperation } from "../../types/advertiser.js";
 import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 
-function formatFinanceRow(op: FinanceOperation, index: number): string {
-  const campaignPart =
-    op.campaignName != null && op.campaignName !== ""
-      ? ` | Campaign: ${op.campaignName}`
-      : "";
-  return `${index + 1}. ${op.date} | ${op.type} | ${formatNumber(op.amount)}${campaignPart}`;
+interface FinanceRow {
+  date: string;
+  money: string;
+  type: string;
+  extType: string;
+  comment: string;
+  status: number;
+}
+
+function formatFinanceRow(op: FinanceRow, index: number): string {
+  const comment = op.comment ? ` | ${op.comment}` : "";
+  return `${index + 1}. ${op.date} | ${op.type} | ${op.money}${comment}`;
 }
 
 export const financesModule: ToolModule = {
@@ -50,7 +54,7 @@ export const financesModule: ToolModule = {
         };
         const res =
           (await api.listFinanceOperations(params)) as ApiListResponse;
-        const items = (res.data ?? []) as FinanceOperation[];
+        const items = (res.rows ?? []) as FinanceRow[];
         const pagination = extractPagination(res);
         const dateRange =
           args.dateFrom && args.dateTo

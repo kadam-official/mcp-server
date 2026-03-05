@@ -90,14 +90,12 @@ export const CAMPAIGN_TYPE_NAME: Record<number, string> = {
 
 export const PRICING_MODEL_MAP: Record<string, number> = {
   cpc: 0,
-  cpm: 1,
-  cpv: 2,
+  cpm: 2,
   cpa_target: 4,
 };
 
 export const PRICING_MODEL_NAME: Record<number, string> = {
   0: "CPC",
-  1: "CPM",
-  2: "CPV",
+  2: "CPM",
   4: "CPA Target",
 };

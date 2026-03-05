@@ -5,20 +5,26 @@ import * as api from "../../api/partners-client.js";
 import {
   formatEntityList,
   clampPerPage,
-  formatNumber,
 } from "../../output-formatter.js";
-import type { CampaignFolder } from "../../types/advertiser.js";
 import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 
-function formatFolderRow(f: CampaignFolder, index: number): string {
-  const parts: string[] = [];
-  if (f.limitsEnabled) {
-    if (f.dailyBudget > 0) parts.push(`${formatNumber(f.dailyBudget)}/day`);
-    if (f.totalBudget > 0) parts.push(`${formatNumber(f.totalBudget)} total`);
-  }
-  const limits = parts.length > 0 ? ` | Budget: ${parts.join(" ")}` : "";
-  return `${index + 1}. [ID: ${f.id}] "${f.name}" — ${f.campaignsCount} campaigns${limits}`;
+interface FolderRow {
+  folder: {
+    id: number;
+    name: string;
+    state: { id: string; label: string };
+    campaignsCount: number;
+    activeCampaignsCount: number;
+  };
+  views: string;
+  clicks: string;
+  moneyOut: string;
+}
+
+function formatFolderRow(row: FolderRow, index: number): string {
+  const f = row.folder;
+  return `${index + 1}. [ID: ${f.id}] "${f.name}" (${f.state?.label ?? f.state?.id}) — ${f.campaignsCount} campaigns (${f.activeCampaignsCount} active)`;
 }
 
 export const campaignFoldersModule: ToolModule = {
@@ -45,7 +51,7 @@ export const campaignFoldersModule: ToolModule = {
           ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
         };
         const res = (await api.listCampaignFolders(params)) as ApiListResponse;
-        const items = (res.data ?? []) as CampaignFolder[];
+        const items = (res.rows ?? []) as FolderRow[];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,
@@ -66,8 +72,8 @@ export const campaignFoldersModule: ToolModule = {
         name: z.string().min(4),
       },
       async (args) => {
-        const folder = (await api.createCampaignFolder(args.name)) as CampaignFolder;
-        return `Folder created: [ID: ${folder.id}] "${folder.name}"`;
+        const result = (await api.createCampaignFolder(args.name)) as { id: number };
+        return `Folder created: [ID: ${result.id}] "${args.name}"`;
       },
     );
 
@@ -88,11 +94,11 @@ export const campaignFoldersModule: ToolModule = {
       async (args) => {
         const { id, ...rest } = args;
         const data: Record<string, unknown> = {};
-        if (rest.limitsEnabled != null) data.limitsEnabled = rest.limitsEnabled;
-        if (rest.totalBudget != null) data.totalBudget = rest.totalBudget;
-        if (rest.dailyBudget != null) data.dailyBudget = rest.dailyBudget;
+        if (rest.totalBudget != null) data.groupTotalLimit = rest.totalBudget;
+        if (rest.dailyBudget != null) data.groupDailyLimit = rest.dailyBudget;
         if (rest.evenDistribution != null)
-          data.isEvenDistribution = rest.evenDistribution;
+          data.groupSpendingEvenly = rest.evenDistribution;
+        data.limitsEnabled = rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
 
         await api.updateCampaignFolder(id, data);
         return `Folder #${id} updated successfully.`;

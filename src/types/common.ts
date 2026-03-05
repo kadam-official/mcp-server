@@ -1,22 +1,30 @@
 export interface ApiListResponse {
-  data: unknown[];
-  meta?: {
-    current_page?: number;
-    last_page?: number;
-    per_page?: number;
-    total?: number;
-  };
-  pagination?: {
-    page?: number;
-    pages?: number;
-    perPage?: number;
-    total?: number;
-  };
+  rows: unknown[];
+  totalRows?: number;
+  page?: number;
+  perPage?: number;
+  total?: Record<string, unknown>;
+  columns?: unknown[];
+  isHasNextPage?: boolean;
+}
+
+export interface ReportConfigGroup {
+  id: string;
+  icon?: string;
+  sources?: number[];
+  filterType?: string;
+  filterSync?: boolean;
+}
+
+export interface ReportConfigMetric {
+  id: string;
+  unit?: string | null;
+  sources?: number[];
 }
 
 export interface ReportConfig {
-  groups: ReportDimension[];
-  metrics: ReportDimension[];
+  groups: Record<string, ReportConfigGroup[]>;
+  metrics: Record<string, ReportConfigMetric[]>;
 }
 
 export interface ReportDimension {
@@ -26,12 +34,10 @@ export interface ReportDimension {
 }
 
 export interface ReportDataResponse {
-  data: Record<string, unknown>[];
-  totals: Record<string, unknown>;
-  meta: {
-    page: number;
-    pages: number;
-    total: number;
-    perPage: number;
-  };
+  rows: Record<string, unknown>[];
+  totalRows: number;
+  total?: Record<string, unknown>;
+  page?: number;
+  perPage?: number;
+  columns?: unknown[];
 }

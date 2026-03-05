@@ -6,18 +6,30 @@ import {
   formatEntityList,
   clampPerPage,
 } from "../../output-formatter.js";
-import type { Creative } from "../../types/advertiser.js";
 import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 const STATUS_ACTION_MAP = {
   active: "activate",
-  paused: "paused",
+  paused: "pause",
   archived: "archive",
 } as const;
 
-function formatCreativeRow(c: Creative, index: number): string {
-  return `${index + 1}. [ID: ${c.id}] "${c.title ?? "(no title)"}" | Campaign #${c.campaignId} | Status: ${c.status} | Moderation: ${c.moderationStatus ?? "—"}`;
+interface CreativeRow {
+  ad?: { id: number; title?: string; text?: string; status?: { id: string; label: string } };
+  materialCampaign?: { id: number; name: string };
+  views: string;
+  clicks: string;
+}
+
+function formatCreativeRow(row: CreativeRow, index: number): string {
+  const ad = row.ad;
+  const campaign = row.materialCampaign;
+  const id = ad?.id ?? "?";
+  const title = ad?.title ?? "(no title)";
+  const status = ad?.status?.label ?? ad?.status?.id ?? "—";
+  const campaignInfo = campaign ? `Campaign: "${campaign.name}" (#${campaign.id})` : "";
+  return `${index + 1}. [ID: ${id}] "${title}" | ${campaignInfo} | Status: ${status} | Views: ${row.views} | Clicks: ${row.clicks}`;
 }
 
 export const creativesModule: ToolModule = {
@@ -48,7 +60,7 @@ export const creativesModule: ToolModule = {
           ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
         };
         const res = (await api.listCreatives(params)) as ApiListResponse;
-        const items = (res.data ?? []) as Creative[];
+        const items = (res.rows ?? []) as CreativeRow[];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,
@@ -168,7 +180,7 @@ export const creativesModule: ToolModule = {
           .split(",")
           .map((s) => parseInt(s.trim(), 10))
           .filter((n) => !Number.isNaN(n));
-        const action = STATUS_ACTION_MAP[args.status];
+        const action = STATUS_ACTION_MAP[args.status] as "activate" | "pause" | "archive";
         await api.setCreativeStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} creatives set to ${args.status}: ${idList}`;

@@ -62,7 +62,7 @@ export const sourcesModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
         const res = (await api.listSources(params)) as ApiListResponse;
-        const items = (res.data ?? []) as Source[];
+        const items = (res.rows ?? []) as Source[];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,

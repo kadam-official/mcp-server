@@ -71,7 +71,7 @@ export const adUnitsModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
         const res = (await api.listAdUnits(args.sourceId, params)) as ApiListResponse;
-        const items = (res.data ?? []) as AdUnit[];
+        const items = (res.rows ?? []) as AdUnit[];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,

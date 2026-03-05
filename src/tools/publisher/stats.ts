@@ -5,9 +5,17 @@ import * as api from "../../api/pub-client.js";
 import { formatTable, clampPerPage } from "../../output-formatter.js";
 import type { ReportDataResponse } from "../../types/common.js";
 import { cacheOnce } from "../../utils/cache-once.js";
-import { findDimensionId, mapToDimensionIds } from "../../utils/dimension-mapper.js";
+import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
 
 const getReportConfig = cacheOnce(() => api.getReportConfig());
+
+function extractCellValue(cell: unknown): string {
+  if (cell == null) return "";
+  if (typeof cell === "object" && cell !== null && "value" in cell) {
+    return String((cell as { value: unknown }).value ?? "");
+  }
+  return String(cell);
+}
 
 export const pubStatsModule: ToolModule = {
   product: "publisher",
@@ -16,13 +24,13 @@ export const pubStatsModule: ToolModule = {
       {
         name: "kadam_pub_get_stats",
         description:
-          "Fetches publisher statistics. Accepts human-readable names, server maps to API IDs internally.",
+          "Fetches publisher statistics. Use human-readable names like 'revenue,impressions,clicks' for metrics and 'day,site,country' for groupBy.",
         product: "publisher",
         annotations: { readOnlyHint: true },
       },
       {
         groupBy: z.string(),
-        metrics: z.string().optional().default("revenue,impressions,clicks,ecpm"),
+        metrics: z.string().optional().default("revenue,impressions,clicks"),
         period: z.enum(["7days", "30days", "today", "yesterday"]).optional().default("7days"),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
@@ -34,26 +42,20 @@ export const pubStatsModule: ToolModule = {
       },
       async (args) => {
         const config = await getReportConfig();
-        const groupById = findDimensionId(config.groups, args.groupBy);
-        if (!groupById) {
-          const available = (config.groups ?? [])
-            .map((g) => g.name ?? g.id)
-            .join(", ");
-          return `Unknown groupBy "${args.groupBy}". Available: ${available || "none"}`;
+        const groupIds = resolveGroupIds(args.groupBy, config);
+        if (groupIds.length === 0) {
+          return `Unknown groupBy "${args.groupBy}". Try: day, week, month, campaign, country, browser, os, device, site`;
         }
 
-        const metricIds = mapToDimensionIds(args.metrics, config.metrics);
+        const metricIds = resolveMetricIds(args.metrics, config);
         if (metricIds.length === 0) {
-          const available = (config.metrics ?? [])
-            .map((m) => m.name ?? m.id)
-            .join(", ");
-          return `No valid metrics. Available: ${available || "none"}`;
+          return "No valid metrics. Try: spend, clicks, views, impressions, ctr, cpc, cpm, conversions, roi, income";
         }
 
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
-          groupBy: groupById,
-          metrics: metricIds.join(","),
+          groups: groupIds,
+          metrics: metricIds,
           period: args.period,
           page: args.page,
           perPage,
@@ -65,40 +67,25 @@ export const pubStatsModule: ToolModule = {
         };
 
         const res = (await api.getReportData(params)) as ReportDataResponse;
-        const rows = res.data ?? [];
-        const totals = res.totals;
+        const rows = res.rows ?? [];
 
         if (rows.length === 0) {
           return "No data found for the given filters.";
         }
 
-        const firstRow = rows[0] as Record<string, unknown>;
-        const headers = Object.keys(firstRow) as string[];
-
-        const formatCell = (v: unknown): string => {
-          if (v == null) return "—";
-          if (typeof v === "number") {
-            if (Number.isInteger(v)) return v.toLocaleString("en-US");
-            return v.toFixed(2);
-          }
-          return String(v);
-        };
-
+        const allKeys = new Set<string>();
+        for (const row of rows) {
+          for (const k of Object.keys(row)) if (k !== "id") allKeys.add(k);
+        }
+        const headers = [...allKeys];
         const tableRows = rows.map((r) =>
-          headers.map((h) => formatCell((r as Record<string, unknown>)[h])),
+          headers.map((h) => extractCellValue(r[h])),
         );
 
-        const tableTotals = totals
-          ? headers.map((h) => formatCell((totals as Record<string, unknown>)[h]))
-          : undefined;
-
+        const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
         return formatTable(
-          {
-            headers,
-            rows: tableRows,
-            totals: tableTotals,
-          },
-          `Publisher Stats (${args.groupBy}, ${args.period})`,
+          { headers, rows: tableRows },
+          `Publisher Stats (${args.groupBy}, ${args.period}, page ${res.page ?? 1}/${totalPages})`,
         );
       },
     );

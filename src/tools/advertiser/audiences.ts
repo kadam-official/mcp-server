@@ -43,7 +43,7 @@ export const audiencesModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
         const res = (await api.listAudiences(params)) as ApiListResponse;
-        const items = (res.data ?? []) as Audience[];
+        const items = (res.rows ?? []) as Audience[];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,
