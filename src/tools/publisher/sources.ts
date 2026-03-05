@@ -59,7 +59,7 @@ export const sourcesModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = await ctx.pub!.listSources(params);
+        const res = await ctx.pub.listSources(params);
         const pagination = extractPagination(res);
         return formatEntityList(
           res.rows,
@@ -83,7 +83,7 @@ export const sourcesModule: ToolModule = {
         url: z.string().url().max(300),
       },
       async (args, ctx) => {
-        const source = await ctx.pub!.createSource({ name: args.name, url: args.url });
+        const source = await ctx.pub.createSource({ name: args.name, url: args.url });
         return `Site created: [ID: ${source.id}] "${source.name}" (${source.url}). Status: oninit. Next: verify domain ownership.`;
       },
     );
@@ -99,7 +99,7 @@ export const sourcesModule: ToolModule = {
         id: z.number(),
       },
       async (args, ctx) => {
-        const source = await ctx.pub!.getSource(args.id);
+        const source = await ctx.pub.getSource(args.id);
         return formatSingleEntity(`Source #${source.id}`, [
           ["ID", String(source.id)],
           ["Name", source.name],
@@ -127,7 +127,7 @@ export const sourcesModule: ToolModule = {
       },
       async (args, ctx) => {
         const { id, name } = args;
-        await ctx.pub!.updateSource(id, name != null ? { name } : {});
+        await ctx.pub.updateSource(id, name != null ? { name } : {});
         return `Site #${id} updated successfully.`;
       },
     );
@@ -146,7 +146,7 @@ export const sourcesModule: ToolModule = {
       },
       async (args, ctx) => {
         const action = STATUS_ACTION_MAP[args.status];
-        await ctx.pub!.setSourceStatus(args.id, action);
+        await ctx.pub.setSourceStatus(args.id, action);
         return `Site #${args.id} set to ${args.status}.`;
       },
     );

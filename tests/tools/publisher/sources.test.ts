@@ -89,4 +89,46 @@ describe("publisher sources tools", () => {
     expect(api.setSourceStatus).toHaveBeenCalledWith(5, "archive");
     expect(text).toContain("set to archived");
   });
+
+  it("get_source returns formatted source details", async () => {
+    const { client, mockApi } = await createToolClient(sourcesModule);
+    const api = mockApi as MockPubClient;
+    api.getSource.mockResolvedValue({
+      id: 42,
+      name: "My Site",
+      url: "https://example.com",
+      status: "accepted",
+      state: "accepted",
+      impressions: 5000,
+      clicks: 100,
+      revenue: 12.50,
+      placesCount: 3,
+    });
+
+    const result = await client.callTool({
+      name: "kadam_pub_get_source",
+      arguments: { id: 42 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.getSource).toHaveBeenCalledWith(42);
+    expect(text).toContain("42");
+    expect(text).toContain("My Site");
+    expect(text).toContain("accepted");
+  });
+
+  it("update_source calls updateSource with correct args", async () => {
+    const { client, mockApi } = await createToolClient(sourcesModule);
+    const api = mockApi as MockPubClient;
+    api.updateSource.mockResolvedValue(undefined as never);
+
+    const result = await client.callTool({
+      name: "kadam_pub_update_source",
+      arguments: { id: 10, name: "New Name" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateSource).toHaveBeenCalledWith(10, { name: "New Name" });
+    expect(text).toContain("updated");
+  });
 });

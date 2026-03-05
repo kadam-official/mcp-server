@@ -4,51 +4,13 @@ import type { ToolModule } from "../../types/tool-module.js";
 import {
   formatTable,
   formatEntityList,
+  extractCellValue,
   clampPerPage,
 } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
+import { resolvePeriodToDates } from "../../utils/date-helpers.js";
 
-function resolvePeriodToDates(
-  period: string,
-): { dateFrom: string; dateTo: string } {
-  const now = new Date();
-  const toDate = (d: Date) => d.toISOString().slice(0, 10);
-
-  switch (period) {
-    case "today":
-      return { dateFrom: toDate(now), dateTo: toDate(now) };
-    case "yesterday": {
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      const s = toDate(y);
-      return { dateFrom: s, dateTo: s };
-    }
-    case "7days":
-    case "week": {
-      const end = new Date(now);
-      const start = new Date(now);
-      start.setDate(start.getDate() - 6);
-      return { dateFrom: toDate(start), dateTo: toDate(end) };
-    }
-    case "month": {
-      const end = new Date(now);
-      const start = new Date(now);
-      start.setDate(start.getDate() - 29);
-      return { dateFrom: toDate(start), dateTo: toDate(end) };
-    }
-    default:
-      return resolvePeriodToDates("7days");
-  }
-}
-
-function extractCellValue(cell: unknown): string {
-  if (cell == null) return "";
-  if (typeof cell === "object" && cell !== null && "value" in cell) {
-    return String((cell as { value: unknown }).value ?? "");
-  }
-  return String(cell);
-}
 
 export const statsModule: ToolModule = {
   product: "advertiser",
@@ -95,7 +57,7 @@ export const statsModule: ToolModule = {
             : resolvePeriodToDates(args.period);
 
         if (args.reportType === "custom") {
-          const config = await ctx.adv!.getReportConfig();
+          const config = await ctx.adv.getReportConfig();
           const groupIds = resolveGroupIds(args.groupBy, config);
           const metricIds = resolveMetricIds(args.metrics, config);
 
@@ -121,7 +83,7 @@ export const statsModule: ToolModule = {
             ...(args.sortBy != null && { sortBy: args.sortBy }),
             ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
           };
-          const res = await ctx.adv!.getReportData(params);
+          const res = await ctx.adv.getReportData(params);
           const rows = res.rows ?? [];
           if (rows.length === 0) {
             return `No data for ${df} to ${dt}.`;
@@ -156,7 +118,7 @@ export const statsModule: ToolModule = {
               searchQuery: args.searchQuery,
             }),
           };
-          const res = await ctx.adv!.getSiteStats(params);
+          const res = await ctx.adv.getSiteStats(params);
           const pagination = extractPagination(res);
           const formatSiteRow = (
             s: Record<string, unknown>,
@@ -186,7 +148,7 @@ export const statsModule: ToolModule = {
               campaignIds: args.campaignIds,
             }),
           };
-          const res = await ctx.adv!.getPostbackStats(params);
+          const res = await ctx.adv.getPostbackStats(params);
           const pagination = extractPagination(res);
           const formatPostbackRow = (
             p: Record<string, unknown>,

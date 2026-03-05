@@ -93,7 +93,6 @@ function buildCreativeFormData(args: Record<string, unknown>): FormData {
   if (args.title != null) fd.set("title", String(args.title));
   if (args.text != null) fd.set("name", String(args.text));
   if (args.sizeId != null) fd.set("sizeId", String(args.sizeId));
-  if (args.isHtml5) fd.set("isHtml5", "1");
   if (args.startDate != null) fd.set("startDate", String(args.startDate));
   if (args.stopDate != null) fd.set("stopDate", String(args.stopDate));
 
@@ -127,7 +126,7 @@ export const creativesModule: ToolModule = {
           ...(args.status != null && { status: args.status }),
           ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
         };
-        const res = await ctx.adv!.listCreatives(params);
+        const res = await ctx.adv.listCreatives(params);
         const pagination = extractPagination(res);
         return formatEntityList(
           res.rows,
@@ -210,7 +209,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           fd.set("image", file.blob, file.filename);
         }
 
-        const c = await ctx.adv!.createCreative(args.campaignId, fd);
+        const c = await ctx.adv.createCreative(args.campaignId, fd);
         return `Creative created: [ID: ${c.id}] for campaign #${args.campaignId}. Status: pending moderation.`;
       },
     );
@@ -246,7 +245,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           data.bids = [{ bid: rest.bid, countries }];
         }
 
-        await ctx.adv!.updateCreative(campaignId, data);
+        await ctx.adv.updateCreative(campaignId, data);
         return `Creative #${creativeId} updated successfully.`;
       },
     );
@@ -266,7 +265,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await ctx.adv!.setCreativeStatus(parsedIds, action);
+        await ctx.adv.setCreativeStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} creatives set to ${args.status}: ${idList}`;
       },

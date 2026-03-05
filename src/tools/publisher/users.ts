@@ -15,7 +15,7 @@ export const usersModule: ToolModule = {
       },
       {},
       async (_args, ctx) => {
-        const user = await ctx.pub!.getUserInfo();
+        const user = await ctx.pub.getUserInfo();
         return formatSingleEntity("Publisher User", [
           ["Email", user.email],
           ["Name", user.name],

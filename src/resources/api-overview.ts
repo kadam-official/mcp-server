@@ -1,18 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-export function registerApiOverviewResource(server: McpServer): void {
-  server.resource("api-overview", "kadam://reference/api-overview", async () => ({
-    contents: [
-      {
-        uri: "kadam://reference/api-overview",
-        mimeType: "text/plain",
-        text: CONTENT,
-      },
-    ],
-  }));
-}
-
-const CONTENT = `
+export const API_OVERVIEW_CONTENT = `
 Kadam Ad Network Overview:
 
 Kadam is an advertising network connecting advertisers with publishers.

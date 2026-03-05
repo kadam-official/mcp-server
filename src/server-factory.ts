@@ -7,8 +7,10 @@ import { registerPrompts } from "./prompts/index.js";
 import { advToolModules } from "./tools/advertiser/index.js";
 import { pubToolModules } from "./tools/publisher/index.js";
 import type { ClientPool } from "./api/client-pool.js";
+import { createRequire } from "node:module";
 
-const SERVER_VERSION = "0.2.0";
+const require = createRequire(import.meta.url);
+const { version: SERVER_VERSION } = require("../package.json") as { version: string };
 
 const SERVER_INSTRUCTIONS = `\
 Kadam MCP Server — Ad network management for advertisers and publishers.

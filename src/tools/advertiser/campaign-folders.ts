@@ -36,7 +36,7 @@ export const campaignFoldersModule: ToolModule = {
           perPage,
           ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
         };
-        const res = await ctx.adv!.listCampaignFolders(params);
+        const res = await ctx.adv.listCampaignFolders(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
         return formatEntityList(
@@ -58,7 +58,7 @@ export const campaignFoldersModule: ToolModule = {
         name: z.string().min(4),
       },
       async (args, ctx) => {
-        const result = await ctx.adv!.createCampaignFolder(args.name);
+        const result = await ctx.adv.createCampaignFolder(args.name);
         return `Folder created: [ID: ${result.id}] "${args.name}"`;
       },
     );
@@ -86,7 +86,7 @@ export const campaignFoldersModule: ToolModule = {
           data.groupSpendingEvenly = rest.evenDistribution;
         data.limitsEnabled = rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
 
-        await ctx.adv!.updateCampaignFolder(id, data);
+        await ctx.adv.updateCampaignFolder(id, data);
         return `Folder #${id} updated successfully.`;
       },
     );

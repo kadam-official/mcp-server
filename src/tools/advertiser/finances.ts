@@ -42,7 +42,7 @@ export const financesModule: ToolModule = {
             activityType: args.activityType,
           }),
         };
-        const res = await ctx.adv!.listFinanceOperations(params);
+        const res = await ctx.adv.listFinanceOperations(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
         const dateRange =

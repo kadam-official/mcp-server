@@ -1,16 +1,8 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import { formatTable, clampPerPage } from "../../output-formatter.js";
+import { formatTable, extractCellValue, clampPerPage } from "../../output-formatter.js";
 import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
-
-function extractCellValue(cell: unknown): string {
-  if (cell == null) return "";
-  if (typeof cell === "object" && cell !== null && "value" in cell) {
-    return String((cell as { value: unknown }).value ?? "");
-  }
-  return String(cell);
-}
 
 export const pubStatsModule: ToolModule = {
   product: "publisher",
@@ -36,7 +28,7 @@ export const pubStatsModule: ToolModule = {
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
       async (args, ctx) => {
-        const config = await ctx.pub!.getReportConfig();
+        const config = await ctx.pub.getReportConfig();
         const groupIds = resolveGroupIds(args.groupBy, config);
         if (groupIds.length === 0) {
           return `Unknown groupBy "${args.groupBy}". Try: day, week, month, campaign, country, browser, os, device, site`;
@@ -61,7 +53,7 @@ export const pubStatsModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
 
-        const res = await ctx.pub!.getReportData(params);
+        const res = await ctx.pub.getReportData(params);
         const rows = res.rows ?? [];
 
         if (rows.length === 0) {

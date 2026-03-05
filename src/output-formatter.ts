@@ -127,6 +127,14 @@ function truncateOutput(text: string): string {
   );
 }
 
+export function extractCellValue(cell: unknown): string {
+  if (cell == null) return "";
+  if (typeof cell === "object" && cell !== null && "value" in cell) {
+    return String((cell as { value: unknown }).value ?? "");
+  }
+  return String(cell);
+}
+
 export function clampPerPage(perPage: number | undefined, defaultVal = 25, max = 100): number {
   if (perPage === undefined) return defaultVal;
   return Math.max(1, Math.min(perPage, max));

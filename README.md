@@ -30,7 +30,7 @@ Add to your MCP config (`.cursor/mcp.json` or `claude_desktop_config.json`):
 ```bash
 docker run -i --rm \
   -e KADAM_ADV_API_KEY=your-key \
-  registry.sdev.pw/kadam/api-mcp:latest
+  kadam/mcp-server:latest
 ```
 
 ### npm global

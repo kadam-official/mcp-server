@@ -4,8 +4,6 @@ export const ADV_STATUS_ACTION_MAP = {
   archived: "archive",
 } as const;
 
-export type AdvStatusAction = (typeof ADV_STATUS_ACTION_MAP)[keyof typeof ADV_STATUS_ACTION_MAP];
-
 export function parseCommaSeparatedIds(raw: string): number[] {
   return raw
     .split(",")

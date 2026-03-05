@@ -205,4 +205,95 @@ describe("ToolWrapper", () => {
     const textContent = result.content![0] as { text: string };
     expect(textContent.text).toContain("KADAM_PUB_API_KEY");
   });
+
+  it("handler that throws ZodError returns formatted validation message", async () => {
+    process.env.KADAM_ADV_API_KEY = "test-key";
+    const server = new McpServer({ name: "test", version: "0.0.1" });
+    const wrapper = new ToolWrapper(server, createPool());
+    wrapper.register(
+      { name: "fail_zod", description: "Fails with ZodError", product: "advertiser" },
+      { input: z.string() },
+      async () => {
+        z.object({ id: z.number() }).parse({ id: "not-a-number" });
+        return "unreachable";
+      },
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.1" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+
+    const result = await client.callTool({
+      name: "fail_zod",
+      arguments: { input: "x" },
+    });
+    expect(result.isError).toBe(true);
+    const textContent = result.content![0] as { text: string };
+    expect(textContent.text).toContain("API response validation failed");
+    expect(textContent.text).toContain("id");
+  });
+
+  it("handler that throws ApiError(401) returns invalid key message", async () => {
+    process.env.KADAM_ADV_API_KEY = "test-key";
+    const server = new McpServer({ name: "test", version: "0.0.1" });
+    const wrapper = new ToolWrapper(server, createPool());
+    wrapper.register(
+      { name: "fail_401", description: "Fails with 401", product: "advertiser" },
+      { input: z.string() },
+      async () => {
+        throw new ApiError("Unauthorized", 401);
+      },
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.1" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+
+    const result = await client.callTool({
+      name: "fail_401",
+      arguments: { input: "x" },
+    });
+    expect(result.isError).toBe(true);
+    const textContent = result.content![0] as { text: string };
+    expect(textContent.text).toBe("API key is invalid or expired. Check your API key configuration.");
+  });
+
+  it("handler that throws ApiError(500) returns generic API error", async () => {
+    process.env.KADAM_ADV_API_KEY = "test-key";
+    const server = new McpServer({ name: "test", version: "0.0.1" });
+    const wrapper = new ToolWrapper(server, createPool());
+    wrapper.register(
+      { name: "fail_500", description: "Fails with 500", product: "advertiser" },
+      { input: z.string() },
+      async () => {
+        throw new ApiError("Internal Server Error", 500);
+      },
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.1" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+
+    const result = await client.callTool({
+      name: "fail_500",
+      arguments: { input: "x" },
+    });
+    expect(result.isError).toBe(true);
+    const textContent = result.content![0] as { text: string };
+    expect(textContent.text).toBe("API error (500): Internal Server Error");
+  });
+
+  it("invalid input args are rejected by MCP SDK", async () => {
+    process.env.KADAM_ADV_API_KEY = "test-key";
+    const server = new McpServer({ name: "test", version: "0.0.1" });
+    const wrapper = new ToolWrapper(server, createPool());
+    wrapper.register(
+      { name: "strict_tool", description: "Strict input", product: "advertiser" },
+      { count: z.number().min(1) },
+      async (args) => `Count: ${args.count}`,
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.1" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+
+    const result = await client.callTool({ name: "strict_tool", arguments: { count: -1 } });
+    expect(result.isError).toBe(true);
+  });
 });

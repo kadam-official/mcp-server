@@ -89,3 +89,7 @@ export const creativeCreateResponseSchema = z.object({
 export const campaignCreateResponseSchema = z.object({
   id: z.number(),
 }).passthrough();
+
+export const folderCreateResponseSchema = z.object({
+  id: z.number(),
+}).passthrough();

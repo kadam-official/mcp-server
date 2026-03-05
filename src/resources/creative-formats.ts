@@ -1,18 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-export function registerCreativeFormatsResource(server: McpServer): void {
-  server.resource("creative-formats", "kadam://reference/creative-formats", async () => ({
-    contents: [
-      {
-        uri: "kadam://reference/creative-formats",
-        mimeType: "text/plain",
-        text: CONTENT,
-      },
-    ],
-  }));
-}
-
-const CONTENT = `
+export const CREATIVE_FORMATS_CONTENT = `
 Creative Format Requirements by Campaign Type:
 
 IMPORTANT: The API uses multipart/form-data with file uploads. Provide image URLs

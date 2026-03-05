@@ -1,7 +1,6 @@
 import { HttpClient } from "./http-client.js";
 import { PartnersClient } from "./partners-client.js";
 import { PubClient } from "./pub-client.js";
-import type { ApiContext } from "../context.js";
 
 export interface ClientPoolConfig {
   advBaseUrl: string;
@@ -16,7 +15,7 @@ export class ClientPool {
 
   constructor(private readonly config: ClientPoolConfig) {}
 
-  resolve(advKey?: string, pubKey?: string): ApiContext {
+  resolve(advKey?: string, pubKey?: string): { adv: PartnersClient | null; pub: PubClient | null } {
     return {
       adv: advKey ? this.getOrCreateAdv(advKey) : null,
       pub: pubKey ? this.getOrCreatePub(pubKey) : null,

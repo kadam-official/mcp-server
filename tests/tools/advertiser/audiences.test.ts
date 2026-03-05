@@ -126,4 +126,19 @@ describe("audiences tools", () => {
     expect(api.deleteAudience).toHaveBeenCalledWith(10);
     expect(text).toContain("deleted permanently");
   });
+
+  it("update_audience calls updateAudience with correct args", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateAudience.mockResolvedValue(undefined as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_audience",
+      arguments: { id: 5, name: "Updated Name", expireDays: 14 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateAudience).toHaveBeenCalledWith(5, expect.objectContaining({ name: "Updated Name", expireDays: 14 }));
+    expect(text).toContain("updated");
+  });
 });

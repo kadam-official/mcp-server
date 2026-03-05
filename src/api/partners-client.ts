@@ -9,6 +9,7 @@ import {
   financeRowSchema,
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
+  folderCreateResponseSchema,
 } from "./schemas/advertiser.js";
 import type {
   CampaignRow,
@@ -70,7 +71,7 @@ export class PartnersClient {
 
   async createCampaignFolder(name: string): Promise<{ id: number }> {
     const raw = await this.http.post("/campaigns/folders/create", { name });
-    return z.object({ id: z.number() }).passthrough().parse(raw);
+    return folderCreateResponseSchema.parse(raw);
   }
 
   async updateCampaignFolder(id: number, data: Record<string, unknown>): Promise<unknown> {

@@ -1,18 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-export function registerReportDimensionsResource(server: McpServer): void {
-  server.resource("report-dimensions", "kadam://reference/report-dimensions", async () => ({
-    contents: [
-      {
-        uri: "kadam://reference/report-dimensions",
-        mimeType: "text/plain",
-        text: CONTENT,
-      },
-    ],
-  }));
-}
-
-const CONTENT = `
+export const REPORT_DIMENSIONS_CONTENT = `
 Report Dimensions & Metrics for kadam_adv_get_stats / kadam_pub_get_stats:
 
 Advertiser Groupings (groupBy):
@@ -30,7 +16,6 @@ Publisher Groupings (groupBy):
   Time: day, hour, week, month
   Entities: site, ad_unit, format
   Geo: country, region
-  Traffic: device, os, browser
 
 Publisher Metrics:
   Basic: revenue, impressions, clicks, ecpm

@@ -18,6 +18,7 @@ function formatCampaignRow(row: CampaignRow, index: number): string {
 const CONNECTION_TYPE_MAP: Record<string, number> = {
   cellular: 1,
   wifi: 2,
+  unknown: 3, // "unknown" in schema maps to "all" (no filtering)
   all: 3,
 };
 
@@ -127,18 +128,19 @@ function applyDefaults(mapped: Record<string, unknown>): void {
 
 function applyTypeDefaults(mapped: Record<string, unknown>): void {
   const typeId = mapped.type as number;
+  const { push, inpage_push, native, banner, popunder } = CAMPAIGN_TYPE_MAP;
 
-  if ([30, 100].includes(typeId)) {
+  if ([push, inpage_push].includes(typeId)) {
     if (mapped.subAges === undefined) mapped.subAges = [1, 2, 3, 4];
     if (mapped.isNeedSecondPush === undefined) mapped.isNeedSecondPush = 0;
   }
 
-  if ([10, 20].includes(typeId)) {
+  if ([native, banner].includes(typeId)) {
     if (mapped.gender === undefined) mapped.gender = 3;
     if (mapped.age === undefined) mapped.age = null;
   }
 
-  if (typeId === 40) {
+  if (typeId === popunder) {
     if (mapped.isPauseAfterModerate === undefined) mapped.isPauseAfterModerate = 0;
   }
 }
@@ -241,7 +243,7 @@ export const campaignsModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = await ctx.adv!.listCampaigns(params);
+        const res = await ctx.adv.listCampaigns(params);
         const pagination = extractPagination(res);
         return formatEntityList(
           res.rows,
@@ -277,7 +279,7 @@ export const campaignsModule: ToolModule = {
           mappedArgs.categories = args.categories.split(",").map((s: string) => parseInt(s.trim(), 10));
         }
         const mappedData = mapCampaignFields(mappedArgs);
-        const result = await ctx.adv!.createCampaign(mappedData);
+        const result = await ctx.adv.createCampaign(mappedData);
         return `Campaign created: [ID: ${result.id}] "${args.name}" in folder #${args.folderId}`;
       },
     );
@@ -304,7 +306,7 @@ export const campaignsModule: ToolModule = {
       async (args, ctx) => {
         const { id, ...rest } = args;
         const mappedData = mapCampaignFields(rest as Record<string, unknown>);
-        await ctx.adv!.updateCampaign(id, mappedData);
+        await ctx.adv.updateCampaign(id, mappedData);
         return `Campaign #${id} updated successfully.`;
       },
     );
@@ -324,7 +326,7 @@ export const campaignsModule: ToolModule = {
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await ctx.adv!.setCampaignStatus(parsedIds, action);
+        await ctx.adv.setCampaignStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;
       },

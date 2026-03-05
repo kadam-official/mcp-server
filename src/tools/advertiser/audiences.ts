@@ -40,7 +40,7 @@ export const audiencesModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = await ctx.adv!.listAudiences(params);
+        const res = await ctx.adv.listAudiences(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
         return formatEntityList(
@@ -63,7 +63,7 @@ export const audiencesModule: ToolModule = {
         id: z.number(),
       },
       async (args, ctx) => {
-        const a = await ctx.adv!.getAudience(args.id);
+        const a = await ctx.adv.getAudience(args.id);
         return formatSingleEntity(`Audience #${a.id}`, [
           ["Name", a.name],
           ["Type", a.type],
@@ -111,7 +111,7 @@ export const audiencesModule: ToolModule = {
           ...(args.hasRejects != null && { hasRejects: args.hasRejects }),
           ...(args.linkedAudiencesIds != null && { linkedAudiencesIds: args.linkedAudiencesIds }),
         };
-        const a = await ctx.adv!.createAudience(data);
+        const a = await ctx.adv.createAudience(data);
         return `Audience created: [ID: ${a.id}] "${a.name}" (type: ${a.type})`;
       },
     );
@@ -148,7 +148,7 @@ export const audiencesModule: ToolModule = {
         if (rest.hasRejects != null) data.hasRejects = rest.hasRejects;
         if (rest.linkedAudiencesIds != null) data.linkedAudiencesIds = rest.linkedAudiencesIds;
 
-        await ctx.adv!.updateAudience(id, data);
+        await ctx.adv.updateAudience(id, data);
         return `Audience #${id} updated successfully.`;
       },
     );
@@ -166,7 +166,7 @@ export const audiencesModule: ToolModule = {
         confirm: z.literal(true),
       },
       async (args, ctx) => {
-        await ctx.adv!.deleteAudience(args.id);
+        await ctx.adv.deleteAudience(args.id);
         return `Audience #${args.id} deleted permanently.`;
       },
     );

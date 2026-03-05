@@ -5,11 +5,11 @@ import { createToolLogger } from "../logger.js";
 import { AuthError } from "../errors.js";
 import { ApiError } from "../api/http-client.js";
 import type { Product } from "../types/tool-module.js";
-import type { ApiContext } from "../context.js";
+import type { AdvContext, PubContext } from "../context.js";
 import type { ClientPool } from "../api/client-pool.js";
 import { getConfig } from "../config.js";
 
-export type ToolHandler<TArgs> = (args: TArgs, ctx: ApiContext) => Promise<string>;
+export type ToolHandler<TArgs, TCtx> = (args: TArgs, ctx: TCtx) => Promise<string>;
 
 export interface ToolDefinition {
   name: string;
@@ -18,30 +18,33 @@ export interface ToolDefinition {
   annotations?: ToolAnnotations;
 }
 
+type ContextForProduct<P extends Product> = P extends "advertiser" ? AdvContext : PubContext;
+
 export class ToolWrapper {
   constructor(
     private readonly server: McpServer,
     private readonly clientPool: ClientPool,
   ) {}
 
-  register<TShape extends z.ZodRawShape>(
-    definition: ToolDefinition,
+  register<TShape extends z.ZodRawShape, P extends Product>(
+    definition: ToolDefinition & { product: P },
     schema: TShape,
-    handler: ToolHandler<z.objectOutputType<TShape, z.ZodTypeAny>>,
+    handler: ToolHandler<z.objectOutputType<TShape, z.ZodTypeAny>, ContextForProduct<P>>,
   ): void {
     const log = createToolLogger(definition.name);
-    const validateAuth = () => this.validateAuth(definition.product);
-    const resolveCtx = () => this.resolveContext();
+    const { product } = definition;
+    const resolveCtx = () => this.resolveProductContext(product);
     const fmtErr = (e: unknown) => this.formatError(e);
+    const inputSchema = z.object(schema);
 
     const callback = async (args: Record<string, unknown>, _extra: unknown) => {
       const startTime = Date.now();
 
       try {
-        validateAuth();
+        const parsed = inputSchema.parse(args);
         const ctx = resolveCtx();
 
-        const result = await handler(args as z.objectOutputType<TShape, z.ZodTypeAny>, ctx);
+        const result = await (handler as ToolHandler<z.objectOutputType<TShape, z.ZodTypeAny>, AdvContext | PubContext>)(parsed, ctx);
 
         const elapsed = Date.now() - startTime;
         log.info({ elapsed, resultSize: result.length }, "Tool completed");
@@ -71,28 +74,28 @@ export class ToolWrapper {
     );
   }
 
-  private resolveContext(): ApiContext {
+  private resolveProductContext(product: Product): AdvContext | PubContext {
     const config = getConfig();
-    return this.clientPool.resolve(
-      config.KADAM_ADV_API_KEY,
-      config.KADAM_PUB_API_KEY,
-    );
-  }
 
-  private validateAuth(product: Product): void {
-    const config = getConfig();
-    if (product === "advertiser" && !config.KADAM_ADV_API_KEY) {
-      throw new AuthError(
-        "KADAM_ADV_API_KEY is not configured. " +
-          "Set it to your Kadam advertiser API key from partners.kadam.net -> Profile -> API.",
-      );
+    if (product === "advertiser") {
+      if (!config.KADAM_ADV_API_KEY) {
+        throw new AuthError(
+          "KADAM_ADV_API_KEY is not configured. " +
+            "Set it to your Kadam advertiser API key from partners.kadam.net -> Profile -> API.",
+        );
+      }
+      const resolved = this.clientPool.resolve(config.KADAM_ADV_API_KEY, undefined);
+      return { adv: resolved.adv! } satisfies AdvContext;
     }
-    if (product === "publisher" && !config.KADAM_PUB_API_KEY) {
+
+    if (!config.KADAM_PUB_API_KEY) {
       throw new AuthError(
         "KADAM_PUB_API_KEY is not configured. " +
           "Set it to your Kadam publisher API key from pub.kadam.net -> Profile -> API.",
       );
     }
+    const resolved = this.clientPool.resolve(undefined, config.KADAM_PUB_API_KEY);
+    return { pub: resolved.pub! } satisfies PubContext;
   }
 
   private formatError(error: unknown): string {

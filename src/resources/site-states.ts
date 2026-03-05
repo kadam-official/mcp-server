@@ -1,18 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-
-export function registerSiteStatesResource(server: McpServer): void {
-  server.resource("site-states", "kadam://reference/site-states", async () => ({
-    contents: [
-      {
-        uri: "kadam://reference/site-states",
-        mimeType: "text/plain",
-        text: CONTENT,
-      },
-    ],
-  }));
-}
-
-const CONTENT = `
+export const SITE_STATES_CONTENT = `
 Publisher Site Lifecycle States:
   oninit      -> Site created, awaiting verification setup
   onconfirm   -> Verification code placed, awaiting check

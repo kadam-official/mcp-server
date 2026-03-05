@@ -68,7 +68,7 @@ export const adUnitsModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = await ctx.pub!.listAdUnits(args.sourceId, params);
+        const res = await ctx.pub.listAdUnits(args.sourceId, params);
         const pagination = extractPagination(res);
         return formatEntityList(
           res.rows,
@@ -93,7 +93,7 @@ export const adUnitsModule: ToolModule = {
       },
       async (args, ctx) => {
         const action = AD_UNIT_STATUS_ACTION_MAP[args.status];
-        await ctx.pub!.setAdUnitStatus(args.id, action);
+        await ctx.pub.setAdUnitStatus(args.id, action);
         return `Ad unit #${args.id} set to ${args.status}.`;
       },
     );
