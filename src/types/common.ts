@@ -27,12 +27,6 @@ export interface ReportConfig {
   metrics: Record<string, ReportConfigMetric[]>;
 }
 
-export interface ReportDimension {
-  id: string;
-  name: string;
-  category: string;
-}
-
 export interface ReportDataResponse {
   rows: Record<string, unknown>[];
   totalRows: number;

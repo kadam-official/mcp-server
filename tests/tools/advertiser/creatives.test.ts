@@ -89,4 +89,30 @@ describe("creatives tools", () => {
     expect(api.setCreativeStatus).toHaveBeenCalledWith([5, 6], "pause");
     expect(text).toContain("2 creatives set to paused");
   });
+
+  it("update_creative calls api.updateCreative with mapped fields", async () => {
+    vi.mocked(api.updateCreative).mockResolvedValue({} as never);
+
+    const client = await createToolClient(creativesModule);
+    const result = await client.callTool({
+      name: "kadam_adv_update_creative",
+      arguments: {
+        campaignId: 10,
+        creativeId: 42,
+        url: "https://new-landing.com",
+        bid: 0.15,
+      },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateCreative).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({
+        adId: 42,
+        url: "https://new-landing.com",
+        bids: [{ bid: 0.15, countries: [] }],
+      }),
+    );
+    expect(text).toContain("Creative #42 updated successfully");
+  });
 });

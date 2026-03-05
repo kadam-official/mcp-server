@@ -21,7 +21,7 @@ Advertisers:
   - Create campaigns (push, native, banner, video, popunder, in-page push)
   - Upload creatives (ads) with images, text, and destination URLs
   - Target by country, device, OS, browser, language, audience segments
-  - Set budgets (daily/total), bids (CPC/CPM/CPV/CPA), and schedules
+  - Set budgets (daily/total), bids (CPC/CPM/CPA), and schedules
   - Monitor performance via custom reports and per-site statistics
   - Manage audience segments for retargeting
 

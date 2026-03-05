@@ -24,7 +24,7 @@ const CAMPAIGN_DETAILS: Record<string, { features: string; pricing: string; crea
   },
   video: {
     features: "impression tracker",
-    pricing: "CPV, CPC, CPM",
+    pricing: "CPC, CPM",
     creatives: "MP4 video file",
   },
   popunder: {

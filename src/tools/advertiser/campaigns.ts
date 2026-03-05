@@ -9,12 +9,7 @@ import {
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
-
-const STATUS_ACTION_MAP = {
-  active: "activate",
-  paused: "pause",
-  archived: "archive",
-} as const;
+import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
 
 interface CampaignRow {
   campaign: {
@@ -46,131 +41,186 @@ const CONNECTION_TYPE_MAP: Record<string, number> = {
   all: 3,
 };
 
-function mapCampaignFields(fields: Record<string, unknown>): Record<string, unknown> {
-  const mapped: Record<string, unknown> = {};
+// --- Campaign field mapping (split into focused functions) ---
 
-  for (const [key, value] of Object.entries(fields)) {
-    if (value == null) continue;
-    switch (key) {
-      case "type":
-        mapped.type = typeof value === "string" ? (CAMPAIGN_TYPE_MAP[value] ?? value) : value;
-        break;
-      case "pricingModel":
-        mapped.cpType = typeof value === "string" ? (PRICING_MODEL_MAP[value] ?? value) : value;
-        break;
-      case "dailyBudget":
-        mapped.dayMoneyLimit = value;
-        break;
-      case "totalBudget":
-        mapped.commonMoneyLimit = value;
-        break;
-      case "evenDistribution":
-        mapped.isEvenDistribution = value;
-        break;
-      case "bid": {
-        const bidVal = value as number;
-        const cpType = mapped.cpType ?? fields.pricingModel;
-        if (cpType === 4 || cpType === "cpa_target") {
-          mapped.bids = [{ leadCost: bidVal, countries: [] }];
-        } else {
-          mapped.bids = [{ bid: bidVal, leadCost: 0, countries: [] }];
-        }
-        break;
+function mapField(
+  key: string,
+  value: unknown,
+  mapped: Record<string, unknown>,
+  fields: Record<string, unknown>,
+): void {
+  switch (key) {
+    case "type":
+      mapped.type = typeof value === "string" ? (CAMPAIGN_TYPE_MAP[value] ?? value) : value;
+      break;
+    case "pricingModel":
+      mapped.cpType = typeof value === "string" ? (PRICING_MODEL_MAP[value] ?? value) : value;
+      break;
+    case "dailyBudget":
+      mapped.dayMoneyLimit = value;
+      break;
+    case "totalBudget":
+      mapped.commonMoneyLimit = value;
+      break;
+    case "evenDistribution":
+      mapped.isEvenDistribution = value;
+      break;
+    case "bid": {
+      const bidVal = value as number;
+      const cpType = mapped.cpType ?? fields.pricingModel;
+      if (cpType === 4 || cpType === "cpa_target") {
+        mapped.bids = [{ leadCost: bidVal, countries: [] }];
+      } else {
+        mapped.bids = [{ bid: bidVal, leadCost: 0, countries: [] }];
       }
-      case "bidCountry":
-        break;
-      case "connectionType":
-        mapped.connectionType = typeof value === "string" ? (CONNECTION_TYPE_MAP[value] ?? 3) : value;
-        break;
-      case "devices":
-        if (typeof value === "string") mapped.devices = value.split(",").map(s => s.trim());
-        break;
-      case "os":
-        if (typeof value === "string") mapped.platforms = value.split(",").map(s => s.trim());
-        break;
-      case "browsers":
-        if (typeof value === "string") mapped.browsers = value.split(",").map(s => s.trim());
-        break;
-      case "countries":
-        if (typeof value === "string") mapped.countries = value.split(",").map(s => s.trim());
-        break;
-      case "audienceIncludeIds":
-      case "audienceExcludeIds":
-        break;
-      default:
-        mapped[key] = value;
+      break;
     }
+    case "connectionType":
+      mapped.connectionType = typeof value === "string" ? (CONNECTION_TYPE_MAP[value] ?? 3) : value;
+      break;
+    case "devices":
+      if (typeof value === "string") mapped.devices = value.split(",").map(s => s.trim());
+      break;
+    case "os":
+      if (typeof value === "string") mapped.platforms = value.split(",").map(s => s.trim());
+      break;
+    case "browsers":
+      if (typeof value === "string") mapped.browsers = value.split(",").map(s => s.trim());
+      break;
+    case "countries":
+      if (typeof value === "string") mapped.countries = value.split(",").map(s => s.trim());
+      break;
+    case "bidCountry":
+    case "audienceIncludeIds":
+    case "audienceExcludeIds":
+      break;
+    default:
+      mapped[key] = value;
   }
+}
 
-  const includeIds = fields.audienceIncludeIds;
-  const excludeIds = fields.audienceExcludeIds;
-  mapped.audiences = {
-    mode: 20,
-    include: typeof includeIds === "string" ? includeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
-    exclude: typeof excludeIds === "string" ? excludeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
-  };
+const FULL_WEEK_SCHEDULE = {
+  mode: 1,
+  list: Array.from({ length: 7 }, (_, i) => ({
+    day: i + 1,
+    hours: Array.from({ length: 24 }, (_, h) => h),
+  })),
+};
 
-  const defaults: Record<string, unknown> = {
-    connectionType: 3,
-    categories: [1001],
-    browsers: [2, 4],
-    disableProxy: 1,
-    sites: { mode: 0, list: [] },
-    ips: { mode: 0, list: [] },
-    newAudiences: [],
-    cities: { mode: 0, list: [] },
-    isps: { mode: 0, list: [] },
-    materialViews: { count: 0, days: 0 },
-    campaignView: { count: 0, days: 0 },
-    postConversion: { audiences: [], windowLength: null, countFirstConversionOnly: false, countLastCampaignOnly: false },
-    commonMoneyLimit: 0,
-    isEvenDistribution: 0,
-    totalLossLimit: 0,
-    minBlockViews: 0,
-    maxBlockViews: 0,
-    dayClickLimit: 0,
-    dayConversionsLimit: 0,
-    isConversionFromPostback: 0,
-    allowMultiAds: 0,
-    time: {
-      mode: 1,
-      list: Array.from({ length: 7 }, (_, i) => ({
-        day: i + 1,
-        hours: Array.from({ length: 24 }, (_, h) => h),
-      })),
-    },
-    timezone: 0,
-    startDate: null,
-    stopDate: null,
-    autorules: [],
-    proxies: [],
-    conversion: null,
-    platformVersions: null,
-    devices: null,
-    languages: null,
-  };
-  for (const [k, v] of Object.entries(defaults)) {
+const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
+  connectionType: 3,
+  categories: [1001],
+  browsers: [2, 4],
+  disableProxy: 1,
+  sites: { mode: 0, list: [] },
+  ips: { mode: 0, list: [] },
+  newAudiences: [],
+  cities: { mode: 0, list: [] },
+  isps: { mode: 0, list: [] },
+  materialViews: { count: 0, days: 0 },
+  campaignView: { count: 0, days: 0 },
+  postConversion: { audiences: [], windowLength: null, countFirstConversionOnly: false, countLastCampaignOnly: false },
+  commonMoneyLimit: 0,
+  isEvenDistribution: 0,
+  totalLossLimit: 0,
+  minBlockViews: 0,
+  maxBlockViews: 0,
+  dayClickLimit: 0,
+  dayConversionsLimit: 0,
+  isConversionFromPostback: 0,
+  allowMultiAds: 0,
+  time: FULL_WEEK_SCHEDULE,
+  timezone: 0,
+  startDate: null,
+  stopDate: null,
+  autorules: [],
+  proxies: [],
+  conversion: null,
+  platformVersions: null,
+  devices: null,
+  languages: null,
+};
+
+function applyDefaults(mapped: Record<string, unknown>): void {
+  for (const [k, v] of Object.entries(CAMPAIGN_DEFAULTS)) {
     if (mapped[k] === undefined) mapped[k] = v;
   }
+}
 
+function applyTypeDefaults(mapped: Record<string, unknown>): void {
   const typeId = mapped.type as number;
-  // push types (30, 100): subAges, isNeedSecondPush
+
   if ([30, 100].includes(typeId)) {
     if (mapped.subAges === undefined) mapped.subAges = [1, 2, 3, 4];
     if (mapped.isNeedSecondPush === undefined) mapped.isNeedSecondPush = 0;
   }
-  // native (10), banner (20): gender, age, allowMultiAds
+
   if ([10, 20].includes(typeId)) {
     if (mapped.gender === undefined) mapped.gender = 3;
     if (mapped.age === undefined) mapped.age = null;
   }
-  // popunder (40): isPauseAfterModerate
+
   if (typeId === 40) {
     if (mapped.isPauseAfterModerate === undefined) mapped.isPauseAfterModerate = 0;
   }
+}
+
+function buildAudiences(fields: Record<string, unknown>): Record<string, unknown> {
+  const includeIds = fields.audienceIncludeIds;
+  const excludeIds = fields.audienceExcludeIds;
+  return {
+    mode: 20,
+    include: typeof includeIds === "string" ? includeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
+    exclude: typeof excludeIds === "string" ? excludeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
+  };
+}
+
+export function mapCampaignFields(fields: Record<string, unknown>): Record<string, unknown> {
+  const mapped: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value == null) continue;
+    mapField(key, value, mapped, fields);
+  }
+
+  mapped.audiences = buildAudiences(fields);
+  applyDefaults(mapped);
+  applyTypeDefaults(mapped);
 
   return mapped;
 }
+
+// --- Shared Zod fields for create/update campaign ---
+
+const campaignTargetingFields = {
+  countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
+  devices: z.string().optional().describe("Comma-separated device types (e.g. 'desktop,mobile,tablet')"),
+  os: z.string().optional().describe("Comma-separated OS filters (e.g. 'windows,android,ios')"),
+  browsers: z.string().optional().describe("Comma-separated browser filters"),
+  languages: z.string().optional().describe("Comma-separated language codes"),
+  connectionType: z.enum(["wifi", "cellular", "unknown"]).optional().describe("Network connection type filter"),
+  gender: z.enum(["male", "female", "unknown"]).optional().describe("Target gender"),
+  ageRanges: z.string().optional().describe("Target age ranges (e.g. '18-24,25-34')"),
+  audienceIncludeIds: z.string().optional().describe("Comma-separated audience IDs to include"),
+  audienceExcludeIds: z.string().optional().describe("Comma-separated audience IDs to exclude"),
+  siteWhitelist: z.string().optional().describe("Comma-separated site IDs for whitelist"),
+  siteBlacklist: z.string().optional().describe("Comma-separated site IDs for blacklist"),
+};
+
+const campaignBudgetFields = {
+  totalBudget: z.number().optional().describe("Total campaign budget in USD"),
+  evenDistribution: z.boolean().optional().describe("Spread budget evenly across the day"),
+  startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+  endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
+  timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
+  schedule: z.string().optional().describe("Hour schedule bitmask for targeting specific hours"),
+  frequencyCapViews: z.number().optional().describe("Max ad views per user in the cap period"),
+  frequencyCapHours: z.number().optional().describe("Frequency cap period in hours"),
+  impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
+  categories: z.string().optional().describe("Comma-separated category IDs (default: 1001=General)"),
+  secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
+  pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
+};
 
 export const campaignsModule: ToolModule = {
   product: "advertiser",
@@ -239,34 +289,12 @@ export const campaignsModule: ToolModule = {
         name: z.string().min(1).describe("Campaign name shown in dashboard"),
         url: z.string().url().describe("Landing page URL"),
         folderId: z.number().describe("Campaign folder ID"),
-        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).describe("Pricing model: cpc, cpm, or cpa_target. Note: popunder only supports cpc/cpa_target; banner/native/push support cpc/cpm; push also supports cpa_target"),
+        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).describe("Pricing model: cpc, cpm, or cpa_target"),
         bid: z.number().positive().describe("Bid amount in USD (e.g. 0.05). For cpa_target this is the target CPA cost"),
         bidCountry: z.string().optional().default("ALL").describe("Country for bid, 'ALL' for global"),
         dailyBudget: z.number().positive().describe("Daily spending limit in USD"),
-        countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
-        devices: z.string().optional().describe("Comma-separated device types (e.g. 'desktop,mobile,tablet')"),
-        os: z.string().optional().describe("Comma-separated OS filters (e.g. 'windows,android,ios')"),
-        browsers: z.string().optional().describe("Comma-separated browser filters"),
-        languages: z.string().optional().describe("Comma-separated language codes"),
-        connectionType: z.enum(["wifi", "cellular", "unknown"]).optional().describe("Network connection type filter"),
-        gender: z.enum(["male", "female", "unknown"]).optional().describe("Target gender"),
-        ageRanges: z.string().optional().describe("Target age ranges (e.g. '18-24,25-34')"),
-        audienceIncludeIds: z.string().optional().describe("Comma-separated audience IDs to include"),
-        audienceExcludeIds: z.string().optional().describe("Comma-separated audience IDs to exclude"),
-        siteWhitelist: z.string().optional().describe("Comma-separated site IDs for whitelist"),
-        siteBlacklist: z.string().optional().describe("Comma-separated site IDs for blacklist"),
-        totalBudget: z.number().optional().describe("Total campaign budget in USD"),
-        evenDistribution: z.boolean().optional().describe("Spread budget evenly across the day"),
-        startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
-        endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
-        timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
-        schedule: z.string().optional().describe("Hour schedule bitmask for targeting specific hours"),
-        frequencyCapViews: z.number().optional().describe("Max ad views per user in the cap period"),
-        frequencyCapHours: z.number().optional().describe("Frequency cap period in hours"),
-        impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
-        categories: z.string().optional().describe("Comma-separated category IDs (default: 1001=General)"),
-        secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
-        pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
+        ...campaignTargetingFields,
+        ...campaignBudgetFields,
       },
       async (args) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
@@ -295,29 +323,8 @@ export const campaignsModule: ToolModule = {
         bid: z.number().positive().optional().describe("Bid amount in USD (e.g. 0.05)"),
         bidCountry: z.string().optional().describe("Country for bid, 'ALL' for global"),
         dailyBudget: z.number().positive().optional().describe("Daily spending limit in USD"),
-        countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
-        devices: z.string().optional().describe("Comma-separated device types (e.g. 'desktop,mobile,tablet')"),
-        os: z.string().optional().describe("Comma-separated OS filters (e.g. 'windows,android,ios')"),
-        browsers: z.string().optional().describe("Comma-separated browser filters"),
-        languages: z.string().optional().describe("Comma-separated language codes"),
-        connectionType: z.enum(["wifi", "cellular", "unknown"]).optional().describe("Network connection type filter"),
-        gender: z.enum(["male", "female", "unknown"]).optional().describe("Target gender"),
-        ageRanges: z.string().optional().describe("Target age ranges (e.g. '18-24,25-34')"),
-        audienceIncludeIds: z.string().optional().describe("Comma-separated audience IDs to include"),
-        audienceExcludeIds: z.string().optional().describe("Comma-separated audience IDs to exclude"),
-        siteWhitelist: z.string().optional().describe("Comma-separated site IDs for whitelist"),
-        siteBlacklist: z.string().optional().describe("Comma-separated site IDs for blacklist"),
-        totalBudget: z.number().optional().describe("Total campaign budget in USD"),
-        evenDistribution: z.boolean().optional().describe("Spread budget evenly across the day"),
-        startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
-        endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
-        timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
-        schedule: z.string().optional().describe("Hour schedule bitmask for targeting specific hours"),
-        frequencyCapViews: z.number().optional().describe("Max ad views per user in the cap period"),
-        frequencyCapHours: z.number().optional().describe("Frequency cap period in hours"),
-        impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
-        secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
-        pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
+        ...campaignTargetingFields,
+        ...campaignBudgetFields,
       },
       async (args) => {
         const { id, ...rest } = args;
@@ -340,11 +347,8 @@ export const campaignsModule: ToolModule = {
         status: z.enum(["active", "paused", "archived"]),
       },
       async (args) => {
-        const parsedIds = args.ids
-          .split(",")
-          .map((s) => parseInt(s.trim(), 10))
-          .filter((n) => !Number.isNaN(n));
-        const action = STATUS_ACTION_MAP[args.status] as "activate" | "pause" | "archive";
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        const action = ADV_STATUS_ACTION_MAP[args.status];
         await api.setCampaignStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;

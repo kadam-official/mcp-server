@@ -5,7 +5,6 @@ import {
   formatPaginatedList,
   formatNumber,
   formatCurrency,
-  formatPercent,
   clampPerPage,
 } from "../src/output-formatter.js";
 
@@ -148,12 +147,6 @@ describe("output-formatter", () => {
   describe("formatCurrency", () => {
     it("formats 45.2 as '$45.20'", () => {
       expect(formatCurrency(45.2)).toBe("$45.20");
-    });
-  });
-
-  describe("formatPercent", () => {
-    it("formats 2.2 as '2.2%'", () => {
-      expect(formatPercent(2.2)).toBe("2.2%");
     });
   });
 

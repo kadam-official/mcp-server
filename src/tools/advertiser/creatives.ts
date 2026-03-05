@@ -10,12 +10,7 @@ import {
 } from "../../output-formatter.js";
 import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
-
-const STATUS_ACTION_MAP = {
-  active: "activate",
-  paused: "pause",
-  archived: "archive",
-} as const;
+import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
 
 interface CreativeRow {
   ad?: { id: number; title?: string; text?: string; status?: { id: string; label: string } };
@@ -75,7 +70,7 @@ async function loadFile(source: string): Promise<LoadedFile> {
   return { blob, filename, width, height };
 }
 
-function parseImageDimensions(data: Uint8Array): { width: number; height: number } {
+export function parseImageDimensions(data: Uint8Array): { width: number; height: number } {
   if (data[0] === 0x89 && data[1] === 0x50) {
     // PNG: IHDR chunk at offset 16
     const view = new DataView(data.buffer, data.byteOffset);
@@ -280,11 +275,8 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         status: z.enum(["active", "paused", "archived"]),
       },
       async (args) => {
-        const parsedIds = args.ids
-          .split(",")
-          .map((s) => parseInt(s.trim(), 10))
-          .filter((n) => !Number.isNaN(n));
-        const action = STATUS_ACTION_MAP[args.status] as "activate" | "pause" | "archive";
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        const action = ADV_STATUS_ACTION_MAP[args.status];
         await api.setCreativeStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} creatives set to ${args.status}: ${idList}`;

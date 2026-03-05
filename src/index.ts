@@ -47,21 +47,25 @@ async function main() {
   registerResources(server);
   registerPrompts(server);
 
-  const advRegistered = hasAdvKey();
-  const pubRegistered = hasPubKey();
+  const advEnabled = hasAdvKey();
+  const pubEnabled = hasPubKey();
 
-  for (const mod of advToolModules) {
-    mod.register(wrapper);
+  if (advEnabled) {
+    for (const mod of advToolModules) {
+      mod.register(wrapper);
+    }
   }
 
-  for (const mod of pubToolModules) {
-    mod.register(wrapper);
+  if (pubEnabled) {
+    for (const mod of pubToolModules) {
+      mod.register(wrapper);
+    }
   }
 
   logger.info(
     {
-      advertiserTools: advRegistered ? "enabled" : "keys listed but not configured",
-      publisherTools: pubRegistered ? "enabled" : "keys listed but not configured",
+      advertiserTools: advEnabled ? "enabled" : "no KADAM_ADV_API_KEY",
+      publisherTools: pubEnabled ? "enabled" : "no KADAM_PUB_API_KEY",
     },
     "Kadam MCP Server starting",
   );

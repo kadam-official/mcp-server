@@ -35,10 +35,6 @@ function getClient(): HttpClient {
   return _client;
 }
 
-export function resetClient(): void {
-  _client = null;
-}
-
 export async function listCampaigns(params: Record<string, unknown>): Promise<ApiListResponse> {
   return getClient().post<ApiListResponse>("/campaigns", params);
 }
@@ -140,12 +136,6 @@ export async function getReportData(
   params: ReportDataParams,
 ): Promise<ReportDataResponse> {
   return getClient().post<ReportDataResponse>("/custom-reports/data", params);
-}
-
-export async function getReportFilters(
-  params: Record<string, unknown>,
-): Promise<unknown> {
-  return getClient().post("/custom-reports/filter-data", params);
 }
 
 export async function getSiteStats(params: Record<string, unknown>): Promise<ApiListResponse> {

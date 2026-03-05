@@ -30,10 +30,6 @@ function getClient(): HttpClient {
   return _client;
 }
 
-export function resetClient(): void {
-  _client = null;
-}
-
 export async function listSources(params: Record<string, unknown>): Promise<ApiListResponse> {
   return getClient().post<ApiListResponse>("/sources/sources-table", params);
 }

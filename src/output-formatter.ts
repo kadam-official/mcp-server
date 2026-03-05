@@ -113,10 +113,6 @@ export function formatCurrency(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-export function formatPercent(n: number): string {
-  return `${n.toFixed(1)}%`;
-}
-
 function truncateOutput(text: string): string {
   const bytes = new TextEncoder().encode(text);
   if (bytes.length <= MAX_OUTPUT_BYTES) return text;
