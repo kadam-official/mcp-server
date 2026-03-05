@@ -8,6 +8,7 @@ import {
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
+import { resolveCountryIds } from "../../utils/geo-mapping.js";
 import type { CampaignRow } from "../../api/schemas/advertiser.js";
 
 function formatCampaignRow(row: CampaignRow, index: number): string {
@@ -47,10 +48,14 @@ function mapField(
     case "bid": {
       const bidVal = value as number;
       const cpType = mapped.cpType ?? fields.pricingModel;
+      const countriesArg = fields.countries;
+      const geoIds = typeof countriesArg === "string" && countriesArg
+        ? resolveCountryIds(countriesArg)
+        : [];
       if (cpType === 4 || cpType === "cpa_target") {
-        mapped.bids = [{ leadCost: bidVal, countries: [] }];
+        mapped.bids = [{ leadCost: bidVal, countries: geoIds }];
       } else {
-        mapped.bids = [{ bid: bidVal, leadCost: 0, countries: [] }];
+        mapped.bids = [{ bid: bidVal, leadCost: 0, countries: geoIds }];
       }
       break;
     }
@@ -67,9 +72,6 @@ function mapField(
       if (typeof value === "string") mapped.browsers = value.split(",").map(s => s.trim());
       break;
     case "countries":
-      if (typeof value === "string") mapped.countries = value.split(",").map(s => s.trim());
-      break;
-    case "bidCountry":
     case "audienceIncludeIds":
     case "audienceExcludeIds":
       break;
@@ -268,10 +270,10 @@ export const campaignsModule: ToolModule = {
         folderId: z.number().describe("Campaign folder ID"),
         pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).describe("Pricing model: cpc, cpm, or cpa_target"),
         bid: z.number().positive().describe("Bid amount in USD (e.g. 0.05). For cpa_target this is the target CPA cost"),
-        bidCountry: z.string().optional().default("ALL").describe("Country for bid, 'ALL' for global"),
         dailyBudget: z.number().positive().describe("Daily spending limit in USD"),
         ...campaignTargetingFields,
         ...campaignBudgetFields,
+        countries: z.string().describe("Comma-separated ISO country codes for bid targeting (e.g. 'US,DE,BR'). Required."),
       },
       async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
@@ -287,7 +289,10 @@ export const campaignsModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_update_campaign",
-        description: "Update an existing campaign. WARNING: the Kadam API requires ALL campaign fields for updates (no partial update). This tool may fail if only some fields are provided. Use set_campaign_status for status changes instead.",
+        description:
+          "Update an existing campaign. IMPORTANT: Kadam API has NO partial update — it requires ALL fields. " +
+          "Missing fields will cause validation errors. This tool is only useful when you provide a COMPLETE campaign configuration. " +
+          "Alternatives: use set_campaign_status for status changes; archive the old campaign and create_campaign for major edits.",
         product: "advertiser",
       },
       {
@@ -298,7 +303,6 @@ export const campaignsModule: ToolModule = {
         folderId: z.number().optional().describe("Campaign folder ID"),
         pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).optional().describe("Pricing model"),
         bid: z.number().positive().optional().describe("Bid amount in USD (e.g. 0.05)"),
-        bidCountry: z.string().optional().describe("Country for bid, 'ALL' for global"),
         dailyBudget: z.number().positive().optional().describe("Daily spending limit in USD"),
         ...campaignTargetingFields,
         ...campaignBudgetFields,

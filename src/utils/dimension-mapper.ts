@@ -2,10 +2,10 @@ import type { ReportConfig } from "../api/schemas/common.js";
 import type { ReportConfigGroup, ReportConfigMetric } from "../api/schemas/common.js";
 
 const METRIC_ALIASES: Record<string, string> = {
+  // Advertiser metrics
   spend: "finance_moneyOut",
   spending: "finance_moneyOut",
   cost: "finance_moneyOut",
-  money: "finance_moneyOut",
   clicks: "traffic_clicks",
   views: "traffic_views",
   impressions: "traffic_views",
@@ -21,6 +21,18 @@ const METRIC_ALIASES: Record<string, string> = {
   roi: "advertiser_ROI",
   income: "advertiser_income",
   trafficback: "traffic_trafficback",
+  // Publisher metrics
+  revenue: "finance_moneyIn",
+  money: "finance_moneyIn",
+  earnings: "finance_moneyIn",
+  "block_ctr": "webmaster_blockCTR",
+  "block_cpm": "webmaster_blockCPM",
+  "pub_cpm": "webmaster_cpm",
+  "pub_cpc": "webmaster_cpc",
+  subscriptions: "traffic_subscriptions",
+  unsubscriptions: "traffic_unsubscriptions",
+  "block_views": "traffic_blockViews",
+  viewrate: "traffic_viewRate",
 };
 
 const GROUP_ALIASES: Record<string, string> = {
@@ -36,12 +48,23 @@ const GROUP_ALIASES: Record<string, string> = {
   os: "traffic_platform",
   platform: "traffic_platform",
   device: "traffic_device",
+  devicetype: "traffic_deviceType",
   format: "traffic_format",
+  "block_format": "traffic_blockFormat",
+  "block_size": "traffic_blockSize",
   site: "traffic_macros",
   isp: "traffic_isp",
   city: "traffic_city",
   connection: "traffic_connectionType",
   language: "traffic_browserLanguage",
+  // Publisher-specific groups
+  source: "webmaster_source",
+  block: "webmaster_block",
+  subid: "webmaster_subId",
+  domain: "traffic_domain",
+  pid: "traffic_pid",
+  "sub_age": "traffic_subsAge",
+  category: "traffic_pageCategory",
 };
 
 function flattenConfig(

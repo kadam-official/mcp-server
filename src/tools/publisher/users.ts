@@ -2,6 +2,12 @@ import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatSingleEntity, formatCurrency } from "../../output-formatter.js";
 
+const CURRENCY_SYMBOL: Record<string, string> = {
+  rub: "₽",
+  usd: "$",
+  eur: "€",
+};
+
 export const usersModule: ToolModule = {
   product: "publisher",
   register(wrapper: ToolWrapper) {
@@ -9,18 +15,20 @@ export const usersModule: ToolModule = {
       {
         name: "kadam_pub_get_user_info",
         description:
-          "Gets current publisher user info including balance, details, and notifications.",
+          "Gets current publisher account info: balance, currency, and notification counts.",
         product: "publisher",
         annotations: { readOnlyHint: true },
       },
       {},
       async (_args, ctx) => {
         const user = await ctx.pub.getUserInfo();
-        return formatSingleEntity("Publisher User", [
-          ["Email", user.email],
-          ["Name", user.name],
-          ["Balance", user.balance != null ? formatCurrency(user.balance) : undefined],
-          ["Notifications", user.notificationsCount != null ? String(user.notificationsCount) : undefined],
+        const sym = CURRENCY_SYMBOL[user.currency ?? "usd"] ?? user.currency;
+        const notif = user.notifications;
+        return formatSingleEntity("Publisher Account", [
+          ["Balance", `${sym}${user.balance}`],
+          ["Currency", user.currency],
+          ["Unread Notifications", notif ? String(notif.unreadItems) : "0"],
+          ["Total Notifications", notif ? String(notif.totalItems) : "0"],
         ]);
       },
     );

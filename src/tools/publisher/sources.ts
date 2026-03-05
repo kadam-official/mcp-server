@@ -5,11 +5,10 @@ import {
   formatEntityList,
   clampPerPage,
   formatNumber,
-  formatCurrency,
   formatSingleEntity,
 } from "../../output-formatter.js";
-import type { Source } from "../../api/schemas/publisher.js";
-import { extractPagination } from "../../utils/pagination.js";
+import type { SourceRow } from "../../api/schemas/publisher.js";
+import type { SourceDetail } from "../../api/schemas/publisher.js";
 
 const STATUS_ACTION_MAP = {
   active: "activate",
@@ -18,10 +17,31 @@ const STATUS_ACTION_MAP = {
   unarchived: "un-archive",
 } as const;
 
-function formatSourceRow(s: Source, index: number): string {
-  const impressions = s.impressions ?? 0;
-  const revenue = s.revenue ?? 0;
-  return `${index + 1}. [ID: ${s.id}] "${s.name}" (${s.status}) URL: ${s.url} | Impressions: ${formatNumber(impressions)} | Revenue: ${formatCurrency(revenue)}`;
+function formatSourceRow(s: SourceRow, index: number): string {
+  return `${index + 1}. [ID: ${s.id}] "${s.name}" (${s.stage}) domain: ${s.domain ?? "—"} | Views: ${formatNumber(s.views)} | Clicks: ${formatNumber(s.clicks)} | Income: ${s.income}`;
+}
+
+function formatSourceDetail(source: SourceDetail): string {
+  return formatSingleEntity(`Source #${source.id}`, [
+    ["ID", String(source.id)],
+    ["Name", source.name ?? "—"],
+    ["URL", source.url],
+    ["State", source.state],
+    ["Archive", source.archive ? "Yes" : "No"],
+    ["Direct Link", source.isDirectLink ? "Yes" : "No"],
+    [
+      "Created",
+      source.createTime
+        ? new Date(source.createTime * 1000).toISOString().slice(0, 10)
+        : undefined,
+    ],
+    [
+      "Script Tag",
+      source.scriptTag && source.scriptTag.length > 0
+        ? source.scriptTag
+        : undefined,
+    ],
+  ]);
 }
 
 export const sourcesModule: ToolModule = {
@@ -60,12 +80,12 @@ export const sourcesModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
         const res = await ctx.pub.listSources(params);
-        const pagination = extractPagination(res);
+        const totalPages = perPage > 0 ? Math.ceil(res.totalRows / perPage) : 1;
         return formatEntityList(
           res.rows,
           formatSourceRow,
           "Sources",
-          pagination,
+          { page: args.page, totalPages, totalRows: res.totalRows },
         );
       },
     );
@@ -74,7 +94,8 @@ export const sourcesModule: ToolModule = {
       {
         name: "kadam_pub_create_source",
         description:
-          "Creates a new publisher site. After creation, the publisher must verify domain ownership. Lifecycle: oninit -> onconfirm -> onstat -> onmoderate -> accepted/deny.",
+          "Creates a new publisher site. After creation, the publisher must verify domain ownership via the scriptTag meta tag. " +
+          "Lifecycle: onconfirm → onstat → onmoderate → accepted/deny.",
         product: "publisher",
         annotations: { readOnlyHint: false },
       },
@@ -83,15 +104,25 @@ export const sourcesModule: ToolModule = {
         url: z.string().url().max(300),
       },
       async (args, ctx) => {
-        const source = await ctx.pub.createSource({ name: args.name, url: args.url });
-        return `Site created: [ID: ${source.id}] "${source.name}" (${source.url}). Status: oninit. Next: verify domain ownership.`;
+        const source = await ctx.pub.createSource({
+          name: args.name,
+          url: args.url,
+        });
+        const parts = [
+          `Site created: [ID: ${source.id}] "${source.name ?? args.name}" (${source.url}).`,
+          `State: ${source.state}.`,
+        ];
+        if (source.scriptTag) {
+          parts.push(`Verification tag: ${source.scriptTag}`);
+        }
+        return parts.join(" ");
       },
     );
 
     wrapper.register(
       {
         name: "kadam_pub_get_source",
-        description: "Get a single publisher site by ID.",
+        description: "Get a single publisher site by ID with detail info.",
         product: "publisher",
         annotations: { readOnlyHint: true },
       },
@@ -100,35 +131,24 @@ export const sourcesModule: ToolModule = {
       },
       async (args, ctx) => {
         const source = await ctx.pub.getSource(args.id);
-        return formatSingleEntity(`Source #${source.id}`, [
-          ["ID", String(source.id)],
-          ["Name", source.name],
-          ["URL", source.url],
-          ["Status", source.status],
-          ["State", source.state],
-          ["Impressions", String(source.impressions ?? 0)],
-          ["Clicks", String(source.clicks ?? 0)],
-          ["Revenue", source.revenue != null ? formatCurrency(source.revenue) : undefined],
-          ["Places Count", source.placesCount != null ? String(source.placesCount) : undefined],
-        ]);
+        return formatSourceDetail(source);
       },
     );
 
     wrapper.register(
       {
         name: "kadam_pub_update_source",
-        description: "Update an existing publisher site. Pass id and optional name.",
+        description: "Update an existing publisher site name.",
         product: "publisher",
         annotations: { readOnlyHint: false },
       },
       {
         id: z.number(),
-        name: z.string().optional(),
+        name: z.string().min(1).max(100),
       },
       async (args, ctx) => {
-        const { id, name } = args;
-        await ctx.pub.updateSource(id, name != null ? { name } : {});
-        return `Site #${id} updated successfully.`;
+        const updated = await ctx.pub.updateSource(args.id, { name: args.name });
+        return formatSourceDetail(updated);
       },
     );
 

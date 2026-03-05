@@ -69,6 +69,7 @@ describe("campaigns tools", () => {
         pricingModel: "cpc",
         bid: 0.5,
         dailyBudget: 100,
+        countries: "US",
       },
     });
 
@@ -76,6 +77,7 @@ describe("campaigns tools", () => {
       expect.objectContaining({
         type: 30,
         cpType: 0,
+        bids: [{ bid: 0.5, leadCost: 0, countries: [34] }],
       }),
     );
   });

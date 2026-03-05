@@ -24,18 +24,16 @@ describe("publisher sources tools", () => {
         {
           id: 1,
           name: "My Site",
-          url: "https://mysite.com",
-          status: "active",
-          state: "accepted",
-          impressions: 1000,
+          domain: "mysite.com",
+          stage: "accepted",
+          archive: 0,
+          views: 1000,
           clicks: 50,
-          revenue: 25,
-          placesCount: 3,
+          income: "₽25",
+          blockCounts: { native: "1", push: "2" },
         },
       ],
       totalRows: 1,
-      page: 1,
-      perPage: 25,
     });
 
     const result = await client.callTool({
@@ -56,23 +54,23 @@ describe("publisher sources tools", () => {
       id: 10,
       name: "New Site",
       url: "https://newsite.com",
-      status: "oninit",
-      state: "oninit",
-      impressions: 0,
-      clicks: 0,
-      revenue: 0,
-      placesCount: 0,
+      state: "onconfirm",
+      archive: 0,
+      scriptTag: '<meta name="kadam-verification" content="abc123" />',
     });
 
-    await client.callTool({
+    const result = await client.callTool({
       name: "kadam_pub_create_source",
       arguments: { name: "New Site", url: "https://newsite.com" },
     });
+    const text = getTextFromResult(result);
 
     expect(api.createSource).toHaveBeenCalledWith({
       name: "New Site",
       url: "https://newsite.com",
     });
+    expect(text).toContain("created");
+    expect(text).toContain("onconfirm");
   });
 
   it("set_source_status with status archived calls api with action archive", async () => {
@@ -97,12 +95,10 @@ describe("publisher sources tools", () => {
       id: 42,
       name: "My Site",
       url: "https://example.com",
-      status: "accepted",
       state: "accepted",
-      impressions: 5000,
-      clicks: 100,
-      revenue: 12.50,
-      placesCount: 3,
+      archive: 0,
+      isDirectLink: false,
+      createTime: 1581426528,
     });
 
     const result = await client.callTool({
@@ -117,10 +113,16 @@ describe("publisher sources tools", () => {
     expect(text).toContain("accepted");
   });
 
-  it("update_source calls updateSource with correct args", async () => {
+  it("update_source calls updateSource and returns detail", async () => {
     const { client, mockApi } = await createToolClient(sourcesModule);
     const api = mockApi as MockPubClient;
-    api.updateSource.mockResolvedValue(undefined as never);
+    api.updateSource.mockResolvedValue({
+      id: 10,
+      name: "New Name",
+      url: "https://example.com",
+      state: "accepted",
+      archive: 0,
+    });
 
     const result = await client.callTool({
       name: "kadam_pub_update_source",
@@ -129,6 +131,7 @@ describe("publisher sources tools", () => {
     const text = getTextFromResult(result);
 
     expect(api.updateSource).toHaveBeenCalledWith(10, { name: "New Name" });
-    expect(text).toContain("updated");
+    expect(text).toContain("New Name");
+    expect(text).toContain("10");
   });
 });

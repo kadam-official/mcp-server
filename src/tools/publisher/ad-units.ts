@@ -5,11 +5,8 @@ import {
   formatEntityList,
   clampPerPage,
   formatNumber,
-  formatCurrency,
 } from "../../output-formatter.js";
-import { AD_UNIT_TYPE_MAP, AD_UNIT_TYPE_NAME } from "../../types/publisher.js";
-import type { AdUnit } from "../../api/schemas/publisher.js";
-import { extractPagination } from "../../utils/pagination.js";
+import type { AdUnitRow } from "../../api/schemas/publisher.js";
 
 const AD_UNIT_STATUS_ACTION_MAP = {
   active: "activate",
@@ -18,12 +15,14 @@ const AD_UNIT_STATUS_ACTION_MAP = {
   restored: "restore",
 } as const;
 
-function formatAdUnitRow(u: AdUnit, index: number): string {
-  const typeName = AD_UNIT_TYPE_NAME[u.type] ?? `Type ${u.type}`;
-  const impressions = u.impressions ?? 0;
-  const clicks = u.clicks ?? 0;
-  const revenue = u.revenue ?? 0;
-  return `${index + 1}. [ID: ${u.id}] "${u.name}" (${typeName}, ${u.status}) | Impressions: ${formatNumber(impressions)} | Clicks: ${formatNumber(clicks)} | Revenue: ${formatCurrency(revenue)}`;
+const STATE_LABEL: Record<number, string> = {
+  0: "inactive",
+  1: "active",
+};
+
+function formatAdUnitRow(u: AdUnitRow, index: number): string {
+  const stateLabel = STATE_LABEL[u.state] ?? `state:${u.state}`;
+  return `${index + 1}. [ID: ${u.id}] "${u.name}" (${u.type}, ${stateLabel}) | Views: ${formatNumber(u.views)} | Clicks: ${formatNumber(u.clicks)} | Income: ${u.income}`;
 }
 
 export const adUnitsModule: ToolModule = {
@@ -33,7 +32,7 @@ export const adUnitsModule: ToolModule = {
       {
         name: "kadam_pub_list_ad_units",
         description:
-          "Lists ad units for a site. Filter by format: native, banner, push, popunder, inpagepush.",
+          "Lists ad units for a site. Optionally filter by format: native, banner, push, popunder, inpagepush.",
         product: "publisher",
         annotations: { readOnlyHint: true },
       },
@@ -54,6 +53,13 @@ export const adUnitsModule: ToolModule = {
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
+        const AD_UNIT_TYPE_MAP: Record<string, number> = {
+          native: 0,
+          banner: 10,
+          push: 20,
+          popunder: 30,
+          inpagepush: 100,
+        };
         const params: Record<string, unknown> = {
           page: args.page,
           perPage,
@@ -69,12 +75,12 @@ export const adUnitsModule: ToolModule = {
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
         const res = await ctx.pub.listAdUnits(args.sourceId, params);
-        const pagination = extractPagination(res);
+        const totalPages = perPage > 0 ? Math.ceil(res.totalRows / perPage) : 1;
         return formatEntityList(
           res.rows,
           formatAdUnitRow,
           "Ad Units",
-          pagination,
+          { page: args.page, totalPages, totalRows: res.totalRows },
         );
       },
     );

@@ -16,15 +16,13 @@ afterEach(() => {
 });
 
 describe("publisher users tools", () => {
-  it("get_user_info returns formatted user details", async () => {
+  it("get_user_info returns formatted account details", async () => {
     const { client, mockApi } = await createToolClient(usersModule);
     const api = mockApi as MockPubClient;
     api.getUserInfo.mockResolvedValue({
-      id: 1,
-      email: "publisher@example.com",
       balance: 150.50,
-      name: "John Doe",
-      notificationsCount: 3,
+      currency: "usd",
+      notifications: { items: [], totalItems: 5, unreadItems: 2 },
     });
 
     const result = await client.callTool({
@@ -33,21 +31,18 @@ describe("publisher users tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(text).toContain("Publisher User");
-    expect(text).toContain("publisher@example.com");
-    expect(text).toContain("John Doe");
-    expect(text).toContain("150.50");
+    expect(text).toContain("Publisher Account");
+    expect(text).toContain("$150.5");
+    expect(text).toContain("2");
   });
 
-  it("handles user with null balance gracefully", async () => {
+  it("handles zero balance gracefully", async () => {
     const { client, mockApi } = await createToolClient(usersModule);
     const api = mockApi as MockPubClient;
     api.getUserInfo.mockResolvedValue({
-      id: 2,
-      email: "test@example.com",
-      balance: null as unknown as number,
-      name: "Test User",
-      notificationsCount: 0,
+      balance: 0,
+      currency: "rub",
+      notifications: { items: [], totalItems: 0, unreadItems: 0 },
     });
 
     const result = await client.callTool({
@@ -56,6 +51,7 @@ describe("publisher users tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(text).toContain("test@example.com");
+    expect(text).toContain("₽0");
+    expect(text).toContain("rub");
   });
 });

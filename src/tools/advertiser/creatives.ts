@@ -217,7 +217,9 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
     wrapper.register(
       {
         name: "kadam_adv_update_creative",
-        description: "Update an existing creative. Only non-image fields can be changed (url, bids, dates). Image changes require creating a new creative.",
+        description:
+          "Update an existing creative. IMPORTANT: Kadam API has NO partial update — all fields are required. " +
+          "Missing fields cause validation errors. For image changes, create a new creative instead.",
         product: "advertiser",
         annotations: { readOnlyHint: false },
       },

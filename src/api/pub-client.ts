@@ -1,12 +1,27 @@
 import type { HttpClient } from "./http-client.js";
-import { listResponseSchema, reportConfigSchema, reportDataResponseSchema } from "./schemas/common.js";
-import type { ListResponse, ReportConfig, ReportDataResponse } from "./schemas/common.js";
-import { sourceSchema, adUnitSchema, pubUserSchema } from "./schemas/publisher.js";
-import type { Source, AdUnit, PubUser } from "./schemas/publisher.js";
+import { reportConfigSchema, reportDataResponseSchema } from "./schemas/common.js";
+import type { ReportConfig, ReportDataResponse } from "./schemas/common.js";
+import {
+  sourceDetailSchema,
+  sourceTableRowSchema,
+  adUnitTableRowSchema,
+  pubUserSchema,
+  parseNumericString,
+} from "./schemas/publisher.js";
+import type { SourceDetail, SourceRow, AdUnitRow, PubUser } from "./schemas/publisher.js";
 import { z } from "zod";
 
-const sourceListSchema = listResponseSchema(sourceSchema);
-const adUnitListSchema = listResponseSchema(adUnitSchema);
+// Raw table response shape returned by DataTable endpoints
+const tableResponseSchema = z.object({
+  rows: z.array(z.unknown()).default([]),
+  totalRows: z.number().default(0),
+  columns: z.array(z.unknown()).optional(),
+});
+
+export interface TableListResponse<T> {
+  rows: T[];
+  totalRows: number;
+}
 
 export interface PubReportDataParams {
   groupBy?: string;
@@ -25,23 +40,47 @@ export interface PubReportDataParams {
 export class PubClient {
   constructor(private readonly http: HttpClient) {}
 
-  async listSources(params: Record<string, unknown>): Promise<ListResponse<Source>> {
+  async listSources(params: Record<string, unknown>): Promise<TableListResponse<SourceRow>> {
     const raw = await this.http.post("/sources/sources-table", params);
-    return sourceListSchema.parse(raw);
+    const table = tableResponseSchema.parse(raw);
+
+    const rows: SourceRow[] = [];
+    for (const rawRow of table.rows) {
+      const parsed = sourceTableRowSchema.safeParse(rawRow);
+      if (!parsed.success) continue;
+
+      const row = parsed.data;
+      if (row.source === "fullResult") continue;
+
+      rows.push({
+        id: row.source.id,
+        name: row.source.name,
+        domain: row.domain ?? null,
+        stage: row.source.stage,
+        archive: row.source.archive ?? 0,
+        views: parseNumericString(row.views),
+        clicks: parseNumericString(row.clicks),
+        income: row.income,
+        blockCounts: row.blockCounts ?? null,
+      });
+    }
+
+    return { rows, totalRows: table.totalRows };
   }
 
-  async createSource(data: { name: string; url: string }): Promise<Source> {
+  async createSource(data: { name: string; url: string }): Promise<SourceDetail> {
     const raw = await this.http.put("/sources", data);
-    return sourceSchema.parse(raw);
+    return sourceDetailSchema.parse(raw);
   }
 
-  async getSource(id: number): Promise<Source> {
+  async getSource(id: number): Promise<SourceDetail> {
     const raw = await this.http.get(`/sources/${id}`);
-    return sourceSchema.parse(raw);
+    return sourceDetailSchema.parse(raw);
   }
 
-  async updateSource(id: number, data: Record<string, unknown>): Promise<unknown> {
-    return this.http.put(`/sources/${id}`, data);
+  async updateSource(id: number, data: Record<string, unknown>): Promise<SourceDetail> {
+    const raw = await this.http.put(`/sources/${id}`, data);
+    return sourceDetailSchema.parse(raw);
   }
 
   async setSourceStatus(
@@ -57,9 +96,35 @@ export class PubClient {
     return this.http.post(`/sources/${id}/${action}`);
   }
 
-  async listAdUnits(sourceId: number, params: Record<string, unknown>): Promise<ListResponse<AdUnit>> {
+  async listAdUnits(
+    sourceId: number,
+    params: Record<string, unknown>,
+  ): Promise<TableListResponse<AdUnitRow>> {
     const raw = await this.http.post(`/places/places-table/${sourceId}`, params);
-    return adUnitListSchema.parse(raw);
+    const table = tableResponseSchema.parse(raw);
+
+    const rows: AdUnitRow[] = [];
+    for (const rawRow of table.rows) {
+      const parsed = adUnitTableRowSchema.safeParse(rawRow);
+      if (!parsed.success) continue;
+
+      const row = parsed.data;
+      if (row.block === "fullResult") continue;
+
+      rows.push({
+        id: row.block.id,
+        name: row.block.name,
+        type: row.type ?? "unknown",
+        state: row.block.state,
+        archive: row.block.archive ?? 0,
+        views: parseNumericString(row.views),
+        clicks: parseNumericString(row.clicks),
+        income: row.income,
+        queries: parseNumericString(row.queries),
+      });
+    }
+
+    return { rows, totalRows: table.totalRows };
   }
 
   async setAdUnitStatus(

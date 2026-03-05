@@ -26,9 +26,11 @@ describe("mapCampaignFields", () => {
     expect(result.bids).toEqual([{ leadCost: 2.0, countries: [] }]);
   });
 
-  it("splits comma-separated countries", () => {
-    const result = mapCampaignFields({ type: "push", countries: "US, DE, BR" });
-    expect(result.countries).toEqual(["US", "DE", "BR"]);
+  it("resolves country ISO codes to geoIDs in bids", () => {
+    const result = mapCampaignFields({ type: "push", bid: 0.01, countries: "US, DE, BR" });
+    const bids = result.bids as Array<{ countries: number[] }>;
+    expect(bids[0].countries).toEqual([34, 24, 40]);
+    expect(result.countries).toBeUndefined();
   });
 
   it("splits comma-separated devices", () => {

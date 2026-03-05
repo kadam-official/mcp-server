@@ -4,6 +4,39 @@ import type { ToolModule } from "../../types/tool-module.js";
 import { formatTable, extractCellValue, clampPerPage } from "../../output-formatter.js";
 import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
 
+function resolveDateRange(
+  period: string,
+  dateFrom?: string,
+  dateTo?: string,
+): { dateFrom: string; dateTo: string } {
+  if (dateFrom && dateTo) return { dateFrom, dateTo };
+
+  const now = new Date();
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const dt = dateTo ?? fmt(now);
+
+  const daysMap: Record<string, number> = {
+    "7days": 7,
+    "30days": 30,
+    today: 0,
+    yesterday: 1,
+  };
+
+  const days = daysMap[period] ?? 7;
+  if (period === "today") {
+    return { dateFrom: fmt(now), dateTo: fmt(now) };
+  }
+  if (period === "yesterday") {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    return { dateFrom: fmt(y), dateTo: fmt(y) };
+  }
+
+  const from = new Date(now);
+  from.setDate(from.getDate() - days);
+  return { dateFrom: dateFrom ?? fmt(from), dateTo: dt };
+}
+
 export const pubStatsModule: ToolModule = {
   product: "publisher",
   register(wrapper: ToolWrapper) {
@@ -11,16 +44,18 @@ export const pubStatsModule: ToolModule = {
       {
         name: "kadam_pub_get_stats",
         description:
-          "Fetches publisher statistics. Use human-readable names like 'revenue,impressions,clicks' for metrics and 'day,site,country' for groupBy.",
+          "Fetches publisher statistics. Use human-readable names like 'revenue,impressions,clicks' for metrics and 'day,site,country' for groupBy. " +
+          "Available metrics: revenue, clicks, views, impressions, pub_cpm, pub_cpc, block_ctr, block_cpm, subscriptions, unsubscriptions, block_views, viewrate. " +
+          "Available groups: day, hour, week, month, source, block, country, browser, os, device, devicetype, domain, subid, pid, category, sub_age, block_format, block_size.",
         product: "publisher",
         annotations: { readOnlyHint: true },
       },
       {
         groupBy: z.string(),
-        metrics: z.string().optional().default("revenue,impressions,clicks"),
+        metrics: z.string().optional().default("revenue,views,clicks"),
         period: z.enum(["7days", "30days", "today", "yesterday"]).optional().default("7days"),
-        dateFrom: z.string().optional(),
-        dateTo: z.string().optional(),
+        dateFrom: z.string().optional().describe("YYYY-MM-DD, overrides period"),
+        dateTo: z.string().optional().describe("YYYY-MM-DD, overrides period"),
         siteIds: z.string().optional(),
         page: z.number().optional().default(1),
         perPage: z.number().optional().default(25),
@@ -31,24 +66,28 @@ export const pubStatsModule: ToolModule = {
         const config = await ctx.pub.getReportConfig();
         const groupIds = resolveGroupIds(args.groupBy, config);
         if (groupIds.length === 0) {
-          return `Unknown groupBy "${args.groupBy}". Try: day, week, month, campaign, country, browser, os, device, site`;
+          return `Unknown groupBy "${args.groupBy}". Try: day, week, month, source, block, country, browser, os, device, domain, subid`;
         }
 
         const metricIds = resolveMetricIds(args.metrics, config);
         if (metricIds.length === 0) {
-          return "No valid metrics. Try: spend, clicks, views, impressions, ctr, cpc, cpm, conversions, roi, income";
+          return "No valid metrics. Try: revenue, clicks, views, impressions, pub_cpm, pub_cpc, block_ctr, subscriptions, viewrate";
         }
 
         const perPage = clampPerPage(args.perPage);
+        const { dateFrom, dateTo } = resolveDateRange(args.period, args.dateFrom, args.dateTo);
+
         const params: Record<string, unknown> = {
           groups: groupIds,
           metrics: metricIds,
-          period: args.period,
+          filters: {
+            dateFrom,
+            dateTo,
+            filters: [],
+            ...(args.siteIds != null && { siteIds: args.siteIds }),
+          },
           page: args.page,
           perPage,
-          ...(args.dateFrom != null && { dateFrom: args.dateFrom }),
-          ...(args.dateTo != null && { dateTo: args.dateTo }),
-          ...(args.siteIds != null && { siteIds: args.siteIds }),
           ...(args.sortBy != null && { sortBy: args.sortBy }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
@@ -57,7 +96,7 @@ export const pubStatsModule: ToolModule = {
         const rows = res.rows ?? [];
 
         if (rows.length === 0) {
-          return "No data found for the given filters.";
+          return `No data found for ${dateFrom} to ${dateTo}.`;
         }
 
         const allKeys = new Set<string>();
@@ -72,7 +111,7 @@ export const pubStatsModule: ToolModule = {
         const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
         return formatTable(
           { headers, rows: tableRows },
-          `Publisher Stats (${args.groupBy}, ${args.period}, page ${res.page ?? 1}/${totalPages})`,
+          `Publisher Stats (${args.groupBy}, ${dateFrom}–${dateTo}, page ${res.page ?? 1}/${totalPages})`,
         );
       },
     );

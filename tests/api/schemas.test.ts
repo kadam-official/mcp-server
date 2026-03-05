@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { listResponseSchema, reportConfigSchema } from "../../src/api/schemas/common.js";
 import { campaignRowSchema, audienceSchema } from "../../src/api/schemas/advertiser.js";
-import { sourceSchema, adUnitSchema } from "../../src/api/schemas/publisher.js";
+import { sourceDetailSchema, sourceTableRowSchema, adUnitTableRowSchema, pubUserSchema } from "../../src/api/schemas/publisher.js";
 
 describe("listResponseSchema", () => {
   const schema = listResponseSchema(z.object({ id: z.number() }));
@@ -78,19 +78,83 @@ describe("audienceSchema", () => {
   });
 });
 
-describe("sourceSchema", () => {
-  it("parses with defaults", () => {
-    const result = sourceSchema.parse({ id: 1, name: "Site", url: "https://example.com" });
-    expect(result.status).toBe("unknown");
-    expect(result.impressions).toBe(0);
+describe("sourceDetailSchema", () => {
+  it("parses GET /sources/{id} response", () => {
+    const result = sourceDetailSchema.parse({
+      id: 1,
+      name: "Site",
+      url: "https://example.com",
+      state: "accepted",
+    });
+    expect(result.id).toBe(1);
+    expect(result.state).toBe("accepted");
+    expect(result.archive).toBe(0);
+  });
+
+  it("handles null name", () => {
+    const result = sourceDetailSchema.parse({
+      id: 2,
+      name: null,
+      url: "https://example.com",
+      state: "onconfirm",
+    });
+    expect(result.name).toBe("");
   });
 });
 
-describe("adUnitSchema", () => {
-  it("parses with required fields", () => {
-    const result = adUnitSchema.parse({ id: 5, name: "Block", type: 10 });
-    expect(result.status).toBe("unknown");
-    expect(result.revenue).toBe(0);
+describe("sourceTableRowSchema", () => {
+  it("parses data row with nested source object", () => {
+    const result = sourceTableRowSchema.parse({
+      source: { id: 1, name: "Site", state: 1, stage: "accepted" },
+      domain: "site.com",
+      views: "100",
+      clicks: "5",
+      income: "₽10",
+    });
+    expect(result.source).not.toBe("fullResult");
+    if (result.source !== "fullResult") {
+      expect(result.source.id).toBe(1);
+    }
+  });
+
+  it("parses fullResult summary row", () => {
+    const result = sourceTableRowSchema.parse({
+      source: "fullResult",
+      domain: null,
+      views: "0",
+      clicks: "0",
+      income: "₽0",
+    });
+    expect(result.source).toBe("fullResult");
+  });
+});
+
+describe("adUnitTableRowSchema", () => {
+  it("parses data row with nested block object", () => {
+    const result = adUnitTableRowSchema.parse({
+      block: { id: 5, name: "Block 1", state: 1 },
+      type: "inpagepush",
+      queries: "10",
+      views: "50",
+      clicks: "2",
+      income: "₽1",
+    });
+    expect(result.block).not.toBe("fullResult");
+    if (result.block !== "fullResult") {
+      expect(result.block.id).toBe(5);
+    }
+  });
+});
+
+describe("pubUserSchema", () => {
+  it("parses real API response", () => {
+    const result = pubUserSchema.parse({
+      balance: 100,
+      currency: "rub",
+      notifications: { items: [], totalItems: 0, unreadItems: 0 },
+    });
+    expect(result.balance).toBe(100);
+    expect(result.currency).toBe("rub");
   });
 });
 
