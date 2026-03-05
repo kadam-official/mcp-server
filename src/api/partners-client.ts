@@ -107,9 +107,9 @@ export async function listCreatives(params: Record<string, unknown>): Promise<Ap
 
 export async function createCreative(
   campaignId: number,
-  data: Record<string, unknown>,
+  formData: FormData,
 ): Promise<Creative> {
-  return getClient().post<Creative>(`/campaigns/${campaignId}/materials`, data);
+  return getClient().postFormData<Creative>(`/campaigns/${campaignId}/materials`, formData);
 }
 
 export async function updateCreative(

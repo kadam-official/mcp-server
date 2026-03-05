@@ -15,26 +15,30 @@ export function registerCreativeFormatsResource(server: McpServer): void {
 const CONTENT = `
 Creative Format Requirements by Campaign Type:
 
+IMPORTANT: The API uses multipart/form-data with file uploads. Provide image URLs
+and the MCP server will download and upload them automatically.
+
 Push / In-Page Push:
   Required: title (max 30 chars), text (max 45 chars), url
-  Optional: iconUrl (192x192), imageUrl (492x328), bid, startDate, endDate
+  Required images: imageUrl (icon, min 192x192), mainImageUrl (min 492x328)
+  Optional: bid, startDate, stopDate
 
-Native:
-  Required: title (max 75 chars), text (max 500 chars), url, iconUrl, imageUrl
-  Optional: bid, startDate, endDate
+Native (Teaser):
+  Required: title (max 75 chars), url
+  Required images: imageUrl (icon, min 500x500), mainImageUrl (min 492x328)
+  Optional: bid, startDate, stopDate
 
 Banner:
-  Required: url, imageUrl (or HTML5 ZIP)
-  Auto-detected: bannerSizeId from image dimensions
-  Common sizes: 300x250, 728x90, 160x600, 320x50, 300x600
-  Optional: name, bid, isHtml5, startDate, endDate
+  Required: url, imageUrl (must match exact banner dimensions), sizeId
+  Common sizeId values: 25=300x250, 35=728x90, 75=160x600, 80=320x50, 300=300x600
+  Optional: bid, startDate, stopDate
 
 Video:
-  Required: url, video file (MP4)
-  Optional: bid, startDate, endDate
+  Required: title (max 30 chars), url, videoUrl (MP4 file, max 30MB)
+  Optional: bid, startDate, stopDate
 
-Popunder:
-  Required: url
-  No images or text needed.
-  Optional: bid, pauseAfterModeration, startDate, endDate
+Popunder (Clickunder):
+  Does NOT support separate creatives.
+  The campaign URL itself serves as the ad.
+  Creatives are auto-managed by the campaign.
 `;
