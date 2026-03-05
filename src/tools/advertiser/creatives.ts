@@ -32,16 +32,47 @@ function formatCreativeRow(row: CreativeRow, index: number): string {
   return `${index + 1}. [ID: ${id}] "${title}" | ${campaignInfo} | Status: ${status} | Views: ${row.views} | Clicks: ${row.clicks}`;
 }
 
-async function downloadFile(url: string): Promise<{ blob: Blob; filename: string; contentType: string }> {
+interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+  width: number;
+  height: number;
+}
+
+async function downloadFile(url: string): Promise<DownloadedFile> {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to download file from ${url}: HTTP ${response.status}`);
   }
-  const blob = await response.blob();
+  const buffer = await response.arrayBuffer();
+  const blob = new Blob([buffer]);
   const urlPath = new URL(url).pathname;
   const filename = urlPath.split("/").pop() || "file";
-  const contentType = response.headers.get("content-type") || blob.type || "application/octet-stream";
-  return { blob, filename, contentType };
+  const { width, height } = parseImageDimensions(new Uint8Array(buffer));
+  return { blob, filename, width, height };
+}
+
+function parseImageDimensions(data: Uint8Array): { width: number; height: number } {
+  if (data[0] === 0x89 && data[1] === 0x50) {
+    // PNG: IHDR chunk at offset 16
+    const view = new DataView(data.buffer, data.byteOffset);
+    return { width: view.getUint32(16), height: view.getUint32(20) };
+  }
+  if (data[0] === 0xFF && data[1] === 0xD8) {
+    // JPEG: scan for SOF0/SOF2 markers
+    let offset = 2;
+    while (offset < data.length - 9) {
+      if (data[offset] !== 0xFF) { offset++; continue; }
+      const marker = data[offset + 1]!;
+      if (marker === 0xC0 || marker === 0xC2) {
+        const view = new DataView(data.buffer, data.byteOffset);
+        return { width: view.getUint16(offset + 7), height: view.getUint16(offset + 5) };
+      }
+      const segLen = (data[offset + 2]! << 8) | data[offset + 3]!;
+      offset += 2 + segLen;
+    }
+  }
+  return { width: 0, height: 0 };
 }
 
 function buildCreativeFormData(args: Record<string, unknown>): FormData {
@@ -152,20 +183,24 @@ All images are downloaded from provided URLs and uploaded to the API as files.`,
         });
 
         if (args.imageUrl) {
-          const { blob, filename } = await downloadFile(args.imageUrl);
-          fd.set("image", blob, filename);
-          fd.set("imageCrop", JSON.stringify({ x: 0, y: 0, width: 9999, height: 9999 }));
+          const file = await downloadFile(args.imageUrl);
+          fd.set("image", file.blob, file.filename);
+          if (file.width > 0) {
+            fd.set("imageCrop", JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }));
+          }
         }
 
         if (args.mainImageUrl) {
-          const { blob, filename } = await downloadFile(args.mainImageUrl);
-          fd.set("rectangleImage", blob, filename);
-          fd.set("rectangleImageCrop", JSON.stringify({ x: 0, y: 0, width: 9999, height: 9999 }));
+          const file = await downloadFile(args.mainImageUrl);
+          fd.set("rectangleImage", file.blob, file.filename);
+          if (file.width > 0) {
+            fd.set("rectangleImageCrop", JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }));
+          }
         }
 
         if (args.videoUrl) {
-          const { blob, filename } = await downloadFile(args.videoUrl);
-          fd.set("image", blob, filename);
+          const file = await downloadFile(args.videoUrl);
+          fd.set("image", file.blob, file.filename);
         }
 
         const c = await api.createCreative(args.campaignId, fd);
