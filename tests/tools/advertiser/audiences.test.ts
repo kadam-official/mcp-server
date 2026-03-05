@@ -19,7 +19,7 @@ afterEach(() => {
 describe("audiences tools", () => {
   it("list_audiences returns formatted list", async () => {
     vi.mocked(api.listAudiences).mockResolvedValue({
-      data: [
+      rows: [
         {
           id: 1,
           name: "Test Audience",
@@ -35,7 +35,9 @@ describe("audiences tools", () => {
           linkedAudiencesIds: [],
         },
       ],
-      meta: { current_page: 1, last_page: 1, total: 1 },
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(audiencesModule);

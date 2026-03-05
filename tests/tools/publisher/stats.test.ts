@@ -19,13 +19,14 @@ afterEach(() => {
 describe("publisher stats tools", () => {
   it("get_stats calls getReportConfig and getReportData", async () => {
     vi.mocked(api.getReportConfig).mockResolvedValue({
-      groups: [{ id: "time_day", name: "day", category: "time" }],
-      metrics: [{ id: "finance_revenue", name: "revenue", category: "finance" }],
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_revenue" }], traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }] },
     });
     vi.mocked(api.getReportData).mockResolvedValue({
-      data: [{ time_day: "2025-03-01", finance_revenue: 50 }],
-      totals: { time_day: "", finance_revenue: 50 },
-      meta: { page: 1, pages: 1, total: 1, perPage: 25 },
+      rows: [{ time_day: "2025-03-01", finance_revenue: 50 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(pubStatsModule);
@@ -42,13 +43,14 @@ describe("publisher stats tools", () => {
 
   it("config caching - call get_stats twice, getReportConfig called only once", async () => {
     vi.mocked(api.getReportConfig).mockResolvedValue({
-      groups: [{ id: "time_day", name: "day", category: "time" }],
-      metrics: [{ id: "finance_revenue", name: "revenue", category: "finance" }],
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_revenue" }], traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }] },
     });
     vi.mocked(api.getReportData).mockResolvedValue({
-      data: [{ time_day: "2025-03-01", finance_revenue: 50 }],
-      totals: { time_day: "", finance_revenue: 50 },
-      meta: { page: 1, pages: 1, total: 1, perPage: 25 },
+      rows: [{ time_day: "2025-03-01", finance_revenue: 50 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(pubStatsModule);

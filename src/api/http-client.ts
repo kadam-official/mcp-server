@@ -7,12 +7,6 @@ export interface HttpClientOptions {
   timeout?: number;
 }
 
-export interface HttpResponse<T = unknown> {
-  status: number;
-  data: T;
-  headers: Record<string, string>;
-}
-
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -84,6 +78,38 @@ export class HttpClient {
   }
 
   private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
+    return this.executeWithRetry<T>(url, (signal) =>
+      fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal,
+      }),
+    );
+  }
+
+  private async requestFormData<T>(url: string, formData: FormData): Promise<T> {
+    return this.executeWithRetry<T>(url, (signal) =>
+      fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: "application/json",
+        },
+        body: formData,
+        signal,
+      }),
+    );
+  }
+
+  private async executeWithRetry<T>(
+    url: string,
+    doFetch: (signal: AbortSignal) => Promise<Response>,
+  ): Promise<T> {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -99,23 +125,12 @@ export class HttpClient {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-        const headers: Record<string, string> = {
-          Authorization: `Bearer ${this.apiKey}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        };
-
-        const response = await fetch(url, {
-          method,
-          headers,
-          body: body !== undefined ? JSON.stringify(body) : undefined,
-          signal: controller.signal,
-        });
+        const response = await doFetch(controller.signal);
 
         clearTimeout(timeoutId);
 
         const elapsed = Date.now() - startTime;
-        this.log.debug({ method, url, status: response.status, elapsed }, "API response");
+        this.log.debug({ url, status: response.status, elapsed }, "API response");
 
         if (response.status === 429) {
           const retryAfter = response.headers.get("Retry-After");
@@ -151,7 +166,7 @@ export class HttpClient {
         if (error instanceof ApiError) throw error;
 
         if (error instanceof DOMException && error.name === "AbortError") {
-          lastError = new Error(`Request timed out after ${this.timeout}ms: ${method} ${url}`);
+          lastError = new Error(`Request timed out after ${this.timeout}ms: ${url}`);
           if (attempt < this.maxRetries) continue;
         }
 
@@ -161,78 +176,6 @@ export class HttpClient {
     }
 
     throw lastError ?? new Error("Request failed after retries");
-  }
-
-  private async requestFormData<T>(url: string, formData: FormData): Promise<T> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      if (attempt > 0) {
-        const delay = RETRY_DELAYS[attempt - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]!;
-        this.log.debug({ attempt, delay, url }, "Retrying form upload");
-        await sleep(delay);
-      }
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            Accept: "application/json",
-          },
-          body: formData,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.status === 429) {
-          const retryAfter = response.headers.get("Retry-After");
-          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : RETRY_DELAYS[attempt]!;
-          this.log.warn({ waitMs }, "Rate limited on form upload, backing off");
-          await sleep(waitMs);
-          continue;
-        }
-
-        if (!response.ok) {
-          const responseBody = await response.text().catch(() => "");
-          const parsed = tryParseJson(responseBody);
-
-          if (RETRYABLE_STATUSES.has(response.status) && attempt < this.maxRetries) {
-            lastError = new ApiError(
-              `API returned ${response.status}: ${responseBody.slice(0, 200)}`,
-              response.status,
-              parsed,
-            );
-            continue;
-          }
-
-          throw new ApiError(
-            formatApiError(response.status, parsed, responseBody),
-            response.status,
-            parsed,
-          );
-        }
-
-        const json = (await response.json()) as Record<string, unknown>;
-        return unwrapApiResponse<T>(json);
-      } catch (error) {
-        if (error instanceof ApiError) throw error;
-
-        if (error instanceof DOMException && error.name === "AbortError") {
-          lastError = new Error(`Form upload timed out after ${this.timeout}ms`);
-          if (attempt < this.maxRetries) continue;
-        }
-
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (attempt < this.maxRetries) continue;
-      }
-    }
-
-    throw lastError ?? new Error("Form upload failed after retries");
   }
 }
 

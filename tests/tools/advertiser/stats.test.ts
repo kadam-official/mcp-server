@@ -19,17 +19,14 @@ afterEach(() => {
 describe("advertiser stats tools", () => {
   it("get_stats with reportType custom calls getReportConfig and getReportData", async () => {
     vi.mocked(api.getReportConfig).mockResolvedValue({
-      groups: [
-        { id: "time_day", name: "day", category: "time" },
-      ],
-      metrics: [
-        { id: "finance_spend", name: "spend", category: "finance" },
-      ],
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }] },
     });
     vi.mocked(api.getReportData).mockResolvedValue({
-      data: [{ time_day: "2025-03-01", finance_spend: 100 }],
-      totals: {},
-      meta: { page: 1, pages: 1, total: 1, perPage: 25 },
+      rows: [{ time_day: "2025-03-01", finance_moneyOut: 100 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(statsModule);
@@ -44,8 +41,10 @@ describe("advertiser stats tools", () => {
 
   it("get_stats with reportType sites calls getSiteStats", async () => {
     vi.mocked(api.getSiteStats).mockResolvedValue({
-      data: [{ siteName: "example.com", impressions: 1000, clicks: 10, spend: 5 }],
-      meta: { current_page: 1, last_page: 1, total: 1 },
+      rows: [{ siteName: "example.com", impressions: 1000, clicks: 10, spend: 5 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(statsModule);
@@ -61,8 +60,10 @@ describe("advertiser stats tools", () => {
 
   it("get_stats with reportType postbacks calls getPostbackStats", async () => {
     vi.mocked(api.getPostbackStats).mockResolvedValue({
-      data: [{ campaign: "Test", conversions: 5 }],
-      meta: { current_page: 1, last_page: 1, total: 1 },
+      rows: [{ campaign: "Test", conversions: 5 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(statsModule);

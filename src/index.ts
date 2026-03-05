@@ -26,7 +26,7 @@ Kadam MCP Server — Ad network management for advertisers and publishers.
 ## Constraints
 - API rate limit: ~10 req/sec per key; server handles retry automatically
 - Creatives go through moderation (1-24h) before serving
-- Image uploads via URL only (server downloads); max 5MB
+- Image uploads via URL or local file path; max 5MB
 - All list/stats tools: max 100 rows per page; use pagination for large datasets
 - Output hard limit: 50KB per response; use filters to narrow results
 `;

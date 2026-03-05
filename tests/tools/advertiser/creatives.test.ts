@@ -19,24 +19,17 @@ afterEach(() => {
 describe("creatives tools", () => {
   it("list_creatives returns formatted list", async () => {
     vi.mocked(api.listCreatives).mockResolvedValue({
-      data: [
+      rows: [
         {
-          id: 1,
-          campaignId: 10,
-          title: "Creative One",
-          text: "",
-          url: "https://example.com",
-          imageUrl: "",
-          iconUrl: "",
-          status: "active",
-          moderationStatus: "accepted",
-          bid: 0.5,
-          clicks: 0,
-          impressions: 0,
-          ctr: 0,
+          ad: { id: 1, title: "Creative One", text: "", status: { id: "active", label: "Active" } },
+          materialCampaign: { id: 10, name: "Test Campaign" },
+          views: "0",
+          clicks: "0",
         },
       ],
-      meta: { current_page: 1, last_page: 1, total: 1 },
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(creativesModule);
@@ -51,7 +44,7 @@ describe("creatives tools", () => {
     expect(text).toContain("Creatives");
   });
 
-  it("create_creative calls api.createCreative with campaignId", async () => {
+  it("create_creative calls api.createCreative with campaignId and FormData", async () => {
     vi.mocked(api.createCreative).mockResolvedValue({
       id: 99,
       campaignId: 15,
@@ -79,11 +72,11 @@ describe("creatives tools", () => {
 
     expect(api.createCreative).toHaveBeenCalledWith(
       15,
-      expect.objectContaining({ url: "https://example.com/landing" }),
+      expect.any(FormData),
     );
   });
 
-  it("set_creative_status with ids 5,6 and status paused calls api with action paused", async () => {
+  it("set_creative_status with ids 5,6 and status paused calls api with action pause", async () => {
     vi.mocked(api.setCreativeStatus).mockResolvedValue(undefined as never);
 
     const client = await createToolClient(creativesModule);
@@ -93,7 +86,7 @@ describe("creatives tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(api.setCreativeStatus).toHaveBeenCalledWith([5, 6], "paused");
+    expect(api.setCreativeStatus).toHaveBeenCalledWith([5, 6], "pause");
     expect(text).toContain("2 creatives set to paused");
   });
 });

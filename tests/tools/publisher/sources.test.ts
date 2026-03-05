@@ -19,7 +19,7 @@ afterEach(() => {
 describe("publisher sources tools", () => {
   it("list_sources returns formatted list", async () => {
     vi.mocked(api.listSources).mockResolvedValue({
-      data: [
+      rows: [
         {
           id: 1,
           name: "My Site",
@@ -32,7 +32,9 @@ describe("publisher sources tools", () => {
           placesCount: 3,
         },
       ],
-      meta: { current_page: 1, last_page: 1, total: 1 },
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(sourcesModule);

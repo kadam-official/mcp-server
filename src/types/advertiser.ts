@@ -1,24 +1,3 @@
-export interface Campaign {
-  id: number;
-  name: string;
-  type: number;
-  status: string;
-  cpType: number;
-  bid: number;
-  url: string;
-  folderId: number;
-  dayMoneyLimit: number;
-  commonMoneyLimit: number;
-  isEvenDistribution: boolean;
-  startDate: string | null;
-  endDate: string | null;
-  timezone: number;
-  clicks: number;
-  impressions: number;
-  moneyOut: number;
-  ctr: number;
-}
-
 export interface CampaignFolder {
   id: number;
   name: string;
@@ -59,15 +38,6 @@ export interface Creative {
   clicks: number;
   impressions: number;
   ctr: number;
-}
-
-export interface FinanceOperation {
-  id: number;
-  date: string;
-  type: string;
-  amount: number;
-  balance: number;
-  campaignName?: string;
 }
 
 export const CAMPAIGN_TYPE_MAP: Record<string, number> = {

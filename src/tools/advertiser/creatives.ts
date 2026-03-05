@@ -55,7 +55,9 @@ async function loadFile(source: string): Promise<LoadedFile> {
       : source.startsWith("~")
         ? source.replace("~", process.env.HOME || "")
         : source;
-    const nodeBuffer = await readFile(filePath);
+    const nodeBuffer = await readFile(filePath).catch(() => {
+      throw new Error(`File not found or unreadable: ${filePath}`);
+    });
     buffer = nodeBuffer.buffer.slice(nodeBuffer.byteOffset, nodeBuffer.byteOffset + nodeBuffer.byteLength);
     filename = basename(filePath);
   } else {

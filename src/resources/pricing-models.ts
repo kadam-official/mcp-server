@@ -4,7 +4,6 @@ import { PRICING_MODEL_MAP, PRICING_MODEL_NAME } from "../types/advertiser.js";
 const PRICING_DESCRIPTIONS: Record<string, string> = {
   cpc: "Cost Per Click. You pay for each click.",
   cpm: "Cost Per Mille. You pay per 1000 impressions.",
-  cpv: "Cost Per View. For video campaigns.",
   cpa_target: "Cost Per Action. Auto-optimized for conversions. Requires conversion tracking setup (postback URL or pixel).",
 };
 

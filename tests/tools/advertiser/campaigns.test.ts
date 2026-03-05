@@ -19,29 +19,28 @@ afterEach(() => {
 describe("campaigns tools", () => {
   it("list_campaigns returns formatted list with [ID: 1] and Test", async () => {
     vi.mocked(api.listCampaigns).mockResolvedValue({
-      data: [
+      rows: [
         {
-          id: 1,
-          name: "Test",
-          type: 30,
-          status: "active",
-          cpType: 0,
-          bid: 0.5,
-          url: "https://example.com",
-          folderId: 1,
-          dayMoneyLimit: 100,
-          commonMoneyLimit: 0,
-          isEvenDistribution: false,
-          startDate: null,
-          endDate: null,
-          timezone: 0,
-          clicks: 0,
-          impressions: 0,
-          moneyOut: 0,
-          ctr: 0,
+          campaign: {
+            id: 1,
+            name: "Test",
+            state: { id: "active", label: "Active" },
+            type: { id: "30", label: "Push" },
+            folder: { id: 1, name: "Default" },
+            model: "CPC",
+            active: 2,
+            total: 3,
+            url: "https://example.com",
+          },
+          dayMoneyLimit: "100",
+          views: "0",
+          clicks: "0",
+          moneyOut: "0",
         },
       ],
-      meta: { current_page: 1, last_page: 1, total: 1 },
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(campaignsModule);
@@ -56,22 +55,6 @@ describe("campaigns tools", () => {
     vi.mocked(api.createCampaign).mockResolvedValue({
       id: 99,
       name: "New",
-      type: 30,
-      status: "active",
-      cpType: 0,
-      bid: 0.5,
-      url: "https://example.com",
-      folderId: 1,
-      dayMoneyLimit: 100,
-      commonMoneyLimit: 0,
-      isEvenDistribution: false,
-      startDate: null,
-      endDate: null,
-      timezone: 0,
-      clicks: 0,
-      impressions: 0,
-      moneyOut: 0,
-      ctr: 0,
     } as never);
 
     const client = await createToolClient(campaignsModule);
@@ -111,7 +94,7 @@ describe("campaigns tools", () => {
     );
   });
 
-  it("set_campaign_status with ids 1,2,3 and active calls api with turn-on", async () => {
+  it("set_campaign_status with ids 1,2,3 and active calls api with activate", async () => {
     vi.mocked(api.setCampaignStatus).mockResolvedValue(undefined as never);
 
     const client = await createToolClient(campaignsModule);
@@ -121,14 +104,16 @@ describe("campaigns tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(api.setCampaignStatus).toHaveBeenCalledWith([1, 2, 3], "turn-on");
+    expect(api.setCampaignStatus).toHaveBeenCalledWith([1, 2, 3], "activate");
     expect(text).toContain("3 campaigns set to active");
   });
 
   it("list_campaigns with empty data handles gracefully", async () => {
     vi.mocked(api.listCampaigns).mockResolvedValue({
-      data: [],
-      meta: { current_page: 1, last_page: 1, total: 0 },
+      rows: [],
+      totalRows: 0,
+      page: 1,
+      perPage: 25,
     });
 
     const client = await createToolClient(campaignsModule);
