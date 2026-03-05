@@ -1,22 +1,12 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/partners-client.js";
+import type { FinanceRow } from "../../api/schemas/advertiser.js";
 import {
   formatEntityList,
   clampPerPage,
 } from "../../output-formatter.js";
-import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
-
-interface FinanceRow {
-  date: string;
-  money: string;
-  type: string;
-  extType: string;
-  comment: string;
-  status: number;
-}
 
 function formatFinanceRow(op: FinanceRow, index: number): string {
   const comment = op.comment ? ` | ${op.comment}` : "";
@@ -41,7 +31,7 @@ export const financesModule: ToolModule = {
         dateTo: z.string().optional(),
         activityType: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
@@ -52,9 +42,8 @@ export const financesModule: ToolModule = {
             activityType: args.activityType,
           }),
         };
-        const res =
-          (await api.listFinanceOperations(params)) as ApiListResponse;
-        const items = (res.rows ?? []) as FinanceRow[];
+        const res = await ctx.adv!.listFinanceOperations(params);
+        const items = res.rows ?? [];
         const pagination = extractPagination(res);
         const dateRange =
           args.dateFrom && args.dateTo

@@ -1,14 +1,12 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/partners-client.js";
 import {
   formatEntityList,
   clampPerPage,
   formatSingleEntity,
 } from "../../output-formatter.js";
-import type { Audience } from "../../types/advertiser.js";
-import type { ApiListResponse } from "../../types/common.js";
+import type { Audience } from "../../api/schemas/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 function formatAudienceRow(a: Audience, index: number): string {
@@ -33,7 +31,7 @@ export const audiencesModule: ToolModule = {
         sortField: z.string().optional(),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
@@ -42,8 +40,8 @@ export const audiencesModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = (await api.listAudiences(params)) as ApiListResponse;
-        const items = (res.rows ?? []) as Audience[];
+        const res = await ctx.adv!.listAudiences(params);
+        const items = res.rows ?? [];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,
@@ -64,8 +62,8 @@ export const audiencesModule: ToolModule = {
       {
         id: z.number(),
       },
-      async (args) => {
-        const a = await api.getAudience(args.id);
+      async (args, ctx) => {
+        const a = await ctx.adv!.getAudience(args.id);
         return formatSingleEntity(`Audience #${a.id}`, [
           ["Name", a.name],
           ["Type", a.type],
@@ -101,7 +99,7 @@ export const audiencesModule: ToolModule = {
         hasRejects: z.boolean().optional(),
         linkedAudiencesIds: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const data: Record<string, unknown> = {
           type: args.type,
           name: args.name,
@@ -113,7 +111,7 @@ export const audiencesModule: ToolModule = {
           ...(args.hasRejects != null && { hasRejects: args.hasRejects }),
           ...(args.linkedAudiencesIds != null && { linkedAudiencesIds: args.linkedAudiencesIds }),
         };
-        const a = await api.createAudience(data);
+        const a = await ctx.adv!.createAudience(data);
         return `Audience created: [ID: ${a.id}] "${a.name}" (type: ${a.type})`;
       },
     );
@@ -137,7 +135,7 @@ export const audiencesModule: ToolModule = {
         hasRejects: z.boolean().optional(),
         linkedAudiencesIds: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const { id, ...rest } = args;
         const data: Record<string, unknown> = {};
         if (rest.type != null) data.type = rest.type;
@@ -150,7 +148,7 @@ export const audiencesModule: ToolModule = {
         if (rest.hasRejects != null) data.hasRejects = rest.hasRejects;
         if (rest.linkedAudiencesIds != null) data.linkedAudiencesIds = rest.linkedAudiencesIds;
 
-        await api.updateAudience(id, data);
+        await ctx.adv!.updateAudience(id, data);
         return `Audience #${id} updated successfully.`;
       },
     );
@@ -167,8 +165,8 @@ export const audiencesModule: ToolModule = {
         id: z.number(),
         confirm: z.literal(true),
       },
-      async (args) => {
-        await api.deleteAudience(args.id);
+      async (args, ctx) => {
+        await ctx.adv!.deleteAudience(args.id);
         return `Audience #${args.id} deleted permanently.`;
       },
     );

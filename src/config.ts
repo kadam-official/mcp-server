@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { AuthError } from "./errors.js";
 
 const envSchema = z.object({
   KADAM_ADV_API_KEY: z.string().min(1).optional(),
@@ -41,27 +40,3 @@ export function hasAdvKey(): boolean {
 export function hasPubKey(): boolean {
   return !!getConfig().KADAM_PUB_API_KEY;
 }
-
-export function requireAdvKey(): string {
-  const key = getConfig().KADAM_ADV_API_KEY;
-  if (!key) {
-    throw new AuthError(
-      "KADAM_ADV_API_KEY is not configured. " +
-        "Set it to your Kadam advertiser API key from partners.kadam.net -> Profile -> API.",
-    );
-  }
-  return key;
-}
-
-export function requirePubKey(): string {
-  const key = getConfig().KADAM_PUB_API_KEY;
-  if (!key) {
-    throw new AuthError(
-      "KADAM_PUB_API_KEY is not configured. " +
-        "Set it to your Kadam publisher API key from pub.kadam.net -> Profile -> API.",
-    );
-  }
-  return key;
-}
-
-export { AuthError } from "./errors.js";

@@ -2,11 +2,14 @@ import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/m
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { createToolLogger } from "../logger.js";
-import { requireAdvKey, requirePubKey, AuthError } from "../config.js";
+import { AuthError } from "../errors.js";
 import { ApiError } from "../api/http-client.js";
 import type { Product } from "../types/tool-module.js";
+import type { ApiContext } from "../context.js";
+import type { ClientPool } from "../api/client-pool.js";
+import { getConfig } from "../config.js";
 
-export type ToolHandler<TArgs> = (args: TArgs) => Promise<string>;
+export type ToolHandler<TArgs> = (args: TArgs, ctx: ApiContext) => Promise<string>;
 
 export interface ToolDefinition {
   name: string;
@@ -16,7 +19,10 @@ export interface ToolDefinition {
 }
 
 export class ToolWrapper {
-  constructor(private readonly server: McpServer) {}
+  constructor(
+    private readonly server: McpServer,
+    private readonly clientPool: ClientPool,
+  ) {}
 
   register<TShape extends z.ZodRawShape>(
     definition: ToolDefinition,
@@ -25,17 +31,17 @@ export class ToolWrapper {
   ): void {
     const log = createToolLogger(definition.name);
     const validateAuth = () => this.validateAuth(definition.product);
+    const resolveCtx = () => this.resolveContext();
     const fmtErr = (e: unknown) => this.formatError(e);
 
-    // ShapeOutput<TShape> and z.objectOutputType<TShape> are structurally identical
-    // but TypeScript can't prove this for unresolved generics.
     const callback = async (args: Record<string, unknown>, _extra: unknown) => {
       const startTime = Date.now();
 
       try {
         validateAuth();
+        const ctx = resolveCtx();
 
-        const result = await handler(args as z.objectOutputType<TShape, z.ZodTypeAny>);
+        const result = await handler(args as z.objectOutputType<TShape, z.ZodTypeAny>, ctx);
 
         const elapsed = Date.now() - startTime;
         log.info({ elapsed, resultSize: result.length }, "Tool completed");
@@ -65,11 +71,27 @@ export class ToolWrapper {
     );
   }
 
+  private resolveContext(): ApiContext {
+    const config = getConfig();
+    return this.clientPool.resolve(
+      config.KADAM_ADV_API_KEY,
+      config.KADAM_PUB_API_KEY,
+    );
+  }
+
   private validateAuth(product: Product): void {
-    if (product === "advertiser") {
-      requireAdvKey();
-    } else if (product === "publisher") {
-      requirePubKey();
+    const config = getConfig();
+    if (product === "advertiser" && !config.KADAM_ADV_API_KEY) {
+      throw new AuthError(
+        "KADAM_ADV_API_KEY is not configured. " +
+          "Set it to your Kadam advertiser API key from partners.kadam.net -> Profile -> API.",
+      );
+    }
+    if (product === "publisher" && !config.KADAM_PUB_API_KEY) {
+      throw new AuthError(
+        "KADAM_PUB_API_KEY is not configured. " +
+          "Set it to your Kadam publisher API key from pub.kadam.net -> Profile -> API.",
+      );
     }
   }
 
@@ -93,7 +115,7 @@ export class ToolWrapper {
 
     if (error instanceof z.ZodError) {
       const issues = error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
-      return `Invalid parameters:\n${issues}`;
+      return `API response validation failed:\n${issues}`;
     }
 
     if (error instanceof Error) {

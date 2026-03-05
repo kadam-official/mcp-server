@@ -1,34 +1,14 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/partners-client.js";
 import {
   formatEntityList,
   clampPerPage,
 } from "../../output-formatter.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
-import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
-
-interface CampaignRow {
-  campaign: {
-    id: number;
-    name: string;
-    state: { id: string; label: string };
-    type: { id: string; label: string };
-    folder: { id: number; name: string };
-    model: string;
-    active: number;
-    total: number;
-    reason?: string | null;
-    url: string;
-  };
-  dayMoneyLimit: string;
-  views: string;
-  clicks: string;
-  moneyOut: string;
-}
+import type { CampaignRow } from "../../api/schemas/advertiser.js";
 
 function formatCampaignRow(row: CampaignRow, index: number): string {
   const c = row.campaign;
@@ -40,8 +20,6 @@ const CONNECTION_TYPE_MAP: Record<string, number> = {
   wifi: 2,
   all: 3,
 };
-
-// --- Campaign field mapping (split into focused functions) ---
 
 function mapField(
   key: string,
@@ -190,8 +168,6 @@ export function mapCampaignFields(fields: Record<string, unknown>): Record<strin
   return mapped;
 }
 
-// --- Shared Zod fields for create/update campaign ---
-
 const campaignTargetingFields = {
   countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
   devices: z.string().optional().describe("Comma-separated device types (e.g. 'desktop,mobile,tablet')"),
@@ -249,7 +225,7 @@ export const campaignsModule: ToolModule = {
         sortField: z.string().optional(),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
@@ -265,11 +241,10 @@ export const campaignsModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = (await api.listCampaigns(params)) as ApiListResponse;
-        const items = (res.rows ?? []) as CampaignRow[];
+        const res = await ctx.adv!.listCampaigns(params);
         const pagination = extractPagination(res);
         return formatEntityList(
-          items,
+          res.rows,
           formatCampaignRow,
           "Campaigns",
           pagination,
@@ -296,13 +271,13 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
       },
-      async (args) => {
+      async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
         if (args.categories) {
           mappedArgs.categories = args.categories.split(",").map((s: string) => parseInt(s.trim(), 10));
         }
         const mappedData = mapCampaignFields(mappedArgs);
-        const result = (await api.createCampaign(mappedData as Record<string, unknown>)) as { id: number };
+        const result = await ctx.adv!.createCampaign(mappedData);
         return `Campaign created: [ID: ${result.id}] "${args.name}" in folder #${args.folderId}`;
       },
     );
@@ -326,10 +301,10 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
       },
-      async (args) => {
+      async (args, ctx) => {
         const { id, ...rest } = args;
         const mappedData = mapCampaignFields(rest as Record<string, unknown>);
-        await api.updateCampaign(id, mappedData);
+        await ctx.adv!.updateCampaign(id, mappedData);
         return `Campaign #${id} updated successfully.`;
       },
     );
@@ -346,10 +321,10 @@ export const campaignsModule: ToolModule = {
         ids: z.string().min(1),
         status: z.enum(["active", "paused", "archived"]),
       },
-      async (args) => {
+      async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await api.setCampaignStatus(parsedIds, action);
+        await ctx.adv!.setCampaignStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;
       },

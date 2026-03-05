@@ -1,12 +1,29 @@
-import { HttpClient } from "./http-client.js";
-import { getConfig, requireAdvKey } from "../config.js";
+import type { HttpClient } from "./http-client.js";
+import { listResponseSchema, reportConfigSchema, reportDataResponseSchema } from "./schemas/common.js";
+import type { ListResponse, ReportConfig, ReportDataResponse } from "./schemas/common.js";
+import {
+  campaignRowSchema,
+  folderRowSchema,
+  creativeRowSchema,
+  audienceSchema,
+  financeRowSchema,
+  campaignCreateResponseSchema,
+  creativeCreateResponseSchema,
+} from "./schemas/advertiser.js";
 import type {
+  CampaignRow,
+  FolderRow,
+  CreativeRow,
   Audience,
-  CampaignFolder,
-  Creative,
-} from "../types/advertiser.js";
-import type { ApiListResponse, ReportConfig, ReportDataResponse } from "../types/common.js";
+  FinanceRow,
+} from "./schemas/advertiser.js";
+import { z } from "zod";
 
+const campaignListSchema = listResponseSchema(campaignRowSchema);
+const folderListSchema = listResponseSchema(folderRowSchema);
+const creativeListSchema = listResponseSchema(creativeRowSchema);
+const audienceListSchema = listResponseSchema(audienceSchema);
+const financeListSchema = listResponseSchema(financeRowSchema);
 
 export interface ReportDataParams {
   groups?: string[];
@@ -22,126 +39,110 @@ export interface ReportDataParams {
   [key: string]: unknown;
 }
 
-let _client: HttpClient | null = null;
+export class PartnersClient {
+  constructor(private readonly http: HttpClient) {}
 
-function getClient(): HttpClient {
-  if (!_client) {
-    const config = getConfig();
-    _client = new HttpClient({
-      baseUrl: config.KADAM_ADV_API_BASE,
-      apiKey: requireAdvKey(),
-    });
+  async listCampaigns(params: Record<string, unknown>): Promise<ListResponse<CampaignRow>> {
+    const raw = await this.http.post("/campaigns", params);
+    return campaignListSchema.parse(raw);
   }
-  return _client;
-}
 
-export async function listCampaigns(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/campaigns", params);
-}
+  async createCampaign(data: Record<string, unknown>): Promise<{ id: number }> {
+    const raw = await this.http.post("/campaigns/create", data);
+    return campaignCreateResponseSchema.parse(raw);
+  }
 
-export async function createCampaign(data: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return getClient().post<Record<string, unknown>>("/campaigns/create", data);
-}
+  async updateCampaign(id: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.put(`/campaigns/${id}/update`, data);
+  }
 
-export async function updateCampaign(
-  id: number,
-  data: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  return getClient().put<Record<string, unknown>>(`/campaigns/${id}/update`, data);
-}
+  async setCampaignStatus(
+    ids: number[],
+    action: "activate" | "pause" | "archive",
+  ): Promise<unknown> {
+    return this.http.post(`/campaigns/${action}`, { campaignIds: ids });
+  }
 
-export async function setCampaignStatus(
-  ids: number[],
-  action: "activate" | "pause" | "archive",
-): Promise<unknown> {
-  return getClient().post(`/campaigns/${action}`, { campaignIds: ids });
-}
+  async listCampaignFolders(params: Record<string, unknown>): Promise<ListResponse<FolderRow>> {
+    const raw = await this.http.post("/campaigns/folders", params);
+    return folderListSchema.parse(raw);
+  }
 
-export async function listCampaignFolders(
-  params: Record<string, unknown>,
-): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/campaigns/folders", params);
-}
+  async createCampaignFolder(name: string): Promise<{ id: number }> {
+    const raw = await this.http.post("/campaigns/folders/create", { name });
+    return z.object({ id: z.number() }).passthrough().parse(raw);
+  }
 
-export async function createCampaignFolder(name: string): Promise<CampaignFolder> {
-  return getClient().post<CampaignFolder>("/campaigns/folders/create", { name });
-}
+  async updateCampaignFolder(id: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.put(`/campaigns/folders/${id}/settings`, data);
+  }
 
-export async function updateCampaignFolder(
-  id: number,
-  data: Record<string, unknown>,
-): Promise<CampaignFolder> {
-  return getClient().put<CampaignFolder>(`/campaigns/folders/${id}/settings`, data);
-}
+  async listAudiences(params: Record<string, unknown>): Promise<ListResponse<Audience>> {
+    const raw = await this.http.post("/audiences", params);
+    return audienceListSchema.parse(raw);
+  }
 
-export async function listAudiences(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/audiences", params);
-}
+  async getAudience(id: number): Promise<Audience> {
+    const raw = await this.http.get(`/audiences/${id}`);
+    return audienceSchema.parse(raw);
+  }
 
-export async function getAudience(id: number): Promise<Audience> {
-  return getClient().get<Audience>(`/audiences/${id}`);
-}
+  async createAudience(data: Record<string, unknown>): Promise<Audience> {
+    const raw = await this.http.post("/audiences/create", data);
+    return audienceSchema.parse(raw);
+  }
 
-export async function createAudience(data: Record<string, unknown>): Promise<Audience> {
-  return getClient().post<Audience>("/audiences/create", data);
-}
+  async updateAudience(id: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.put(`/audiences/${id}`, data);
+  }
 
-export async function updateAudience(
-  id: number,
-  data: Record<string, unknown>,
-): Promise<Audience> {
-  return getClient().put<Audience>(`/audiences/${id}`, data);
-}
+  async deleteAudience(id: number): Promise<unknown> {
+    return this.http.delete(`/audiences/${id}`);
+  }
 
-export async function deleteAudience(id: number): Promise<unknown> {
-  return getClient().delete(`/audiences/${id}`);
-}
+  async listCreatives(params: Record<string, unknown>): Promise<ListResponse<CreativeRow>> {
+    const raw = await this.http.post("/materials", params);
+    return creativeListSchema.parse(raw);
+  }
 
-export async function listCreatives(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/materials", params);
-}
+  async createCreative(campaignId: number, formData: FormData): Promise<{ id: number }> {
+    const raw = await this.http.postFormData(`/campaigns/${campaignId}/materials`, formData);
+    return creativeCreateResponseSchema.parse(raw);
+  }
 
-export async function createCreative(
-  campaignId: number,
-  formData: FormData,
-): Promise<Creative> {
-  return getClient().postFormData<Creative>(`/campaigns/${campaignId}/materials`, formData);
-}
+  async updateCreative(campaignId: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.put(`/campaigns/${campaignId}/materials`, data);
+  }
 
-export async function updateCreative(
-  campaignId: number,
-  data: Record<string, unknown>,
-): Promise<Creative> {
-  return getClient().put<Creative>(`/campaigns/${campaignId}/materials`, data);
-}
+  async setCreativeStatus(
+    ids: number[],
+    action: "activate" | "pause" | "archive",
+  ): Promise<unknown> {
+    return this.http.post(`/materials/${action}`, { adsIds: ids });
+  }
 
-export async function setCreativeStatus(
-  ids: number[],
-  action: "activate" | "pause" | "archive",
-): Promise<unknown> {
-  return getClient().post(`/materials/${action}`, { adsIds: ids });
-}
+  async listFinanceOperations(params: Record<string, unknown>): Promise<ListResponse<FinanceRow>> {
+    const raw = await this.http.post("/finances/operations", params);
+    return financeListSchema.parse(raw);
+  }
 
-export async function listFinanceOperations(
-  params: Record<string, unknown>,
-): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/finances/operations", params);
-}
+  async getReportConfig(): Promise<ReportConfig> {
+    const raw = await this.http.options("/custom-reports");
+    return reportConfigSchema.parse(raw);
+  }
 
-export async function getReportConfig(): Promise<ReportConfig> {
-  return getClient().options<ReportConfig>("/custom-reports");
-}
+  async getReportData(params: ReportDataParams): Promise<ReportDataResponse> {
+    const raw = await this.http.post("/custom-reports/data", params);
+    return reportDataResponseSchema.parse(raw);
+  }
 
-export async function getReportData(
-  params: ReportDataParams,
-): Promise<ReportDataResponse> {
-  return getClient().post<ReportDataResponse>("/custom-reports/data", params);
-}
+  async getSiteStats(params: Record<string, unknown>): Promise<ListResponse<Record<string, unknown>>> {
+    const raw = await this.http.post("/stats/sites", params);
+    return listResponseSchema(z.record(z.unknown())).parse(raw);
+  }
 
-export async function getSiteStats(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/stats/sites", params);
-}
-
-export async function getPostbackStats(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/stats/postback", params);
+  async getPostbackStats(params: Record<string, unknown>): Promise<ListResponse<Record<string, unknown>>> {
+    const raw = await this.http.post("/stats/postback", params);
+    return listResponseSchema(z.record(z.unknown())).parse(raw);
+  }
 }

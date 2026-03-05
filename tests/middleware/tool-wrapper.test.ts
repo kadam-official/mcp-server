@@ -5,15 +5,23 @@ import { z } from "zod";
 import { ToolWrapper } from "../../src/middleware/tool-wrapper.js";
 import { ApiError } from "../../src/api/http-client.js";
 import { resetConfig } from "../../src/config.js";
+import { ClientPool } from "../../src/api/client-pool.js";
 
 vi.mock("../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
+function createPool(): ClientPool {
+  return new ClientPool({
+    advBaseUrl: "https://partners.kadam.net/api/v1",
+    pubBaseUrl: "https://pub.kadam.net/api",
+  });
+}
+
 async function createTestSetup() {
   const server = new McpServer({ name: "test", version: "0.0.1" });
-  const wrapper = new ToolWrapper(server);
+  const wrapper = new ToolWrapper(server, createPool());
 
   wrapper.register(
     { name: "test_tool", description: "A test tool", product: "advertiser" },
@@ -85,7 +93,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ApiError(404) returns Resource not found", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server);
+    const wrapper = new ToolWrapper(server, createPool());
     wrapper.register(
       { name: "fail_404", description: "Fails with 404", product: "advertiser" },
       { input: z.string() },
@@ -109,7 +117,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ApiError(422, message) returns Validation error", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server);
+    const wrapper = new ToolWrapper(server, createPool());
     wrapper.register(
       { name: "fail_422", description: "Fails with 422", product: "advertiser" },
       { input: z.string() },
@@ -133,7 +141,7 @@ describe("ToolWrapper", () => {
   it("handler that throws generic Error returns Error: message", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server);
+    const wrapper = new ToolWrapper(server, createPool());
     wrapper.register(
       { name: "fail_generic", description: "Fails with generic error", product: "advertiser" },
       { input: z.string() },
@@ -157,7 +165,7 @@ describe("ToolWrapper", () => {
   it("tool with advertiser product works with ADV key set", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server);
+    const wrapper = new ToolWrapper(server, createPool());
     wrapper.register(
       { name: "adv_tool", description: "Adv tool", product: "advertiser" },
       { input: z.string() },
@@ -179,7 +187,7 @@ describe("ToolWrapper", () => {
     process.env.KADAM_ADV_API_KEY = "adv-key";
     delete process.env.KADAM_PUB_API_KEY;
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server);
+    const wrapper = new ToolWrapper(server, createPool());
     wrapper.register(
       { name: "pub_tool", description: "Publisher tool", product: "publisher" },
       { input: z.string() },

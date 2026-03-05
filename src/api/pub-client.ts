@@ -1,7 +1,12 @@
-import { HttpClient } from "./http-client.js";
-import { getConfig, requirePubKey } from "../config.js";
-import type { Source, AdUnit, PubUser } from "../types/publisher.js";
-import type { ApiListResponse, ReportConfig, ReportDataResponse } from "../types/common.js";
+import type { HttpClient } from "./http-client.js";
+import { listResponseSchema, reportConfigSchema, reportDataResponseSchema } from "./schemas/common.js";
+import type { ListResponse, ReportConfig, ReportDataResponse } from "./schemas/common.js";
+import { sourceSchema, adUnitSchema, pubUserSchema } from "./schemas/publisher.js";
+import type { Source, AdUnit, PubUser } from "./schemas/publisher.js";
+import { z } from "zod";
+
+const sourceListSchema = listResponseSchema(sourceSchema);
+const adUnitListSchema = listResponseSchema(adUnitSchema);
 
 export interface PubReportDataParams {
   groupBy?: string;
@@ -17,81 +22,71 @@ export interface PubReportDataParams {
   [key: string]: unknown;
 }
 
-let _client: HttpClient | null = null;
+export class PubClient {
+  constructor(private readonly http: HttpClient) {}
 
-function getClient(): HttpClient {
-  if (!_client) {
-    const config = getConfig();
-    _client = new HttpClient({
-      baseUrl: config.KADAM_PUB_API_BASE,
-      apiKey: requirePubKey(),
-    });
+  async listSources(params: Record<string, unknown>): Promise<ListResponse<Source>> {
+    const raw = await this.http.post("/sources/sources-table", params);
+    return sourceListSchema.parse(raw);
   }
-  return _client;
-}
 
-export async function listSources(params: Record<string, unknown>): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>("/sources/sources-table", params);
-}
-
-export async function createSource(data: { name: string; url: string }): Promise<Source> {
-  return getClient().put<Source>("/sources", data);
-}
-
-export async function getSource(id: number): Promise<Source> {
-  return getClient().get<Source>(`/sources/${id}`);
-}
-
-export async function updateSource(
-  id: number,
-  data: Record<string, unknown>,
-): Promise<Source> {
-  return getClient().put<Source>(`/sources/${id}`, data);
-}
-
-export async function setSourceStatus(
-  id: number,
-  action: "activate" | "deactivate" | "archive" | "un-archive",
-): Promise<unknown> {
-  if (action === "archive") {
-    return getClient().post(`/sources/archive/${id}`);
+  async createSource(data: { name: string; url: string }): Promise<Source> {
+    const raw = await this.http.put("/sources", data);
+    return sourceSchema.parse(raw);
   }
-  if (action === "un-archive") {
-    return getClient().post(`/sources/un-archive/${id}`);
+
+  async getSource(id: number): Promise<Source> {
+    const raw = await this.http.get(`/sources/${id}`);
+    return sourceSchema.parse(raw);
   }
-  return getClient().post(`/sources/${id}/${action}`);
-}
 
-export async function listAdUnits(
-  sourceId: number,
-  params: Record<string, unknown>,
-): Promise<ApiListResponse> {
-  return getClient().post<ApiListResponse>(`/places/places-table/${sourceId}`, params);
-}
-
-export async function setAdUnitStatus(
-  id: number,
-  action: "activate" | "deactivate" | "delete" | "restore",
-): Promise<unknown> {
-  if (action === "delete") {
-    return getClient().delete(`/places/${id}`);
+  async updateSource(id: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.put(`/sources/${id}`, data);
   }
-  if (action === "restore") {
-    return getClient().post(`/places/${id}/restore`);
+
+  async setSourceStatus(
+    id: number,
+    action: "activate" | "deactivate" | "archive" | "un-archive",
+  ): Promise<unknown> {
+    if (action === "archive") {
+      return this.http.post(`/sources/archive/${id}`);
+    }
+    if (action === "un-archive") {
+      return this.http.post(`/sources/un-archive/${id}`);
+    }
+    return this.http.post(`/sources/${id}/${action}`);
   }
-  return getClient().post(`/places/${id}/${action}`);
-}
 
-export async function getUserInfo(): Promise<PubUser> {
-  return getClient().post<PubUser>("/users/check-upd");
-}
+  async listAdUnits(sourceId: number, params: Record<string, unknown>): Promise<ListResponse<AdUnit>> {
+    const raw = await this.http.post(`/places/places-table/${sourceId}`, params);
+    return adUnitListSchema.parse(raw);
+  }
 
-export async function getReportConfig(): Promise<ReportConfig> {
-  return getClient().options<ReportConfig>("/custom-reports");
-}
+  async setAdUnitStatus(
+    id: number,
+    action: "activate" | "deactivate" | "delete" | "restore",
+  ): Promise<unknown> {
+    if (action === "delete") {
+      return this.http.delete(`/places/${id}`);
+    }
+    if (action === "restore") {
+      return this.http.post(`/places/${id}/restore`);
+    }
+    return this.http.post(`/places/${id}/${action}`);
+  }
 
-export async function getReportData(
-  params: PubReportDataParams,
-): Promise<ReportDataResponse> {
-  return getClient().post<ReportDataResponse>("/custom-reports/data", params);
+  async getUserInfo(): Promise<PubUser> {
+    const raw = await this.http.post("/users/check-upd");
+    return pubUserSchema.parse(raw);
+  }
+
+  async getReportConfig(): Promise<ReportConfig> {
+    const raw = await this.http.options("/custom-reports");
+    return reportConfigSchema.parse(raw);
+  }
+
+  async getReportData(params: PubReportDataParams): Promise<ReportDataResponse> {
+    const raw = await this.http.post("/custom-reports/data", params);
+    return reportDataResponseSchema.parse(raw);
+  }
 }

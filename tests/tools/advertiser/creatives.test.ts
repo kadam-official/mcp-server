@@ -1,24 +1,25 @@
-import { createToolClient, getTextFromResult } from "../../helpers/tool-client.js";
+import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
 import { creativesModule } from "../../../src/tools/advertiser/creatives.js";
-import * as api from "../../../src/api/partners-client.js";
+import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../../../src/api/partners-client.js");
-
 beforeEach(() => {
   process.env.KADAM_ADV_API_KEY = "test-adv-key";
 });
 afterEach(() => {
   delete process.env.KADAM_ADV_API_KEY;
+  resetConfig();
 });
 
 describe("creatives tools", () => {
   it("list_creatives returns formatted list", async () => {
-    vi.mocked(api.listCreatives).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCreatives.mockResolvedValue({
       rows: [
         {
           ad: { id: 1, title: "Creative One", text: "", status: { id: "active", label: "Active" } },
@@ -32,7 +33,6 @@ describe("creatives tools", () => {
       perPage: 25,
     });
 
-    const client = await createToolClient(creativesModule);
     const result = await client.callTool({
       name: "kadam_adv_list_creatives",
       arguments: { page: 1 },
@@ -45,7 +45,9 @@ describe("creatives tools", () => {
   });
 
   it("create_creative calls api.createCreative with campaignId and FormData", async () => {
-    vi.mocked(api.createCreative).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({
       id: 99,
       campaignId: 15,
       title: "",
@@ -61,7 +63,6 @@ describe("creatives tools", () => {
       ctr: 0,
     });
 
-    const client = await createToolClient(creativesModule);
     await client.callTool({
       name: "kadam_adv_create_creative",
       arguments: {
@@ -77,9 +78,10 @@ describe("creatives tools", () => {
   });
 
   it("set_creative_status with ids 5,6 and status paused calls api with action pause", async () => {
-    vi.mocked(api.setCreativeStatus).mockResolvedValue(undefined as never);
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCreativeStatus.mockResolvedValue(undefined as never);
 
-    const client = await createToolClient(creativesModule);
     const result = await client.callTool({
       name: "kadam_adv_set_creative_status",
       arguments: { ids: "5,6", status: "paused" },
@@ -91,9 +93,10 @@ describe("creatives tools", () => {
   });
 
   it("update_creative calls api.updateCreative with mapped fields", async () => {
-    vi.mocked(api.updateCreative).mockResolvedValue({} as never);
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateCreative.mockResolvedValue({} as never);
 
-    const client = await createToolClient(creativesModule);
     const result = await client.callTool({
       name: "kadam_adv_update_creative",
       arguments: {

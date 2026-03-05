@@ -1,26 +1,12 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/partners-client.js";
+import type { FolderRow } from "../../api/schemas/advertiser.js";
 import {
   formatEntityList,
   clampPerPage,
 } from "../../output-formatter.js";
-import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
-
-interface FolderRow {
-  folder: {
-    id: number;
-    name: string;
-    state: { id: string; label: string };
-    campaignsCount: number;
-    activeCampaignsCount: number;
-  };
-  views: string;
-  clicks: string;
-  moneyOut: string;
-}
 
 function formatFolderRow(row: FolderRow, index: number): string {
   const f = row.folder;
@@ -43,15 +29,15 @@ export const campaignFoldersModule: ToolModule = {
         perPage: z.number().optional().default(25),
         searchQuery: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
           perPage,
           ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
         };
-        const res = (await api.listCampaignFolders(params)) as ApiListResponse;
-        const items = (res.rows ?? []) as FolderRow[];
+        const res = await ctx.adv!.listCampaignFolders(params);
+        const items = res.rows ?? [];
         const pagination = extractPagination(res);
         return formatEntityList(
           items,
@@ -71,8 +57,8 @@ export const campaignFoldersModule: ToolModule = {
       {
         name: z.string().min(4),
       },
-      async (args) => {
-        const result = (await api.createCampaignFolder(args.name)) as { id: number };
+      async (args, ctx) => {
+        const result = await ctx.adv!.createCampaignFolder(args.name);
         return `Folder created: [ID: ${result.id}] "${args.name}"`;
       },
     );
@@ -91,7 +77,7 @@ export const campaignFoldersModule: ToolModule = {
         dailyBudget: z.number().optional(),
         evenDistribution: z.boolean().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const { id, ...rest } = args;
         const data: Record<string, unknown> = {};
         if (rest.totalBudget != null) data.groupTotalLimit = rest.totalBudget;
@@ -100,7 +86,7 @@ export const campaignFoldersModule: ToolModule = {
           data.groupSpendingEvenly = rest.evenDistribution;
         data.limitsEnabled = rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
 
-        await api.updateCampaignFolder(id, data);
+        await ctx.adv!.updateCampaignFolder(id, data);
         return `Folder #${id} updated successfully.`;
       },
     );

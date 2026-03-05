@@ -1,24 +1,25 @@
-import { createToolClient, getTextFromResult } from "../../helpers/tool-client.js";
+import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
 import { campaignsModule } from "../../../src/tools/advertiser/campaigns.js";
-import * as api from "../../../src/api/partners-client.js";
+import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../../../src/api/partners-client.js");
-
 beforeEach(() => {
   process.env.KADAM_ADV_API_KEY = "test-adv-key";
 });
 afterEach(() => {
   delete process.env.KADAM_ADV_API_KEY;
+  resetConfig();
 });
 
 describe("campaigns tools", () => {
   it("list_campaigns returns formatted list with [ID: 1] and Test", async () => {
-    vi.mocked(api.listCampaigns).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCampaigns.mockResolvedValue({
       rows: [
         {
           campaign: {
@@ -43,7 +44,6 @@ describe("campaigns tools", () => {
       perPage: 25,
     });
 
-    const client = await createToolClient(campaignsModule);
     const result = await client.callTool({ name: "kadam_adv_list_campaigns", arguments: { page: 1 } });
     const text = getTextFromResult(result);
 
@@ -52,12 +52,13 @@ describe("campaigns tools", () => {
   });
 
   it("create_campaign calls api with type 30 (push) and cpType 0 (cpc)", async () => {
-    vi.mocked(api.createCampaign).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({
       id: 99,
       name: "New",
     } as never);
 
-    const client = await createToolClient(campaignsModule);
     await client.callTool({
       name: "kadam_adv_create_campaign",
       arguments: {
@@ -80,9 +81,10 @@ describe("campaigns tools", () => {
   });
 
   it("update_campaign calls api.updateCampaign with correct id", async () => {
-    vi.mocked(api.updateCampaign).mockResolvedValue({} as never);
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateCampaign.mockResolvedValue({} as never);
 
-    const client = await createToolClient(campaignsModule);
     await client.callTool({
       name: "kadam_adv_update_campaign",
       arguments: { id: 42, name: "Updated Name" },
@@ -95,9 +97,10 @@ describe("campaigns tools", () => {
   });
 
   it("set_campaign_status with ids 1,2,3 and active calls api with activate", async () => {
-    vi.mocked(api.setCampaignStatus).mockResolvedValue(undefined as never);
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignStatus.mockResolvedValue(undefined as never);
 
-    const client = await createToolClient(campaignsModule);
     const result = await client.callTool({
       name: "kadam_adv_set_campaign_status",
       arguments: { ids: "1,2,3", status: "active" },
@@ -109,14 +112,15 @@ describe("campaigns tools", () => {
   });
 
   it("list_campaigns with empty data handles gracefully", async () => {
-    vi.mocked(api.listCampaigns).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCampaigns.mockResolvedValue({
       rows: [],
       totalRows: 0,
       page: 1,
       perPage: 25,
     });
 
-    const client = await createToolClient(campaignsModule);
     const result = await client.callTool({ name: "kadam_adv_list_campaigns", arguments: { page: 1 } });
     const text = getTextFromResult(result);
 

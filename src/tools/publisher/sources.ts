@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/pub-client.js";
 import {
   formatEntityList,
   clampPerPage,
@@ -9,8 +8,7 @@ import {
   formatCurrency,
   formatSingleEntity,
 } from "../../output-formatter.js";
-import type { Source } from "../../types/publisher.js";
-import type { ApiListResponse } from "../../types/common.js";
+import type { Source } from "../../api/schemas/publisher.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 const STATUS_ACTION_MAP = {
@@ -48,7 +46,7 @@ export const sourcesModule: ToolModule = {
         sortField: z.string().optional(),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
@@ -61,11 +59,10 @@ export const sourcesModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = (await api.listSources(params)) as ApiListResponse;
-        const items = (res.rows ?? []) as Source[];
+        const res = await ctx.pub!.listSources(params);
         const pagination = extractPagination(res);
         return formatEntityList(
-          items,
+          res.rows,
           formatSourceRow,
           "Sources",
           pagination,
@@ -85,8 +82,8 @@ export const sourcesModule: ToolModule = {
         name: z.string().min(1).max(100),
         url: z.string().url().max(300),
       },
-      async (args) => {
-        const source = (await api.createSource({ name: args.name, url: args.url })) as Source;
+      async (args, ctx) => {
+        const source = await ctx.pub!.createSource({ name: args.name, url: args.url });
         return `Site created: [ID: ${source.id}] "${source.name}" (${source.url}). Status: oninit. Next: verify domain ownership.`;
       },
     );
@@ -101,8 +98,8 @@ export const sourcesModule: ToolModule = {
       {
         id: z.number(),
       },
-      async (args) => {
-        const source = (await api.getSource(args.id)) as Source;
+      async (args, ctx) => {
+        const source = await ctx.pub!.getSource(args.id);
         return formatSingleEntity(`Source #${source.id}`, [
           ["ID", String(source.id)],
           ["Name", source.name],
@@ -128,9 +125,9 @@ export const sourcesModule: ToolModule = {
         id: z.number(),
         name: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const { id, name } = args;
-        await api.updateSource(id, name != null ? { name } : {});
+        await ctx.pub!.updateSource(id, name != null ? { name } : {});
         return `Site #${id} updated successfully.`;
       },
     );
@@ -147,9 +144,9 @@ export const sourcesModule: ToolModule = {
         id: z.number(),
         status: z.enum(["active", "paused", "archived", "unarchived"]),
       },
-      async (args) => {
+      async (args, ctx) => {
         const action = STATUS_ACTION_MAP[args.status];
-        await api.setSourceStatus(args.id, action);
+        await ctx.pub!.setSourceStatus(args.id, action);
         return `Site #${args.id} set to ${args.status}.`;
       },
     );

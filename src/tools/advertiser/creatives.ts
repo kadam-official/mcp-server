@@ -3,21 +3,13 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/partners-client.js";
 import {
   formatEntityList,
   clampPerPage,
 } from "../../output-formatter.js";
-import type { ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
-
-interface CreativeRow {
-  ad?: { id: number; title?: string; text?: string; status?: { id: string; label: string } };
-  materialCampaign?: { id: number; name: string };
-  views: string;
-  clicks: string;
-}
+import type { CreativeRow } from "../../api/schemas/advertiser.js";
 
 function formatCreativeRow(row: CreativeRow, index: number): string {
   const ad = row.ad;
@@ -72,12 +64,10 @@ async function loadFile(source: string): Promise<LoadedFile> {
 
 export function parseImageDimensions(data: Uint8Array): { width: number; height: number } {
   if (data[0] === 0x89 && data[1] === 0x50) {
-    // PNG: IHDR chunk at offset 16
     const view = new DataView(data.buffer, data.byteOffset);
     return { width: view.getUint32(16), height: view.getUint32(20) };
   }
   if (data[0] === 0xFF && data[1] === 0xD8) {
-    // JPEG: scan for SOF0/SOF2 markers
     let offset = 2;
     while (offset < data.length - 9) {
       if (data[offset] !== 0xFF) { offset++; continue; }
@@ -128,7 +118,7 @@ export const creativesModule: ToolModule = {
         status: z.string().optional(),
         searchQuery: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
@@ -137,11 +127,10 @@ export const creativesModule: ToolModule = {
           ...(args.status != null && { status: args.status }),
           ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
         };
-        const res = (await api.listCreatives(params)) as ApiListResponse;
-        const items = (res.rows ?? []) as CreativeRow[];
+        const res = await ctx.adv!.listCreatives(params);
         const pagination = extractPagination(res);
         return formatEntityList(
-          items,
+          res.rows,
           formatCreativeRow,
           "Creatives",
           pagination,
@@ -180,7 +169,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         startDate: z.string().optional().describe("Creative start date (YYYY-MM-DD HH:MM:SS)"),
         stopDate: z.string().optional().describe("Creative stop date (YYYY-MM-DD HH:MM:SS)"),
       },
-      async (args) => {
+      async (args, ctx) => {
         const bids: Array<Record<string, unknown>> = [];
         if (args.bid != null) {
           const countries = args.bidCountries
@@ -221,8 +210,8 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           fd.set("image", file.blob, file.filename);
         }
 
-        const c = await api.createCreative(args.campaignId, fd);
-        return `Creative created: [ID: ${(c as Record<string, unknown>).id}] for campaign #${args.campaignId}. Status: pending moderation.`;
+        const c = await ctx.adv!.createCreative(args.campaignId, fd);
+        return `Creative created: [ID: ${c.id}] for campaign #${args.campaignId}. Status: pending moderation.`;
       },
     );
 
@@ -243,7 +232,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         stopDate: z.string().optional(),
         pauseAfterModeration: z.boolean().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const { campaignId, creativeId, ...rest } = args;
         const data: Record<string, unknown> = { adId: creativeId };
         if (rest.url != null) data.url = rest.url;
@@ -257,7 +246,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           data.bids = [{ bid: rest.bid, countries }];
         }
 
-        await api.updateCreative(campaignId, data);
+        await ctx.adv!.updateCreative(campaignId, data);
         return `Creative #${creativeId} updated successfully.`;
       },
     );
@@ -274,10 +263,10 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         ids: z.string().min(1),
         status: z.enum(["active", "paused", "archived"]),
       },
-      async (args) => {
+      async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await api.setCreativeStatus(parsedIds, action);
+        await ctx.adv!.setCreativeStatus(parsedIds, action);
         const idList = parsedIds.map((id) => `#${id}`).join(", ");
         return `${parsedIds.length} creatives set to ${args.status}: ${idList}`;
       },

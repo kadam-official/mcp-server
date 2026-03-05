@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/pub-client.js";
 import {
   formatEntityList,
   clampPerPage,
@@ -9,8 +8,7 @@ import {
   formatCurrency,
 } from "../../output-formatter.js";
 import { AD_UNIT_TYPE_MAP, AD_UNIT_TYPE_NAME } from "../../types/publisher.js";
-import type { AdUnit } from "../../types/publisher.js";
-import type { ApiListResponse } from "../../types/common.js";
+import type { AdUnit } from "../../api/schemas/publisher.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 const AD_UNIT_STATUS_ACTION_MAP = {
@@ -54,7 +52,7 @@ export const adUnitsModule: ToolModule = {
         sortField: z.string().optional(),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const params: Record<string, unknown> = {
           page: args.page,
@@ -70,11 +68,10 @@ export const adUnitsModule: ToolModule = {
           ...(args.sortField != null && { sortField: args.sortField }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
-        const res = (await api.listAdUnits(args.sourceId, params)) as ApiListResponse;
-        const items = (res.rows ?? []) as AdUnit[];
+        const res = await ctx.pub!.listAdUnits(args.sourceId, params);
         const pagination = extractPagination(res);
         return formatEntityList(
-          items,
+          res.rows,
           formatAdUnitRow,
           "Ad Units",
           pagination,
@@ -94,9 +91,9 @@ export const adUnitsModule: ToolModule = {
         id: z.number(),
         status: z.enum(["active", "paused", "archived", "restored"]),
       },
-      async (args) => {
+      async (args, ctx) => {
         const action = AD_UNIT_STATUS_ACTION_MAP[args.status];
-        await api.setAdUnitStatus(args.id, action);
+        await ctx.pub!.setAdUnitStatus(args.id, action);
         return `Ad unit #${args.id} set to ${args.status}.`;
       },
     );

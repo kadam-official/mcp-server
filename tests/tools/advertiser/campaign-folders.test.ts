@@ -1,24 +1,25 @@
-import { createToolClient, getTextFromResult } from "../../helpers/tool-client.js";
+import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
 import { campaignFoldersModule } from "../../../src/tools/advertiser/campaign-folders.js";
-import * as api from "../../../src/api/partners-client.js";
+import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../../../src/api/partners-client.js");
-
 beforeEach(() => {
   process.env.KADAM_ADV_API_KEY = "test-adv-key";
 });
 afterEach(() => {
   delete process.env.KADAM_ADV_API_KEY;
+  resetConfig();
 });
 
 describe("campaign-folders tools", () => {
   it("list_campaign_folders returns formatted list", async () => {
-    vi.mocked(api.listCampaignFolders).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCampaignFolders.mockResolvedValue({
       rows: [
         {
           folder: {
@@ -38,7 +39,6 @@ describe("campaign-folders tools", () => {
       perPage: 25,
     });
 
-    const client = await createToolClient(campaignFoldersModule);
     const result = await client.callTool({
       name: "kadam_adv_list_campaign_folders",
       arguments: { page: 1 },
@@ -51,9 +51,10 @@ describe("campaign-folders tools", () => {
   });
 
   it("create_campaign_folder calls api and returns ID", async () => {
-    vi.mocked(api.createCampaignFolder).mockResolvedValue({ id: 42 } as never);
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaignFolder.mockResolvedValue({ id: 42 } as never);
 
-    const client = await createToolClient(campaignFoldersModule);
     const result = await client.callTool({
       name: "kadam_adv_create_campaign_folder",
       arguments: { name: "Test Folder" },
@@ -65,9 +66,10 @@ describe("campaign-folders tools", () => {
   });
 
   it("update_campaign_folder auto-sets limitsEnabled when budget is provided", async () => {
-    vi.mocked(api.updateCampaignFolder).mockResolvedValue(undefined as never);
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateCampaignFolder.mockResolvedValue(undefined as never);
 
-    const client = await createToolClient(campaignFoldersModule);
     const result = await client.callTool({
       name: "kadam_adv_update_campaign_folder",
       arguments: { id: 1, dailyBudget: 500 },
@@ -82,9 +84,10 @@ describe("campaign-folders tools", () => {
   });
 
   it("update_campaign_folder respects explicit limitsEnabled=false", async () => {
-    vi.mocked(api.updateCampaignFolder).mockResolvedValue(undefined as never);
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateCampaignFolder.mockResolvedValue(undefined as never);
 
-    const client = await createToolClient(campaignFoldersModule);
     await client.callTool({
       name: "kadam_adv_update_campaign_folder",
       arguments: { id: 2, limitsEnabled: false },

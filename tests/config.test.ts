@@ -61,23 +61,15 @@ describe("config", () => {
     expect(hasPubKey2()).toBe(false);
   });
 
-  it("requireAdvKey returns key when set", async () => {
-    process.env.KADAM_ADV_API_KEY = "adv-secret";
-    const { requireAdvKey } = await import("../src/config.js");
-    expect(requireAdvKey()).toBe("adv-secret");
-  });
+  it("resetConfig clears cache", async () => {
+    process.env.KADAM_ADV_API_KEY = "first-key";
+    const { getConfig, resetConfig } = await import("../src/config.js");
+    const config1 = getConfig();
+    expect(config1.KADAM_ADV_API_KEY).toBe("first-key");
 
-  it("requireAdvKey throws AuthError when not set, message contains partners.kadam.net", async () => {
-    delete process.env.KADAM_ADV_API_KEY;
-    const { requireAdvKey, AuthError } = await import("../src/config.js");
-    expect(() => requireAdvKey()).toThrow(AuthError);
-    expect(() => requireAdvKey()).toThrow(/partners\.kadam\.net/);
-  });
-
-  it("requirePubKey throws AuthError when not set, message contains pub.kadam.net", async () => {
-    delete process.env.KADAM_PUB_API_KEY;
-    const { requirePubKey, AuthError } = await import("../src/config.js");
-    expect(() => requirePubKey()).toThrow(AuthError);
-    expect(() => requirePubKey()).toThrow(/pub\.kadam\.net/);
+    process.env.KADAM_ADV_API_KEY = "second-key";
+    resetConfig();
+    const config2 = getConfig();
+    expect(config2.KADAM_ADV_API_KEY).toBe("second-key");
   });
 });

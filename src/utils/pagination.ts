@@ -1,6 +1,11 @@
-import type { ApiListResponse } from "../types/common.js";
+export interface PaginatedResponse {
+  rows: unknown[];
+  totalRows?: number;
+  page?: number;
+  perPage?: number;
+}
 
-export function extractPagination(res: ApiListResponse): {
+export function extractPagination(res: PaginatedResponse): {
   page: number;
   totalPages: number;
   totalRows: number;

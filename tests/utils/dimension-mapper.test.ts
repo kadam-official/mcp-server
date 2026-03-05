@@ -1,5 +1,5 @@
 import { resolveMetricIds, resolveGroupIds } from "../../src/utils/dimension-mapper.js";
-import type { ReportConfig } from "../../src/types/common.js";
+import type { ReportConfig } from "../../src/api/schemas/common.js";
 
 const mockConfig: ReportConfig = {
   groups: {

@@ -1,4 +1,5 @@
-import type { ReportConfig, ReportConfigGroup, ReportConfigMetric } from "../types/common.js";
+import type { ReportConfig } from "../api/schemas/common.js";
+import type { ReportConfigGroup, ReportConfigMetric } from "../api/schemas/common.js";
 
 const METRIC_ALIASES: Record<string, string> = {
   spend: "finance_moneyOut",

@@ -1,24 +1,25 @@
-import { createToolClient, getTextFromResult } from "../../helpers/tool-client.js";
+import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
 import { audiencesModule } from "../../../src/tools/advertiser/audiences.js";
-import * as api from "../../../src/api/partners-client.js";
+import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../../../src/api/partners-client.js");
-
 beforeEach(() => {
   process.env.KADAM_ADV_API_KEY = "test-adv-key";
 });
 afterEach(() => {
   delete process.env.KADAM_ADV_API_KEY;
+  resetConfig();
 });
 
 describe("audiences tools", () => {
   it("list_audiences returns formatted list", async () => {
-    vi.mocked(api.listAudiences).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listAudiences.mockResolvedValue({
       rows: [
         {
           id: 1,
@@ -40,7 +41,6 @@ describe("audiences tools", () => {
       perPage: 25,
     });
 
-    const client = await createToolClient(audiencesModule);
     const result = await client.callTool({
       name: "kadam_adv_list_audiences",
       arguments: { page: 1 },
@@ -53,7 +53,9 @@ describe("audiences tools", () => {
   });
 
   it("get_audience returns single entity format", async () => {
-    vi.mocked(api.getAudience).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getAudience.mockResolvedValue({
       id: 5,
       name: "My Audience",
       type: "audience",
@@ -68,7 +70,6 @@ describe("audiences tools", () => {
       linkedAudiencesIds: [],
     });
 
-    const client = await createToolClient(audiencesModule);
     const result = await client.callTool({
       name: "kadam_adv_get_audience",
       arguments: { id: 5 },
@@ -80,7 +81,9 @@ describe("audiences tools", () => {
   });
 
   it("create_audience returns Audience created: [ID: ...]", async () => {
-    vi.mocked(api.createAudience).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createAudience.mockResolvedValue({
       id: 42,
       name: "New Audience",
       type: "audience",
@@ -95,7 +98,6 @@ describe("audiences tools", () => {
       linkedAudiencesIds: [],
     });
 
-    const client = await createToolClient(audiencesModule);
     const result = await client.callTool({
       name: "kadam_adv_create_audience",
       arguments: {
@@ -111,9 +113,10 @@ describe("audiences tools", () => {
   });
 
   it("delete_audience with confirm true works and calls api.deleteAudience", async () => {
-    vi.mocked(api.deleteAudience).mockResolvedValue(undefined as never);
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.deleteAudience.mockResolvedValue(undefined as never);
 
-    const client = await createToolClient(audiencesModule);
     const result = await client.callTool({
       name: "kadam_adv_delete_audience",
       arguments: { id: 10, confirm: true },

@@ -1,37 +1,28 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { ToolWrapper } from "../../src/middleware/tool-wrapper.js";
 import { resetConfig } from "../../src/config.js";
-import { registerResources } from "../../src/resources/index.js";
-import { registerPrompts } from "../../src/prompts/index.js";
-import { advToolModules } from "../../src/tools/advertiser/index.js";
-import { pubToolModules } from "../../src/tools/publisher/index.js";
-
-vi.mock("../../src/api/partners-client.js");
-vi.mock("../../src/api/pub-client.js");
+import { ClientPool } from "../../src/api/client-pool.js";
+import { createMcpServer } from "../../src/server-factory.js";
 
 vi.mock("../../src/logger.js", () => ({
-  logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+    debug: vi.fn(),
+    child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
 async function createFullServer() {
-  const server = new McpServer(
-    { name: "@kadam/mcp-server", version: "0.1.0" },
-    { instructions: "Test instructions" },
-  );
-  const wrapper = new ToolWrapper(server);
+  const pool = new ClientPool({
+    advBaseUrl: "https://partners.kadam.net/api/v1",
+    pubBaseUrl: "https://pub.kadam.net/api",
+  });
 
-  registerResources(server);
-  registerPrompts(server);
-
-  for (const mod of advToolModules) {
-    mod.register(wrapper);
-  }
-  for (const mod of pubToolModules) {
-    mod.register(wrapper);
-  }
+  const server = createMcpServer(pool);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.1" });

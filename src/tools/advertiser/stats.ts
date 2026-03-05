@@ -1,18 +1,13 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/partners-client.js";
 import {
   formatTable,
   formatEntityList,
   clampPerPage,
 } from "../../output-formatter.js";
-import type { ReportDataResponse, ApiListResponse } from "../../types/common.js";
 import { extractPagination } from "../../utils/pagination.js";
-import { cacheOnce } from "../../utils/cache-once.js";
 import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
-
-const getReportConfig = cacheOnce(() => api.getReportConfig());
 
 function resolvePeriodToDates(
   period: string,
@@ -92,7 +87,7 @@ export const statsModule: ToolModule = {
           .default("all"),
         searchQuery: z.string().optional(),
       },
-      async (args) => {
+      async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
         const { dateFrom: df, dateTo: dt } =
           args.dateFrom != null && args.dateTo != null
@@ -100,7 +95,7 @@ export const statsModule: ToolModule = {
             : resolvePeriodToDates(args.period);
 
         if (args.reportType === "custom") {
-          const config = await getReportConfig();
+          const config = await ctx.adv!.getReportConfig();
           const groupIds = resolveGroupIds(args.groupBy, config);
           const metricIds = resolveMetricIds(args.metrics, config);
 
@@ -126,7 +121,7 @@ export const statsModule: ToolModule = {
             ...(args.sortBy != null && { sortBy: args.sortBy }),
             ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
           };
-          const res = (await api.getReportData(params)) as ReportDataResponse;
+          const res = await ctx.adv!.getReportData(params);
           const rows = res.rows ?? [];
           if (rows.length === 0) {
             return `No data for ${df} to ${dt}.`;
@@ -161,8 +156,7 @@ export const statsModule: ToolModule = {
               searchQuery: args.searchQuery,
             }),
           };
-          const res = (await api.getSiteStats(params)) as ApiListResponse;
-          const items = (res.rows ?? []) as Record<string, unknown>[];
+          const res = await ctx.adv!.getSiteStats(params);
           const pagination = extractPagination(res);
           const formatSiteRow = (
             s: Record<string, unknown>,
@@ -175,7 +169,7 @@ export const statsModule: ToolModule = {
             return `${i + 1}. ${parts}`;
           };
           return formatEntityList(
-            items,
+            res.rows,
             formatSiteRow,
             `Site stats (${df} to ${dt})`,
             pagination,
@@ -192,10 +186,7 @@ export const statsModule: ToolModule = {
               campaignIds: args.campaignIds,
             }),
           };
-          const res = (await api.getPostbackStats(
-            params,
-          )) as ApiListResponse;
-          const items = (res.rows ?? []) as Record<string, unknown>[];
+          const res = await ctx.adv!.getPostbackStats(params);
           const pagination = extractPagination(res);
           const formatPostbackRow = (
             p: Record<string, unknown>,
@@ -207,7 +198,7 @@ export const statsModule: ToolModule = {
             return `${i + 1}. ${parts}`;
           };
           return formatEntityList(
-            items,
+            res.rows,
             formatPostbackRow,
             `Postback stats (${df} to ${dt})`,
             pagination,

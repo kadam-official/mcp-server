@@ -1,8 +1,6 @@
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import * as api from "../../api/pub-client.js";
 import { formatSingleEntity, formatCurrency } from "../../output-formatter.js";
-import type { PubUser } from "../../types/publisher.js";
 
 export const usersModule: ToolModule = {
   product: "publisher",
@@ -16,8 +14,8 @@ export const usersModule: ToolModule = {
         annotations: { readOnlyHint: true },
       },
       {},
-      async () => {
-        const user = (await api.getUserInfo()) as PubUser;
+      async (_args, ctx) => {
+        const user = await ctx.pub!.getUserInfo();
         return formatSingleEntity("Publisher User", [
           ["Email", user.email],
           ["Name", user.name],

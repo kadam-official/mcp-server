@@ -1,24 +1,25 @@
-import { createToolClient, getTextFromResult } from "../../helpers/tool-client.js";
+import { createToolClient, getTextFromResult, type MockPubClient } from "../../helpers/tool-client.js";
 import { sourcesModule } from "../../../src/tools/publisher/sources.js";
-import * as api from "../../../src/api/pub-client.js";
+import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-vi.mock("../../../src/api/pub-client.js");
-
 beforeEach(() => {
   process.env.KADAM_PUB_API_KEY = "test-pub-key";
 });
 afterEach(() => {
   delete process.env.KADAM_PUB_API_KEY;
+  resetConfig();
 });
 
 describe("publisher sources tools", () => {
   it("list_sources returns formatted list", async () => {
-    vi.mocked(api.listSources).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(sourcesModule);
+    const api = mockApi as MockPubClient;
+    api.listSources.mockResolvedValue({
       rows: [
         {
           id: 1,
@@ -37,7 +38,6 @@ describe("publisher sources tools", () => {
       perPage: 25,
     });
 
-    const client = await createToolClient(sourcesModule);
     const result = await client.callTool({
       name: "kadam_pub_list_sources",
       arguments: { page: 1 },
@@ -50,7 +50,9 @@ describe("publisher sources tools", () => {
   });
 
   it("create_source calls api.createSource with name and url", async () => {
-    vi.mocked(api.createSource).mockResolvedValue({
+    const { client, mockApi } = await createToolClient(sourcesModule);
+    const api = mockApi as MockPubClient;
+    api.createSource.mockResolvedValue({
       id: 10,
       name: "New Site",
       url: "https://newsite.com",
@@ -62,7 +64,6 @@ describe("publisher sources tools", () => {
       placesCount: 0,
     });
 
-    const client = await createToolClient(sourcesModule);
     await client.callTool({
       name: "kadam_pub_create_source",
       arguments: { name: "New Site", url: "https://newsite.com" },
@@ -75,9 +76,10 @@ describe("publisher sources tools", () => {
   });
 
   it("set_source_status with status archived calls api with action archive", async () => {
-    vi.mocked(api.setSourceStatus).mockResolvedValue(undefined as never);
+    const { client, mockApi } = await createToolClient(sourcesModule);
+    const api = mockApi as MockPubClient;
+    api.setSourceStatus.mockResolvedValue(undefined as never);
 
-    const client = await createToolClient(sourcesModule);
     const result = await client.callTool({
       name: "kadam_pub_set_source_status",
       arguments: { id: 5, status: "archived" },
