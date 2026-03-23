@@ -5,7 +5,8 @@ import {
   campaignRowSchema,
   folderRowSchema,
   creativeRowSchema,
-  audienceSchema,
+  audienceRowSchema_,
+  audienceDetailSchema,
   financeRowSchema,
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
@@ -15,15 +16,17 @@ import type {
   CampaignRow,
   FolderRow,
   CreativeRow,
-  Audience,
+  AudienceRow,
+  AudienceDetail,
   FinanceRow,
 } from "./schemas/advertiser.js";
 import { z } from "zod";
+import { OptionsRegistry } from "./options-registry.js";
 
 const campaignListSchema = listResponseSchema(campaignRowSchema);
 const folderListSchema = listResponseSchema(folderRowSchema);
 const creativeListSchema = listResponseSchema(creativeRowSchema);
-const audienceListSchema = listResponseSchema(audienceSchema);
+const audienceListSchema = listResponseSchema(audienceRowSchema_);
 const financeListSchema = listResponseSchema(financeRowSchema);
 
 export interface ReportDataParams {
@@ -41,7 +44,11 @@ export interface ReportDataParams {
 }
 
 export class PartnersClient {
-  constructor(private readonly http: HttpClient) {}
+  readonly options: OptionsRegistry;
+
+  constructor(private readonly http: HttpClient) {
+    this.options = new OptionsRegistry(http);
+  }
 
   async listCampaigns(params: Record<string, unknown>): Promise<ListResponse<CampaignRow>> {
     const raw = await this.http.post("/campaigns", params);
@@ -51,6 +58,11 @@ export class PartnersClient {
   async createCampaign(data: Record<string, unknown>): Promise<{ id: number }> {
     const raw = await this.http.post("/campaigns/create", data);
     return campaignCreateResponseSchema.parse(raw);
+  }
+
+  async getCampaign(id: number): Promise<Record<string, unknown>> {
+    const raw = await this.http.get(`/campaigns/${id}`);
+    return raw as Record<string, unknown>;
   }
 
   async updateCampaign(id: number, data: Record<string, unknown>): Promise<unknown> {
@@ -78,19 +90,19 @@ export class PartnersClient {
     return this.http.put(`/campaigns/folders/${id}/settings`, data);
   }
 
-  async listAudiences(params: Record<string, unknown>): Promise<ListResponse<Audience>> {
+  async listAudiences(params: Record<string, unknown>): Promise<ListResponse<AudienceRow>> {
     const raw = await this.http.post("/audiences", params);
     return audienceListSchema.parse(raw);
   }
 
-  async getAudience(id: number): Promise<Audience> {
+  async getAudience(id: number): Promise<AudienceDetail> {
     const raw = await this.http.get(`/audiences/${id}`);
-    return audienceSchema.parse(raw);
+    return audienceDetailSchema.parse(raw);
   }
 
-  async createAudience(data: Record<string, unknown>): Promise<Audience> {
+  async createAudience(data: Record<string, unknown>): Promise<AudienceDetail> {
     const raw = await this.http.post("/audiences/create", data);
-    return audienceSchema.parse(raw);
+    return audienceDetailSchema.parse(raw);
   }
 
   async updateAudience(id: number, data: Record<string, unknown>): Promise<unknown> {
@@ -109,6 +121,11 @@ export class PartnersClient {
   async createCreative(campaignId: number, formData: FormData): Promise<{ id: number }> {
     const raw = await this.http.postFormData(`/campaigns/${campaignId}/materials`, formData);
     return creativeCreateResponseSchema.parse(raw);
+  }
+
+  async getMaterial(id: number): Promise<Record<string, unknown>> {
+    const raw = await this.http.get(`/materials/${id}`);
+    return raw as Record<string, unknown>;
   }
 
   async updateCreative(campaignId: number, data: Record<string, unknown>): Promise<unknown> {
@@ -142,8 +159,8 @@ export class PartnersClient {
     return listResponseSchema(z.record(z.unknown())).parse(raw);
   }
 
-  async getPostbackStats(params: Record<string, unknown>): Promise<ListResponse<Record<string, unknown>>> {
-    const raw = await this.http.post("/stats/postback", params);
+  async getConversionDetails(params: Record<string, unknown>): Promise<ListResponse<Record<string, unknown>>> {
+    const raw = await this.http.post("/stats/conversions", params);
     return listResponseSchema(z.record(z.unknown())).parse(raw);
   }
 }

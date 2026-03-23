@@ -1,5 +1,6 @@
-export const CREATIVE_FORMATS_CONTENT = `
-Creative Format Requirements by Campaign Type:
+import type { OptionsRegistry } from "../api/options-registry.js";
+
+const STATIC_CONTENT = `Creative Format Requirements by Campaign Type:
 
 IMPORTANT: The API uses multipart/form-data with file uploads. Provide image URLs
 and the MCP server will download and upload them automatically.
@@ -16,7 +17,6 @@ Native (Teaser):
 
 Banner:
   Required: url, imageUrl (must match exact banner dimensions), sizeId
-  Common sizeId values: 25=300x250, 35=728x90, 75=160x600, 80=320x50, 300=300x600
   Optional: bid, startDate, stopDate
 
 Video:
@@ -26,5 +26,25 @@ Video:
 Popunder (Clickunder):
   Does NOT support separate creatives.
   The campaign URL itself serves as the ad.
-  Creatives are auto-managed by the campaign.
-`;
+  Creatives are auto-managed by the campaign.`;
+
+export async function getCreativeFormatsContent(registry: OptionsRegistry | null): Promise<string> {
+  let sizesSection = "";
+
+  if (registry) {
+    try {
+      const opts = await registry.getMaterialOptions();
+      const lines = ["\nBanner Sizes (sizeId values):"];
+      for (const s of opts.sizes) {
+        if (s.width > 0 && s.height > 0) {
+          lines.push(`  ${s.id} = ${s.label} (${s.width}x${s.height})`);
+        } else {
+          lines.push(`  ${s.id} = ${s.label}`);
+        }
+      }
+      sizesSection = lines.join("\n");
+    } catch { /* fallback to no sizes */ }
+  }
+
+  return STATIC_CONTENT + sizesSection;
+}

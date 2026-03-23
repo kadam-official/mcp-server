@@ -59,11 +59,11 @@ describe("advertiser stats tools", () => {
     expect(text).toContain("Site stats");
   });
 
-  it("get_stats with reportType postbacks calls getPostbackStats", async () => {
+  it("get_stats with reportType conversions calls getConversionDetails", async () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
-    api.getPostbackStats.mockResolvedValue({
-      rows: [{ campaign: "Test", conversions: 5 }],
+    api.getConversionDetails.mockResolvedValue({
+      rows: [{ conversionType: "Approve", campaign: "Test (123)", adId: 100, conversionTime: "01.03.2026 12:00:00" }],
       totalRows: 1,
       page: 1,
       perPage: 25,
@@ -71,11 +71,11 @@ describe("advertiser stats tools", () => {
 
     const result = await client.callTool({
       name: "kadam_adv_get_stats",
-      arguments: { reportType: "postbacks", period: "7days" },
+      arguments: { reportType: "conversions", period: "7days" },
     });
     const text = getTextFromResult(result);
 
-    expect(api.getPostbackStats).toHaveBeenCalled();
-    expect(text).toContain("Postback stats");
+    expect(api.getConversionDetails).toHaveBeenCalled();
+    expect(text).toContain("Conversion Details");
   });
 });

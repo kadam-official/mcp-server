@@ -53,23 +53,45 @@ export const creativeRowSchema = z.object({
 
 export type CreativeRow = z.infer<typeof creativeRowSchema>;
 
-export const audienceSchema = z.object({
+export const audienceRowSchema_ = z.object({
+  audienceId: z.number(),
+  audienceName: z.string(),
+  type: z.string(),
+  fp: z.boolean().optional().default(false),
+  dateCreated: z.string().optional().default(""),
+  expireDays: z.number().optional().default(0),
+  reachToday: z.number().optional().default(0),
+  newToday: z.number().optional().default(0),
+  reach7d: z.number().optional().default(0),
+  new7d: z.number().optional().default(0),
+}).passthrough();
+
+export type AudienceRow = z.infer<typeof audienceRowSchema_>;
+
+export const audienceDetailSchema = z.object({
   id: z.number(),
   name: z.string(),
   type: z.string(),
   expireDays: z.number().optional().default(0),
-  size: z.number().optional().default(0),
-  status: z.string().optional().default("unknown"),
-  campaignsIds: z.array(z.number()).optional().default([]),
+  audienceCode: z.string().nullable().optional(),
+  linkedAudiencesIds: z.array(z.number()).optional().default([]),
+  linkedAudiences: z.record(z.string()).optional(),
+  usersIds: z.array(z.unknown()).nullable().optional().default(null),
+  fp: z.union([
+    z.object({ id: z.number(), name: z.string() }),
+    z.boolean(),
+    z.null(),
+  ]).optional(),
   hasClicks: z.boolean().optional(),
   hasConversions: z.boolean().optional(),
   hasHolds: z.boolean().optional(),
   hasRejects: z.boolean().optional(),
-  linkedAudiencesIds: z.array(z.number()).optional().default([]),
-  code: z.string().optional(),
+  campaignsIds: z.array(z.union([z.number(), z.string().transform(Number)])).optional(),
+  campaigns: z.record(z.string()).optional(),
+  extAudienceId: z.number().nullable().optional(),
 }).passthrough();
 
-export type Audience = z.infer<typeof audienceSchema>;
+export type AudienceDetail = z.infer<typeof audienceDetailSchema>;
 
 export const financeRowSchema = z.object({
   date: z.string(),

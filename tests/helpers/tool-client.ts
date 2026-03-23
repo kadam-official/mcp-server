@@ -14,9 +14,57 @@ export function createMockClientPool(): ClientPool {
   return pool;
 }
 
+function createMockOptionsRegistry() {
+  const defaultOpts = {
+    cpTypes: [{ id: 0, label: "CPC" }, { id: 2, label: "CPM" }, { id: 4, label: "CPA Target" }],
+    countries: [{ id: 34, code: "US", label: "United States", tier: 1 }, { id: 24, code: "DE", label: "Germany", tier: 1 }, { id: 40, code: "BR", label: "Brazil", tier: null }],
+    countriesPresets: [],
+    browsers: [{ id: 8, label: "Chrome" }],
+    devices: [{ id: 1, label: "Desktop" }],
+    platformVersions: [{ id: 10, label: "Android" }],
+    languages: [{ id: 2, label: "English" }],
+    categories: [
+      { id: 1001, label: "Adult content (IAB25-3)" },
+      { id: 122, label: "News (IAB12)", children: [{ id: 1567, label: "News general" }] },
+      { id: "mainstream", label: "Mainstream" },
+    ],
+    ages: [],
+    subAges: [{ id: 1, label: "Newest", period: "1 day" }, { id: 2, label: "New", period: "2-6 days" }, { id: 3, label: "Medium", period: "7-13 days" }, { id: 4, label: "Old", period: "14+ days" }],
+    audiences: [],
+    limits: { dayMoneyLimit: 300 },
+    bidCoefficients: { maxWithoutStatCPC: 65 },
+    options: { allowAgeSelection: true, allowGenderSelection: true, showInterests: false, postbackLink: "" },
+    folders: [],
+    conversionTemplates: [],
+  };
+
+  const countryMap = new Map<string, number>();
+  for (const c of defaultOpts.countries) countryMap.set(c.code, c.id);
+
+  return {
+    getCampaignOptions: vi.fn().mockResolvedValue(defaultOpts),
+    getMaterialOptions: vi.fn().mockResolvedValue({ sizes: [] }),
+    resolveCountryIds: vi.fn().mockImplementation(async (codes: string) =>
+      codes.split(",").map((s: string) => {
+        const id = countryMap.get(s.trim().toUpperCase());
+        if (id === undefined) throw new Error(`Unknown: ${s.trim()}`);
+        return id;
+      }),
+    ),
+    resolveIds: vi.fn().mockImplementation(async (_kind: string, input: string) =>
+      input.split(",").map((s: string) => s.trim()),
+    ),
+    getCountryMap: vi.fn().mockResolvedValue(countryMap),
+    getNameResolvers: vi.fn(),
+    preload: vi.fn(),
+  };
+}
+
 export function createMockPartnersClient() {
   return {
+    options: createMockOptionsRegistry(),
     listCampaigns: vi.fn(),
+    getCampaign: vi.fn(),
     createCampaign: vi.fn(),
     updateCampaign: vi.fn(),
     setCampaignStatus: vi.fn(),
@@ -29,6 +77,7 @@ export function createMockPartnersClient() {
     updateAudience: vi.fn(),
     deleteAudience: vi.fn(),
     listCreatives: vi.fn(),
+    getMaterial: vi.fn(),
     createCreative: vi.fn(),
     updateCreative: vi.fn(),
     setCreativeStatus: vi.fn(),
@@ -36,7 +85,7 @@ export function createMockPartnersClient() {
     getReportConfig: vi.fn(),
     getReportData: vi.fn(),
     getSiteStats: vi.fn(),
-    getPostbackStats: vi.fn(),
+    getConversionDetails: vi.fn(),
   };
 }
 

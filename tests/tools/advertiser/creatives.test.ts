@@ -92,15 +92,28 @@ describe("creatives tools", () => {
     expect(text).toContain("2 creatives set to paused");
   });
 
-  it("update_creative calls api.updateCreative with mapped fields", async () => {
+  it("update_creative does read-modify-write, merging changes with current state", async () => {
     const { client, mockApi } = await createToolClient(creativesModule);
     const api = mockApi as MockPartnersClient;
+    api.getMaterial.mockResolvedValue({
+      id: 42,
+      campaignId: 10,
+      type: 20,
+      title: "Old Title",
+      name: "Old Text",
+      url: "https://old.com",
+      isPauseAfterModer: 0,
+      startDate: null,
+      stopDate: null,
+      sizeId: 0,
+      bids: [],
+      status: 10,
+    });
     api.updateCreative.mockResolvedValue({} as never);
 
     const result = await client.callTool({
       name: "kadam_adv_update_creative",
       arguments: {
-        campaignId: 10,
         creativeId: 42,
         url: "https://new-landing.com",
         bid: 0.15,
@@ -108,14 +121,17 @@ describe("creatives tools", () => {
     });
     const text = getTextFromResult(result);
 
+    expect(api.getMaterial).toHaveBeenCalledWith(42);
     expect(api.updateCreative).toHaveBeenCalledWith(
       10,
       expect.objectContaining({
         adId: 42,
         url: "https://new-landing.com",
-        bids: [{ bid: 0.15, countries: [] }],
+        title: "Old Title",
+        name: "Old Text",
+        bids: [{ bid: 0.15, leadCost: 0, countries: [] }],
       }),
     );
-    expect(text).toContain("Creative #42 updated successfully");
+    expect(text).toContain("Creative #42 in campaign #10 updated successfully");
   });
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { listResponseSchema, reportConfigSchema } from "../../src/api/schemas/common.js";
-import { campaignRowSchema, audienceSchema } from "../../src/api/schemas/advertiser.js";
+import { campaignRowSchema, audienceRowSchema_, audienceDetailSchema } from "../../src/api/schemas/advertiser.js";
 import { sourceDetailSchema, sourceTableRowSchema, adUnitTableRowSchema, pubUserSchema } from "../../src/api/schemas/publisher.js";
 
 describe("listResponseSchema", () => {
@@ -69,12 +69,71 @@ describe("campaignRowSchema", () => {
   });
 });
 
-describe("audienceSchema", () => {
-  it("parses minimal audience", () => {
-    const result = audienceSchema.parse({ id: 1, name: "Test", type: "retarget" });
-    expect(result.id).toBe(1);
-    expect(result.size).toBe(0);
-    expect(result.campaignsIds).toEqual([]);
+describe("audienceRowSchema_", () => {
+  it("parses list row with audienceId/audienceName", () => {
+    const result = audienceRowSchema_.parse({
+      audienceId: 1,
+      audienceName: "Test",
+      type: "s2s",
+      dateCreated: "01.03.2026",
+      expireDays: 10,
+      reachToday: 5,
+      new7d: 3,
+    });
+    expect(result.audienceId).toBe(1);
+    expect(result.audienceName).toBe("Test");
+    expect(result.reachToday).toBe(5);
+  });
+});
+
+describe("audienceDetailSchema", () => {
+  it("parses GET /audiences/{id} response for pixel", () => {
+    const result = audienceDetailSchema.parse({
+      id: 42,
+      name: "My Pixel",
+      type: "audience_code",
+      expireDays: 10,
+      audienceCode: "https://example.com/code",
+      usersIds: null,
+      fp: null,
+    });
+    expect(result.id).toBe(42);
+    expect(result.usersIds).toBeNull();
+  });
+
+  it("parses stat audience with campaigns and fp object", () => {
+    const result = audienceDetailSchema.parse({
+      id: 10,
+      name: "Stat",
+      type: "audience",
+      expireDays: 14,
+      hasClicks: true,
+      hasConversions: false,
+      hasHolds: false,
+      hasRejects: false,
+      campaignsIds: [100],
+      campaigns: { "100": "Campaign A" },
+      usersIds: null,
+      fp: { id: 11, name: "Stat - FP" },
+    });
+    expect(result.fp).toEqual({ id: 11, name: "Stat - FP" });
+    expect(result.campaigns).toEqual({ "100": "Campaign A" });
+  });
+
+  it("parses s2s audience with linked audiences", () => {
+    const result = audienceDetailSchema.parse({
+      id: 42,
+      name: "My S2S",
+      type: "s2s",
+      expireDays: 10,
+      audienceCode: "https://example.com/match_s2s/42/",
+      linkedAudiencesIds: [1, 2],
+      linkedAudiences: { "1": "aud1 [audience_code]", "2": "aud2 [fingerprint]" },
+      usersIds: null,
+      fp: null,
+    });
+    expect(result.linkedAudiencesIds).toEqual([1, 2]);
+    expect(result.linkedAudiences).toEqual({ "1": "aud1 [audience_code]", "2": "aud2 [fingerprint]" });
   });
 });
 

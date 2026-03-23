@@ -10,6 +10,26 @@ import {
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
 import type { CreativeRow } from "../../api/schemas/advertiser.js";
+import type { OptionsRegistry } from "../../api/options-registry.js";
+import { logger } from "../../logger.js";
+
+async function validateSizeId(sizeId: number, registry: OptionsRegistry): Promise<void> {
+  try {
+    const opts = await registry.getMaterialOptions();
+    const valid = opts.sizes.find((s) => s.id === sizeId);
+    if (!valid) {
+      const popular = opts.sizes
+        .filter((s) => s.width > 0)
+        .slice(0, 20)
+        .map((s) => `${s.id}=${s.label}`)
+        .join(", ");
+      throw new Error(`Invalid sizeId ${sizeId}. Available sizes: ${popular}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Invalid sizeId")) throw e;
+    logger.warn({ sizeId, err: e }, "Could not validate sizeId against options; falling back to API validation");
+  }
+}
 
 function formatCreativeRow(row: CreativeRow, index: number): string {
   const ad = row.ad;
@@ -145,7 +165,7 @@ export const creativesModule: ToolModule = {
 Campaign type determines required fields:
 - Push / In-Page Push: title, text, url, imageUrl (icon 192x192+), mainImageUrl (492x328+)
 - Native: title, url, imageUrl (icon 500x500+), mainImageUrl (492x328+)
-- Banner: url, imageUrl (exact banner size), sizeId (e.g. 25=300x250, 35=728x90, 75=160x600, 80=320x50)
+- Banner: url, imageUrl (exact banner size), sizeId (use kadam://reference/creative-formats for valid sizes)
 - Video: title, url, videoUrl (MP4 file)
 - Popunder: does NOT support separate creatives (campaign URL = ad)
 
@@ -161,7 +181,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         imageUrl: z.string().optional().describe("Icon/image source: URL or local file path (push: 192x192+, native: 500x500+, banner: exact size)"),
         mainImageUrl: z.string().optional().describe("Main/rectangle image source: URL or local path (push/inpage: 492x328+, native: 492x328+). Not needed for banner/video."),
         videoUrl: z.string().optional().describe("Video source: URL or local file path to MP4 (video campaigns only)"),
-        sizeId: z.number().optional().describe("Banner size ID (required for banner). Common: 25=300x250, 35=728x90, 75=160x600, 80=320x50, 300=300x600"),
+        sizeId: z.number().optional().describe("Banner size ID (required for banner). See kadam://reference/creative-formats for valid sizes."),
         pauseAfterModeration: z.boolean().optional().default(true).describe("Pause creative after it passes moderation (default: true for safety)"),
         bid: z.number().optional().describe("Custom bid for this creative (overrides campaign bid)"),
         bidCountries: z.string().optional().describe("Comma-separated country IDs for the bid"),
@@ -169,6 +189,10 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         stopDate: z.string().optional().describe("Creative stop date (YYYY-MM-DD HH:MM:SS)"),
       },
       async (args, ctx) => {
+        if (args.sizeId != null) {
+          await validateSizeId(args.sizeId, ctx.adv.options);
+        }
+
         const bids: Array<Record<string, unknown>> = [];
         if (args.bid != null) {
           const countries = args.bidCountries
@@ -218,37 +242,55 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
       {
         name: "kadam_adv_update_creative",
         description:
-          "Update an existing creative. IMPORTANT: Kadam API has NO partial update — all fields are required. " +
-          "Missing fields cause validation errors. For image changes, create a new creative instead.",
+          "Update an existing creative (read-modify-write). Fetches current state, merges your changes, sends full payload. " +
+          "Pass only the fields you want to change. For image changes, create a new creative instead.",
         product: "advertiser",
         annotations: { readOnlyHint: false },
       },
       {
-        campaignId: z.number(),
-        creativeId: z.number(),
-        url: z.string().url().optional(),
-        bid: z.number().optional(),
-        bidCountries: z.string().optional(),
-        startDate: z.string().optional(),
-        stopDate: z.string().optional(),
-        pauseAfterModeration: z.boolean().optional(),
+        creativeId: z.number().describe("Creative (material) ID to update"),
+        url: z.string().url().optional().describe("Landing page URL"),
+        title: z.string().optional().describe("Creative title"),
+        text: z.string().optional().describe("Creative description/text"),
+        bid: z.number().optional().describe("Custom bid for this creative"),
+        bidCountries: z.string().optional().describe("Comma-separated GEO IDs for the bid"),
+        startDate: z.string().optional().describe("Start date (YYYY-MM-DD HH:MM:SS)"),
+        stopDate: z.string().optional().describe("Stop date (YYYY-MM-DD HH:MM:SS or null to clear)"),
+        pauseAfterModeration: z.boolean().optional().describe("Pause after moderation"),
       },
       async (args, ctx) => {
-        const { campaignId, creativeId, ...rest } = args;
-        const data: Record<string, unknown> = { adId: creativeId };
-        if (rest.url != null) data.url = rest.url;
-        if (rest.pauseAfterModeration != null) data.isPauseAfterModer = rest.pauseAfterModeration ? 1 : 0;
-        if (rest.startDate != null) data.startDate = rest.startDate;
-        if (rest.stopDate != null) data.stopDate = rest.stopDate;
-        if (rest.bid != null) {
-          const countries = rest.bidCountries
-            ? rest.bidCountries.split(",").map((s) => parseInt(s.trim(), 10))
-            : [];
-          data.bids = [{ bid: rest.bid, countries }];
+        const { creativeId, ...changes } = args;
+        const current = await ctx.adv.getMaterial(creativeId);
+        const campaignId = current.campaignId as number;
+
+        const merged: Record<string, unknown> = {
+          adId: creativeId,
+          url: changes.url ?? current.url,
+          isPauseAfterModer: changes.pauseAfterModeration != null
+            ? (changes.pauseAfterModeration ? 1 : 0)
+            : current.isPauseAfterModer,
+          startDate: changes.startDate !== undefined ? changes.startDate : current.startDate,
+          stopDate: changes.stopDate !== undefined ? changes.stopDate : current.stopDate,
+        };
+
+        if (current.title !== undefined) merged.title = changes.title ?? current.title;
+        if (current.name !== undefined) merged.name = changes.text ?? current.name;
+        if (current.sizeId !== undefined) merged.sizeId = current.sizeId;
+
+        // GET now returns bids as array [{bid, leadCost, countries}] matching PUT format
+        const currentBids = current.bids as Array<Record<string, unknown>> | undefined;
+        if (changes.bid != null) {
+          const existingCountries = (currentBids?.[0]?.countries ?? []) as number[];
+          const countries = changes.bidCountries
+            ? changes.bidCountries.split(",").map(Number)
+            : existingCountries;
+          merged.bids = [{ bid: changes.bid, leadCost: 0, countries }];
+        } else {
+          merged.bids = current.bids;
         }
 
-        await ctx.adv.updateCreative(campaignId, data);
-        return `Creative #${creativeId} updated successfully.`;
+        await ctx.adv.updateCreative(campaignId, merged);
+        return `Creative #${creativeId} in campaign #${campaignId} updated successfully.`;
       },
     );
 

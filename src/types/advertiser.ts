@@ -21,9 +21,3 @@ export const PRICING_MODEL_MAP: Record<string, number> = {
   cpm: 2,
   cpa_target: 4,
 };
-
-export const PRICING_MODEL_NAME: Record<number, string> = {
-  0: "CPC",
-  2: "CPM",
-  4: "CPA Target",
-};

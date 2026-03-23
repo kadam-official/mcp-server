@@ -19,13 +19,13 @@ export const statsModule: ToolModule = {
       {
         name: "kadam_adv_get_stats",
         description:
-          "Unified advertiser statistics. Use reportType to select: 'custom' (default) for full report builder, 'sites' for per-site breakdown, 'postbacks' for conversion logs. For custom reports use human-readable names like 'spend,clicks,impressions,ctr' for metrics and 'day,campaign,country' for groupBy.",
+          "Unified advertiser statistics. Use reportType to select: 'custom' (default) for full report builder, 'sites' for per-site breakdown, 'conversions' for individual conversion event log. For custom reports use human-readable names like 'spend,clicks,impressions,ctr' for metrics and 'day,campaign,country' for groupBy.",
         product: "advertiser",
         annotations: { readOnlyHint: true },
       },
       {
         reportType: z
-          .enum(["custom", "sites", "postbacks"])
+          .enum(["custom", "sites", "conversions"])
           .optional()
           .default("custom"),
         period: z
@@ -48,6 +48,10 @@ export const statsModule: ToolModule = {
           .optional()
           .default("all"),
         searchQuery: z.string().optional(),
+        conversionTypes: z.string().optional().describe("Comma-separated conversion type IDs (for reportType=conversions)"),
+        folderIds: z.string().optional().describe("Comma-separated folder IDs (for reportType=conversions)"),
+        audienceIds: z.string().optional().describe("Comma-separated audience IDs (for reportType=conversions)"),
+        timezone: z.number().optional().describe("Timezone offset in hours (for reportType=conversions)"),
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
@@ -138,36 +142,43 @@ export const statsModule: ToolModule = {
           );
         }
 
-        if (args.reportType === "postbacks") {
-          const params: Record<string, unknown> = {
+        if (args.reportType === "conversions") {
+          const filters: Record<string, unknown> = {
             dateFrom: df,
             dateTo: dt,
+          };
+          if (args.campaignIds != null) filters.campaignIds = args.campaignIds.split(",").map(Number);
+          if (args.creativeIds != null) filters.adsIds = args.creativeIds.split(",").map(Number);
+          if (args.conversionTypes != null) filters.conversionTypes = args.conversionTypes.split(",").map(Number);
+          if (args.folderIds != null) filters.folderIds = args.folderIds.split(",").map(Number);
+          if (args.audienceIds != null) filters.audIds = args.audienceIds.split(",").map(Number);
+          if (args.timezone != null) filters.timezone = args.timezone;
+
+          const params: Record<string, unknown> = {
             page: args.page,
             perPage,
-            ...(args.campaignIds != null && {
-              campaignIds: args.campaignIds,
-            }),
+            filters,
+            ...(args.sortBy != null && { sort: { [args.sortBy]: args.sortOrder ?? "desc" } }),
           };
-          const res = await ctx.adv.getPostbackStats(params);
-          const pagination = extractPagination(res);
-          const formatPostbackRow = (
-            p: Record<string, unknown>,
-            i: number,
-          ): string => {
-            const parts = Object.entries(p)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(" | ");
-            return `${i + 1}. ${parts}`;
-          };
-          return formatEntityList(
-            res.rows,
-            formatPostbackRow,
-            `Postback stats (${df} to ${dt})`,
-            pagination,
+          const res = await ctx.adv.getConversionDetails(params);
+          const rows = res.rows ?? [];
+          if (rows.length === 0) {
+            return `No conversions for ${df} to ${dt}.`;
+          }
+          const allKeys = new Set<string>();
+          for (const row of rows) {
+            for (const k of Object.keys(row)) allKeys.add(k);
+          }
+          const headers = [...allKeys];
+          const tableRows = rows.map((row) =>
+            headers.map((h) => String(row[h] ?? "")),
           );
+          const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
+          const title = `Conversion Details (${df} to ${dt}, page ${res.page ?? 1}/${totalPages})`;
+          return formatTable({ headers, rows: tableRows }, title);
         }
 
-        return "Unknown reportType.";
+        return "Unknown reportType. Use: custom, sites, or conversions.";
       },
     );
   },

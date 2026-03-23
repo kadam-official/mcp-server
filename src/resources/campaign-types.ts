@@ -1,62 +1,73 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CAMPAIGN_TYPE_MAP, CAMPAIGN_TYPE_NAME } from "../types/advertiser.js";
+import type { OptionsRegistry, CampaignOptions, CategoryItem } from "../api/options-registry.js";
 
-const CAMPAIGN_DETAILS: Record<string, { features: string; pricing: string; creatives: string }> = {
-  push: {
-    features: "subAge targeting, secondPush option",
-    pricing: "CPC, CPM, CPA Target",
-    creatives: "title + text + icon + main image",
-  },
-  inpage_push: {
-    features: "secondPush option",
-    pricing: "CPC, CPM, CPA Target",
-    creatives: "title + text + icon + main image",
-  },
-  native: {
-    features: "gender/age targeting, impression tracker, multi-ads",
-    pricing: "CPC, CPM, CPA Target",
-    creatives: "title + description + thumbnail + main image",
-  },
-  banner: {
-    features: "gender/age targeting, impression tracker, multi-ads, HTML5 support",
-    pricing: "CPC, CPM, CPA Target",
-    creatives: "banner image (or HTML5 ZIP) + size",
-  },
-  video: {
-    features: "impression tracker",
-    pricing: "CPC, CPM",
-    creatives: "MP4 video file",
-  },
-  popunder: {
-    features: "isPauseAfterModerate",
-    pricing: "CPC, CPM",
-    creatives: "URL only (no image/text needed)",
-  },
+const CREATIVE_INFO: Record<string, string> = {
+  push: "title + text + icon + main image",
+  inpage_push: "title + text + icon + main image",
+  native: "title + description + thumbnail + main image",
+  banner: "banner image (or HTML5 ZIP) + size",
+  video: "MP4 video file",
+  popunder: "URL only (no image/text needed)",
 };
 
-function generateContent(): string {
+function formatCategoryTree(cats: CategoryItem[], indent: string): string[] {
+  const lines: string[] = [];
+  for (const cat of cats) {
+    lines.push(`${indent}${cat.id}: ${cat.label}`);
+    if (cat.children && cat.children.length > 0) {
+      lines.push(...formatCategoryTree(cat.children, indent + "  "));
+    }
+  }
+  return lines;
+}
+
+function formatOptions(opts: CampaignOptions): string {
+  const parts: string[] = [];
+  const pricing = opts.cpTypes.map((c) => c.label).join(", ");
+  parts.push(`Pricing: ${pricing}`);
+
+  if (opts.options.allowAgeSelection) parts.push("age targeting");
+  if (opts.options.allowGenderSelection) parts.push("gender targeting");
+  if (opts.subAges.length > 0) parts.push("subAge targeting");
+  if (opts.categories.length > 0) {
+    const topLabels = opts.categories.map((c) => c.label).join(", ");
+    parts.push(`categories: ${topLabels}`);
+  }
+  return parts.join(" | ");
+}
+
+async function generateContent(registry: OptionsRegistry | null): Promise<string> {
   const lines = ["Campaign Types:"];
   for (const [key, id] of Object.entries(CAMPAIGN_TYPE_MAP)) {
     const name = CAMPAIGN_TYPE_NAME[id] ?? key;
-    const details = CAMPAIGN_DETAILS[key];
     lines.push(`- ${name} (id: ${id}): ${key} format`);
-    if (details) {
-      lines.push(`  Features: ${details.features}`);
-      lines.push(`  Pricing: ${details.pricing}`);
-      lines.push(`  Creatives: ${details.creatives}`);
+
+    if (registry) {
+      try {
+        const opts = await registry.getCampaignOptions(id);
+        lines.push(`  ${formatOptions(opts)}`);
+        if (opts.categories.length > 0) {
+          lines.push("  Categories:");
+          lines.push(...formatCategoryTree(opts.categories, "    "));
+        }
+      } catch { /* options unavailable — skip dynamic info */ }
     }
+
+    const creatives = CREATIVE_INFO[key];
+    if (creatives) lines.push(`  Creatives: ${creatives}`);
     lines.push("");
   }
   return lines.join("\n");
 }
 
-export function registerCampaignTypesResource(server: McpServer): void {
+export function registerCampaignTypesResource(server: McpServer, registry: OptionsRegistry | null): void {
   server.resource("campaign-types", "kadam://reference/campaign-types", async () => ({
     contents: [
       {
         uri: "kadam://reference/campaign-types",
         mimeType: "text/plain",
-        text: generateContent(),
+        text: await generateContent(registry),
       },
     ],
   }));

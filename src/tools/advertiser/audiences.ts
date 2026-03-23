@@ -6,11 +6,50 @@ import {
   clampPerPage,
   formatSingleEntity,
 } from "../../output-formatter.js";
-import type { Audience } from "../../api/schemas/advertiser.js";
+import type { AudienceRow, AudienceDetail } from "../../api/schemas/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 
-function formatAudienceRow(a: Audience, index: number): string {
-  return `${index + 1}. [ID: ${a.id}] "${a.name}" (type: ${a.type}, size: ${a.size}) Status: ${a.status} | Expire: ${a.expireDays} days`;
+function formatAudienceRow(a: AudienceRow, index: number): string {
+  return `${index + 1}. [ID: ${a.audienceId}] "${a.audienceName}" (type: ${a.type}) Expire: ${a.expireDays}d | Reach today: ${a.reachToday} | New 7d: ${a.new7d}`;
+}
+
+function formatAudienceDetail(a: AudienceDetail): string {
+  const pairs: [string, string | undefined][] = [
+    ["Name", a.name],
+    ["Type", a.type],
+    ["Expire Days", String(a.expireDays)],
+  ];
+
+  if (a.audienceCode) pairs.push(["Audience Code", a.audienceCode]);
+
+  if (a.type === "audience") {
+    const flags = [
+      a.hasClicks && "clicks",
+      a.hasConversions && "conversions",
+      a.hasHolds && "holds",
+      a.hasRejects && "rejects",
+    ].filter(Boolean).join(", ");
+    if (flags) pairs.push(["Tracking", flags]);
+    if (a.campaigns) {
+      const cmpList = Object.entries(a.campaigns).map(([id, name]) => `${name} (#${id})`).join("; ");
+      pairs.push(["Campaigns", cmpList]);
+    }
+  }
+
+  if (a.type === "s2s" && a.linkedAudiences) {
+    const linked = Object.entries(a.linkedAudiences).map(([id, name]) => `${name} (#${id})`).join("; ");
+    pairs.push(["Linked Audiences", linked]);
+  }
+
+  if (a.type === "audience_code" && a.extAudienceId) {
+    pairs.push(["Ext Audience ID", String(a.extAudienceId)]);
+  }
+
+  if (a.fp && typeof a.fp === "object" && "id" in a.fp) {
+    pairs.push(["Fingerprint Audience", `${a.fp.name} (#${a.fp.id})`]);
+  }
+
+  return formatSingleEntity(`Audience #${a.id}`, pairs);
 }
 
 export const audiencesModule: ToolModule = {
@@ -55,7 +94,7 @@ export const audiencesModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_get_audience",
-        description: "Get a single audience by ID.",
+        description: "Get a single audience by ID. Returns type-specific details: tracking code for pixel/s2s, campaign links for stat, linked audiences for s2s.",
         product: "advertiser",
         annotations: { readOnlyHint: true },
       },
@@ -64,89 +103,104 @@ export const audiencesModule: ToolModule = {
       },
       async (args, ctx) => {
         const a = await ctx.adv.getAudience(args.id);
-        return formatSingleEntity(`Audience #${a.id}`, [
-          ["Name", a.name],
-          ["Type", a.type],
-          ["Expire Days", a.expireDays != null ? String(a.expireDays) : undefined],
-          ["Size", a.size != null ? String(a.size) : undefined],
-          ["Status", a.status],
-          ["Campaigns", (a.campaignsIds ?? []).length > 0 ? (a.campaignsIds ?? []).join(", ") : undefined],
-          ["hasClicks", a.hasClicks != null ? String(a.hasClicks) : undefined],
-          ["hasConversions", a.hasConversions != null ? String(a.hasConversions) : undefined],
-          ["hasHolds", a.hasHolds != null ? String(a.hasHolds) : undefined],
-          ["hasRejects", a.hasRejects != null ? String(a.hasRejects) : undefined],
-          ["Linked Audiences", (a.linkedAudiencesIds ?? []).length > 0 ? (a.linkedAudiencesIds ?? []).join(", ") : undefined],
-        ]);
+        return formatAudienceDetail(a);
       },
     );
 
     wrapper.register(
       {
         name: "kadam_adv_create_audience",
-        description:
-          "Create a new audience. Required: type (audience|audience_code|fingerprint|s2s), name, expireDays.",
+        description: [
+          "Create a new audience. Types and required fields:",
+          "• audience_code (pixel) — name, expireDays. Optional: createFingerprint (creates linked FP audience).",
+          "• audience (stat/campaign data) — name, expireDays, campaignIds (comma-separated), plus at least one of: hasClicks, hasConversions, hasHolds, hasRejects.",
+          "• s2s — name, expireDays, linkedAudienceIds (comma-separated IDs of pixel/fingerprint audiences).",
+          "• fingerprint — cannot be created directly; set createFingerprint=true on pixel or stat audience.",
+        ].join("\n"),
         product: "advertiser",
         annotations: { readOnlyHint: false },
       },
       {
-        type: z.enum(["audience", "audience_code", "fingerprint", "s2s"]),
+        type: z.enum(["audience", "audience_code", "s2s"]),
         name: z.string().min(1),
-        expireDays: z.number(),
-        campaignsIds: z.string().optional(),
-        hasClicks: z.boolean().optional(),
-        hasConversions: z.boolean().optional(),
-        hasHolds: z.boolean().optional(),
-        hasRejects: z.boolean().optional(),
-        linkedAudiencesIds: z.string().optional(),
+        expireDays: z.number().min(1).max(365),
+        campaignIds: z.string().optional().describe("Comma-separated campaign IDs (required for type=audience)"),
+        hasClicks: z.boolean().optional().describe("Track clicks (type=audience)"),
+        hasConversions: z.boolean().optional().describe("Track conversions (type=audience)"),
+        hasHolds: z.boolean().optional().describe("Track holds (type=audience)"),
+        hasRejects: z.boolean().optional().describe("Track rejects (type=audience)"),
+        linkedAudienceIds: z.string().optional().describe("Comma-separated pixel/fingerprint audience IDs (required for type=s2s)"),
+        createFingerprint: z.boolean().optional().describe("Also create a linked fingerprint audience (type=audience_code or audience)"),
       },
       async (args, ctx) => {
         const data: Record<string, unknown> = {
           type: args.type,
           name: args.name,
           expireDays: args.expireDays,
-          ...(args.campaignsIds != null && { campaignsIds: args.campaignsIds }),
-          ...(args.hasClicks != null && { hasClicks: args.hasClicks }),
-          ...(args.hasConversions != null && { hasConversions: args.hasConversions }),
-          ...(args.hasHolds != null && { hasHolds: args.hasHolds }),
-          ...(args.hasRejects != null && { hasRejects: args.hasRejects }),
-          ...(args.linkedAudiencesIds != null && { linkedAudiencesIds: args.linkedAudiencesIds }),
         };
+
+        if (args.type === "audience") {
+          if (args.campaignIds) data.campaignsIds = args.campaignIds.split(",").map(Number);
+          if (args.hasClicks != null) data.hasClicks = args.hasClicks;
+          if (args.hasConversions != null) data.hasConversions = args.hasConversions;
+          if (args.hasHolds != null) data.hasHolds = args.hasHolds;
+          if (args.hasRejects != null) data.hasRejects = args.hasRejects;
+        }
+
+        if (args.type === "s2s" && args.linkedAudienceIds) {
+          data.linkedAudiencesIds = args.linkedAudienceIds.split(",").map(Number);
+        }
+
+        if (args.createFingerprint != null) data.fp = args.createFingerprint;
+
         const a = await ctx.adv.createAudience(data);
-        return `Audience created: [ID: ${a.id}] "${a.name}" (type: ${a.type})`;
+        return formatAudienceDetail(a);
       },
     );
 
     wrapper.register(
       {
         name: "kadam_adv_update_audience",
-        description: "Update an existing audience. Pass id and any fields to change.",
+        description: "Update an existing audience (read-modify-write). Fetches current state, merges your changes, sends full payload. Type cannot be changed. Pass only the fields you want to change.",
         product: "advertiser",
         annotations: { readOnlyHint: false },
       },
       {
         id: z.number(),
-        type: z.enum(["audience", "audience_code", "fingerprint", "s2s"]).optional(),
         name: z.string().min(1).optional(),
-        expireDays: z.number().optional(),
-        campaignsIds: z.string().optional(),
+        expireDays: z.number().min(1).max(365).optional(),
+        campaignIds: z.string().optional().describe("Comma-separated campaign IDs (type=audience)"),
         hasClicks: z.boolean().optional(),
         hasConversions: z.boolean().optional(),
         hasHolds: z.boolean().optional(),
         hasRejects: z.boolean().optional(),
-        linkedAudiencesIds: z.string().optional(),
+        linkedAudienceIds: z.string().optional().describe("Comma-separated pixel/fingerprint audience IDs (type=s2s)"),
       },
       async (args, ctx) => {
         const { id, ...rest } = args;
-        const data: Record<string, unknown> = {};
-        if (rest.type != null) data.type = rest.type;
-        if (rest.name != null) data.name = rest.name;
-        if (rest.expireDays != null) data.expireDays = rest.expireDays;
-        if (rest.campaignsIds != null) data.campaignsIds = rest.campaignsIds;
-        if (rest.hasClicks != null) data.hasClicks = rest.hasClicks;
-        if (rest.hasConversions != null) data.hasConversions = rest.hasConversions;
-        if (rest.hasHolds != null) data.hasHolds = rest.hasHolds;
-        if (rest.hasRejects != null) data.hasRejects = rest.hasRejects;
-        if (rest.linkedAudiencesIds != null) data.linkedAudiencesIds = rest.linkedAudiencesIds;
+        const current = await ctx.adv.getAudience(id);
+
+        const data: Record<string, unknown> = {
+          type: current.type,
+          name: rest.name ?? current.name,
+          expireDays: rest.expireDays ?? current.expireDays,
+        };
+
+        if (current.type === "audience") {
+          data.hasClicks = rest.hasClicks ?? current.hasClicks ?? false;
+          data.hasConversions = rest.hasConversions ?? current.hasConversions ?? false;
+          data.hasHolds = rest.hasHolds ?? current.hasHolds ?? false;
+          data.hasRejects = rest.hasRejects ?? current.hasRejects ?? false;
+          data.campaignsIds = rest.campaignIds
+            ? rest.campaignIds.split(",").map(Number)
+            : current.campaignsIds ?? [];
+        }
+
+        if (current.type === "s2s") {
+          data.linkedAudiencesIds = rest.linkedAudienceIds
+            ? rest.linkedAudienceIds.split(",").map(Number)
+            : current.linkedAudiencesIds ?? [];
+        }
 
         await ctx.adv.updateAudience(id, data);
         return `Audience #${id} updated successfully.`;

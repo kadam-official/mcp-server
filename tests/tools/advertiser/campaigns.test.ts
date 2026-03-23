@@ -82,20 +82,39 @@ describe("campaigns tools", () => {
     );
   });
 
-  it("update_campaign calls api.updateCampaign with correct id", async () => {
+  it("update_campaign does read-modify-write, merging changes with current state", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: [],
+      status: 10,
+    });
     api.updateCampaign.mockResolvedValue({} as never);
 
     await client.callTool({
       name: "kadam_adv_update_campaign",
-      arguments: { id: 42, name: "Updated Name" },
+      arguments: { id: 42, name: "Updated Name", dailyBudget: 200 },
     });
 
+    expect(api.getCampaign).toHaveBeenCalledWith(42);
     expect(api.updateCampaign).toHaveBeenCalledWith(
       42,
-      expect.objectContaining({ name: "Updated Name" }),
+      expect.objectContaining({
+        type: 30,
+        name: "Updated Name",
+        url: "https://old.com",
+        dayMoneyLimit: 200,
+      }),
     );
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.id).toBeUndefined();
+    expect(payload.status).toBeUndefined();
   });
 
   it("set_campaign_status with ids 1,2,3 and active calls api with activate", async () => {

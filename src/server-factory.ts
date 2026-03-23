@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ToolWrapper } from "./middleware/tool-wrapper.js";
-import { hasAdvKey, hasPubKey } from "./config.js";
+import { hasAdvKey, hasPubKey, getConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
@@ -47,10 +47,17 @@ export function createMcpServer(clientPool: ClientPool): McpServer {
 
   const wrapper = new ToolWrapper(server, clientPool);
 
-  registerResources(server);
+  const advEnabled = hasAdvKey();
+  let advRegistry = null;
+  if (advEnabled) {
+    const config = getConfig();
+    const { adv } = clientPool.resolve(config.KADAM_ADV_API_KEY!, undefined);
+    advRegistry = adv?.options ?? null;
+  }
+
+  registerResources(server, advRegistry);
   registerPrompts(server);
 
-  const advEnabled = hasAdvKey();
   const pubEnabled = hasPubKey();
 
   if (advEnabled) {

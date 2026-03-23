@@ -8,8 +8,9 @@ import {
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
-import { resolveCountryIds } from "../../utils/geo-mapping.js";
 import type { CampaignRow } from "../../api/schemas/advertiser.js";
+import { flattenCategoryIds } from "../../api/options-registry.js";
+import type { OptionsRegistry, CampaignOptions } from "../../api/options-registry.js";
 
 function formatCampaignRow(row: CampaignRow, index: number): string {
   const c = row.campaign;
@@ -19,16 +20,17 @@ function formatCampaignRow(row: CampaignRow, index: number): string {
 const CONNECTION_TYPE_MAP: Record<string, number> = {
   cellular: 1,
   wifi: 2,
-  unknown: 3, // "unknown" in schema maps to "all" (no filtering)
+  unknown: 3,
   all: 3,
 };
 
-function mapField(
+async function mapField(
   key: string,
   value: unknown,
   mapped: Record<string, unknown>,
   fields: Record<string, unknown>,
-): void {
+  registry: OptionsRegistry,
+): Promise<void> {
   switch (key) {
     case "type":
       mapped.type = typeof value === "string" ? (CAMPAIGN_TYPE_MAP[value] ?? value) : value;
@@ -47,12 +49,13 @@ function mapField(
       break;
     case "bid": {
       const bidVal = value as number;
-      const cpType = mapped.cpType ?? fields.pricingModel;
+      const rawPm = fields.pricingModel;
+      const cpType = typeof rawPm === "string" ? (PRICING_MODEL_MAP[rawPm] ?? rawPm) : rawPm;
       const countriesArg = fields.countries;
       const geoIds = typeof countriesArg === "string" && countriesArg
-        ? resolveCountryIds(countriesArg)
+        ? await registry.resolveCountryIds(countriesArg)
         : [];
-      if (cpType === 4 || cpType === "cpa_target") {
+      if (cpType === 4) {
         mapped.bids = [{ leadCost: bidVal, countries: geoIds }];
       } else {
         mapped.bids = [{ bid: bidVal, leadCost: 0, countries: geoIds }];
@@ -63,13 +66,16 @@ function mapField(
       mapped.connectionType = typeof value === "string" ? (CONNECTION_TYPE_MAP[value] ?? 3) : value;
       break;
     case "devices":
-      if (typeof value === "string") mapped.devices = value.split(",").map(s => s.trim());
+      if (typeof value === "string") mapped.devices = await registry.resolveIds("device", value);
       break;
     case "os":
-      if (typeof value === "string") mapped.platforms = value.split(",").map(s => s.trim());
+      if (typeof value === "string") mapped.platformVersions = await registry.resolveIds("platform", value);
       break;
     case "browsers":
-      if (typeof value === "string") mapped.browsers = value.split(",").map(s => s.trim());
+      if (typeof value === "string") mapped.browsers = await registry.resolveIds("browser", value);
+      break;
+    case "languages":
+      if (typeof value === "string") mapped.languages = await registry.resolveIds("language", value);
       break;
     case "countries":
     case "audienceIncludeIds":
@@ -90,8 +96,6 @@ const FULL_WEEK_SCHEDULE = {
 
 const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   connectionType: 3,
-  categories: [1001],
-  browsers: [2, 4],
   disableProxy: 1,
   sites: { mode: 0, list: [] },
   ips: { mode: 0, list: [] },
@@ -119,7 +123,6 @@ const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   conversion: null,
   platformVersions: null,
   devices: null,
-  languages: null,
 };
 
 function applyDefaults(mapped: Record<string, unknown>): void {
@@ -128,12 +131,22 @@ function applyDefaults(mapped: Record<string, unknown>): void {
   }
 }
 
-function applyTypeDefaults(mapped: Record<string, unknown>): void {
+function applyTypeDefaults(mapped: Record<string, unknown>, opts: CampaignOptions): void {
   const typeId = mapped.type as number;
   const { push, inpage_push, native, banner, popunder } = CAMPAIGN_TYPE_MAP;
 
+  if (opts.categories.length > 0 && mapped.categories === undefined) {
+    mapped.categories = flattenCategoryIds(opts.categories);
+  }
+
+  if (mapped.browsers === undefined && opts.browsers.length > 0) {
+    mapped.browsers = opts.browsers.map((b) => b.id as number);
+  }
+
   if ([push, inpage_push].includes(typeId)) {
-    if (mapped.subAges === undefined) mapped.subAges = [1, 2, 3, 4];
+    if (mapped.subAges === undefined && opts.subAges.length > 0) {
+      mapped.subAges = opts.subAges.map((s) => s.id);
+    }
     if (mapped.isNeedSecondPush === undefined) mapped.isNeedSecondPush = 0;
   }
 
@@ -147,6 +160,16 @@ function applyTypeDefaults(mapped: Record<string, unknown>): void {
   }
 }
 
+function validateCpType(typeId: number, cpTypeId: number, opts: CampaignOptions): void {
+  const validIds = opts.cpTypes.map((c) => Number(c.id));
+  if (!validIds.includes(cpTypeId)) {
+    const available = opts.cpTypes.map((c) => `${c.label} (${c.id})`).join(", ");
+    throw new Error(
+      `Pricing model ${cpTypeId} is not available for this campaign type. Available: ${available}`,
+    );
+  }
+}
+
 function buildAudiences(fields: Record<string, unknown>): Record<string, unknown> {
   const includeIds = fields.audienceIncludeIds;
   const excludeIds = fields.audienceExcludeIds;
@@ -157,27 +180,50 @@ function buildAudiences(fields: Record<string, unknown>): Record<string, unknown
   };
 }
 
-export function mapCampaignFields(fields: Record<string, unknown>): Record<string, unknown> {
+export async function mapCampaignFields(
+  fields: Record<string, unknown>,
+  registry: OptionsRegistry,
+): Promise<Record<string, unknown>> {
   const mapped: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(fields)) {
     if (value == null) continue;
-    mapField(key, value, mapped, fields);
+    await mapField(key, value, mapped, fields, registry);
+  }
+
+  const typeId = mapped.type as number;
+  const opts = await registry.getCampaignOptions(typeId);
+
+  if (mapped.cpType != null) {
+    validateCpType(typeId, mapped.cpType as number, opts);
+  }
+
+  const bids = mapped.bids as Array<Record<string, unknown>> | undefined;
+  if (bids?.[0]) {
+    const bidVal = (bids[0].bid ?? bids[0].leadCost) as number | undefined;
+    if (bidVal != null && opts.bidCoefficients) {
+      const cpType = mapped.cpType as number;
+      const maxKey = cpType === 2 ? "maxWithoutStatCPM" : "maxWithoutStatCPC";
+      const maxBid = opts.bidCoefficients[maxKey];
+      if (maxBid != null && bidVal > maxBid) {
+        throw new Error(`Bid ${bidVal} exceeds maximum ${maxBid} for this account. Reduce bid or contact support.`);
+      }
+    }
   }
 
   mapped.audiences = buildAudiences(fields);
   applyDefaults(mapped);
-  applyTypeDefaults(mapped);
+  applyTypeDefaults(mapped, opts);
 
   return mapped;
 }
 
 const campaignTargetingFields = {
   countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
-  devices: z.string().optional().describe("Comma-separated device types (e.g. 'desktop,mobile,tablet')"),
-  os: z.string().optional().describe("Comma-separated OS filters (e.g. 'windows,android,ios')"),
-  browsers: z.string().optional().describe("Comma-separated browser filters"),
-  languages: z.string().optional().describe("Comma-separated language codes"),
+  devices: z.string().optional().describe("Comma-separated device names or IDs (e.g. 'Desktop,Smartphone' or '1,4')"),
+  os: z.string().optional().describe("Comma-separated OS names or IDs (e.g. 'Android,iOS' or '10,20')"),
+  browsers: z.string().optional().describe("Comma-separated browser names or IDs (e.g. 'Chrome,Firefox' or '8,16')"),
+  languages: z.string().optional().describe("Comma-separated language names or IDs"),
   connectionType: z.enum(["wifi", "cellular", "unknown"]).optional().describe("Network connection type filter"),
   gender: z.enum(["male", "female", "unknown"]).optional().describe("Target gender"),
   ageRanges: z.string().optional().describe("Target age ranges (e.g. '18-24,25-34')"),
@@ -197,7 +243,7 @@ const campaignBudgetFields = {
   frequencyCapViews: z.number().optional().describe("Max ad views per user in the cap period"),
   frequencyCapHours: z.number().optional().describe("Frequency cap period in hours"),
   impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
-  categories: z.string().optional().describe("Comma-separated category IDs (default: 1001=General)"),
+  categories: z.string().optional().describe("Comma-separated category IDs or 'mainstream'"),
   secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
   pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
 };
@@ -278,9 +324,12 @@ export const campaignsModule: ToolModule = {
       async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
         if (args.categories) {
-          mappedArgs.categories = args.categories.split(",").map((s: string) => parseInt(s.trim(), 10));
+          mappedArgs.categories = args.categories.split(",").map((s: string) => {
+            const n = parseInt(s.trim(), 10);
+            return isNaN(n) ? s.trim() : n;
+          });
         }
-        const mappedData = mapCampaignFields(mappedArgs);
+        const mappedData = await mapCampaignFields(mappedArgs, ctx.adv.options);
         const result = await ctx.adv.createCampaign(mappedData);
         return `Campaign created: [ID: ${result.id}] "${args.name}" in folder #${args.folderId}`;
       },
@@ -290,27 +339,63 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_update_campaign",
         description:
-          "Update an existing campaign. IMPORTANT: Kadam API has NO partial update — it requires ALL fields. " +
-          "Missing fields will cause validation errors. This tool is only useful when you provide a COMPLETE campaign configuration. " +
-          "Alternatives: use set_campaign_status for status changes; archive the old campaign and create_campaign for major edits.",
+          "Update an existing campaign (read-modify-write). Fetches current state from API, merges your changes, sends full payload. " +
+          "Pass only the fields you want to change. For status changes use set_campaign_status instead.",
         product: "advertiser",
       },
       {
         id: z.number().describe("Campaign ID to update"),
-        type: z.enum(["push", "inpage_push", "native", "banner", "video", "popunder"]).optional().describe("Ad format"),
-        name: z.string().min(1).optional().describe("Campaign name shown in dashboard"),
+        name: z.string().min(1).optional().describe("Campaign name"),
         url: z.string().url().optional().describe("Landing page URL"),
         folderId: z.number().optional().describe("Campaign folder ID"),
-        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).optional().describe("Pricing model"),
-        bid: z.number().positive().optional().describe("Bid amount in USD (e.g. 0.05)"),
-        dailyBudget: z.number().positive().optional().describe("Daily spending limit in USD"),
-        ...campaignTargetingFields,
-        ...campaignBudgetFields,
+        dailyBudget: z.number().optional().describe("Daily spending limit"),
+        totalBudget: z.number().optional().describe("Total campaign budget"),
+        evenDistribution: z.boolean().optional().describe("Spread budget evenly across the day"),
+        bid: z.number().positive().optional().describe("Bid amount"),
+        bidCountries: z.string().optional().describe("Comma-separated GEO IDs for bids"),
+        connectionType: z.number().optional().describe("1=cellular, 2=wifi, 3=all"),
+        disableProxy: z.boolean().optional(),
+        startDate: z.string().optional().describe("Start date (YYYY-MM-DD HH:MM:SS)"),
+        stopDate: z.string().optional().describe("End date (YYYY-MM-DD HH:MM:SS or null to clear)"),
+        timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3, -5 for UTC-5)"),
       },
       async (args, ctx) => {
-        const { id, ...rest } = args;
-        const mappedData = mapCampaignFields(rest as Record<string, unknown>);
-        await ctx.adv.updateCampaign(id, mappedData);
+        const { id, ...changes } = args;
+        const current = await ctx.adv.getCampaign(id);
+
+        const merged = { ...current };
+
+        if (changes.name != null) merged.name = changes.name;
+        if (changes.url != null) merged.url = changes.url;
+        if (changes.folderId != null) merged.folderId = changes.folderId;
+        if (changes.dailyBudget != null) merged.dayMoneyLimit = changes.dailyBudget;
+        if (changes.totalBudget != null) merged.commonMoneyLimit = changes.totalBudget;
+        if (changes.evenDistribution != null) merged.isEvenDistribution = changes.evenDistribution ? 1 : 0;
+        if (changes.connectionType != null) merged.connectionType = changes.connectionType;
+        if (changes.disableProxy != null) merged.disableProxy = changes.disableProxy ? 1 : 0;
+        if (changes.startDate != null) merged.startDate = changes.startDate;
+        if (changes.stopDate !== undefined) merged.stopDate = changes.stopDate;
+        if (changes.timezone != null) merged.timezone = changes.timezone;
+
+        // GET now returns bids as array [{bid, leadCost, countries}] matching PUT format
+        const currentBids = current.bids as Array<Record<string, unknown>> | undefined;
+        if (changes.bid != null) {
+          const existingCountries = (currentBids?.[0]?.countries ?? []) as number[];
+          const countries = changes.bidCountries
+            ? changes.bidCountries.split(",").map(Number)
+            : existingCountries;
+          merged.bids = [{ bid: changes.bid, leadCost: 0, countries }];
+        }
+
+        delete merged.id;
+        delete merged.status;
+
+        // Backend PUT rejects empty categories array; "mainstream" = all non-adult (safe default)
+        if (Array.isArray(merged.categories) && (merged.categories as unknown[]).length === 0) {
+          merged.categories = ["mainstream"];
+        }
+
+        await ctx.adv.updateCampaign(id, merged);
         return `Campaign #${id} updated successfully.`;
       },
     );
