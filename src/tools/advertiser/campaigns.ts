@@ -77,6 +77,13 @@ async function mapField(
     case "languages":
       if (typeof value === "string") mapped.languages = await registry.resolveIds("language", value);
       break;
+    case "postViewWindow":
+    case "postClickWindow":
+    case "countFirstConversionOnly":
+    case "countLastCampaignOnly":
+    case "postClickAttrPriority":
+    case "postConversionAudienceIds":
+      break; // handled in buildPostConversion
     case "countries":
     case "audienceIncludeIds":
     case "audienceExcludeIds":
@@ -104,7 +111,14 @@ const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   isps: { mode: 0, list: [] },
   materialViews: { count: 0, days: 0 },
   campaignView: { count: 0, days: 0 },
-  postConversion: { audiences: [], windowLength: null, countFirstConversionOnly: false, countLastCampaignOnly: false },
+  postConversion: {
+    audiences: [],
+    countFirstConversionOnly: true,
+    countLastCampaignOnly: true,
+    postClickAttrPriority: true,
+    windowLengthPostView: null,
+    windowLengthPostClick: null,
+  },
   commonMoneyLimit: 0,
   isEvenDistribution: 0,
   totalLossLimit: 0,
@@ -170,6 +184,33 @@ function validateCpType(typeId: number, cpTypeId: number, opts: CampaignOptions)
   }
 }
 
+function buildPostConversion(fields: Record<string, unknown>): Record<string, unknown> | undefined {
+  const pvWindow = fields.postViewWindow as number | undefined;
+  const pcWindow = fields.postClickWindow as number | undefined;
+  const firstOnly = fields.countFirstConversionOnly as boolean | undefined;
+  const lastCampaign = fields.countLastCampaignOnly as boolean | undefined;
+  const clickPriority = fields.postClickAttrPriority as boolean | undefined;
+  const audienceIdsStr = fields.postConversionAudienceIds as string | undefined;
+
+  if (pvWindow == null && pcWindow == null && firstOnly == null &&
+      lastCampaign == null && clickPriority == null && audienceIdsStr == null) {
+    return undefined;
+  }
+
+  const audiences = audienceIdsStr
+    ? audienceIdsStr.split(",").map(s => parseInt(s.trim(), 10))
+    : [];
+
+  return {
+    audiences,
+    countFirstConversionOnly: firstOnly ?? true,
+    countLastCampaignOnly: lastCampaign ?? true,
+    postClickAttrPriority: clickPriority ?? true,
+    windowLengthPostView: pvWindow ?? null,
+    windowLengthPostClick: pcWindow ?? null,
+  };
+}
+
 function buildAudiences(fields: Record<string, unknown>): Record<string, unknown> {
   const includeIds = fields.audienceIncludeIds;
   const excludeIds = fields.audienceExcludeIds;
@@ -212,6 +253,12 @@ export async function mapCampaignFields(
   }
 
   mapped.audiences = buildAudiences(fields);
+
+  const customPostConversion = buildPostConversion(fields);
+  if (customPostConversion) {
+    mapped.postConversion = customPostConversion;
+  }
+
   applyDefaults(mapped);
   applyTypeDefaults(mapped, opts);
 
@@ -246,6 +293,21 @@ const campaignBudgetFields = {
   categories: z.string().optional().describe("Comma-separated category IDs or 'mainstream'"),
   secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
   pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
+};
+
+const postConversionFields = {
+  postViewWindow: z.number().min(1).max(168).optional()
+    .describe("Post-view attribution window in hours (1-168). Time after ad impression to count a conversion"),
+  postClickWindow: z.number().min(1).max(168).optional()
+    .describe("Post-click attribution window in hours (1-168). Time after ad click to count a conversion"),
+  countFirstConversionOnly: z.boolean().optional()
+    .describe("Only count the first conversion per user (default: true). Set false to allow multiple conversions per view/click"),
+  countLastCampaignOnly: z.boolean().optional()
+    .describe("Attribute conversion only to the last campaign impression (default: true)"),
+  postClickAttrPriority: z.boolean().optional()
+    .describe("Post-click attribution takes priority over post-view (default: true)"),
+  postConversionAudienceIds: z.string().optional()
+    .describe("Comma-separated audience IDs for post-conversion retargeting"),
 };
 
 export const campaignsModule: ToolModule = {
@@ -319,6 +381,7 @@ export const campaignsModule: ToolModule = {
         dailyBudget: z.number().positive().describe("Daily spending limit in USD"),
         ...campaignTargetingFields,
         ...campaignBudgetFields,
+        ...postConversionFields,
         countries: z.string().describe("Comma-separated ISO country codes for bid targeting (e.g. 'US,DE,BR'). Required."),
       },
       async (args, ctx) => {
@@ -358,6 +421,7 @@ export const campaignsModule: ToolModule = {
         startDate: z.string().optional().describe("Start date (YYYY-MM-DD HH:MM:SS)"),
         stopDate: z.string().optional().describe("End date (YYYY-MM-DD HH:MM:SS or null to clear)"),
         timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3, -5 for UTC-5)"),
+        ...postConversionFields,
       },
       async (args, ctx) => {
         const { id, ...changes } = args;
@@ -376,6 +440,22 @@ export const campaignsModule: ToolModule = {
         if (changes.startDate != null) merged.startDate = changes.startDate;
         if (changes.stopDate !== undefined) merged.stopDate = changes.stopDate;
         if (changes.timezone != null) merged.timezone = changes.timezone;
+
+        const currentPc = (current.postConversion ?? {}) as Record<string, unknown>;
+        const pcOverrides: Record<string, unknown> = {};
+        if (changes.postViewWindow !== undefined) pcOverrides.windowLengthPostView = changes.postViewWindow;
+        if (changes.postClickWindow !== undefined) pcOverrides.windowLengthPostClick = changes.postClickWindow;
+        if (changes.countFirstConversionOnly !== undefined) pcOverrides.countFirstConversionOnly = changes.countFirstConversionOnly;
+        if (changes.countLastCampaignOnly !== undefined) pcOverrides.countLastCampaignOnly = changes.countLastCampaignOnly;
+        if (changes.postClickAttrPriority !== undefined) pcOverrides.postClickAttrPriority = changes.postClickAttrPriority;
+        if (changes.postConversionAudienceIds !== undefined) {
+          pcOverrides.audiences = changes.postConversionAudienceIds
+            ? changes.postConversionAudienceIds.split(",").map(s => parseInt(s.trim(), 10))
+            : [];
+        }
+        if (Object.keys(pcOverrides).length > 0) {
+          merged.postConversion = { ...currentPc, ...pcOverrides };
+        }
 
         // GET now returns bids as array [{bid, leadCost, countries}] matching PUT format
         const currentBids = current.bids as Array<Record<string, unknown>> | undefined;

@@ -222,4 +222,45 @@ describe("mapCampaignFields", () => {
       mapCampaignFields({ type: "popunder", pricingModel: "cpm" }, registry),
     ).rejects.toThrow("Pricing model 2 is not available");
   });
+
+  it("uses default postConversion when no postConversion fields provided", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result.postConversion).toEqual({
+      audiences: [],
+      countFirstConversionOnly: true,
+      countLastCampaignOnly: true,
+      postClickAttrPriority: true,
+      windowLengthPostView: null,
+      windowLengthPostClick: null,
+    });
+  });
+
+  it("builds custom postConversion when any field is provided", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      postViewWindow: 24,
+      postClickWindow: 48,
+      countFirstConversionOnly: false,
+      postConversionAudienceIds: "1,3",
+    }, createMockRegistry());
+    expect(result.postConversion).toEqual({
+      audiences: [1, 3],
+      countFirstConversionOnly: false,
+      countLastCampaignOnly: true,
+      postClickAttrPriority: true,
+      windowLengthPostView: 24,
+      windowLengthPostClick: 48,
+    });
+  });
+
+  it("does not leak postConversion fields to top-level mapped", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      postViewWindow: 12,
+      countFirstConversionOnly: true,
+    }, createMockRegistry());
+    expect(result.postViewWindow).toBeUndefined();
+    expect(result.countFirstConversionOnly).toBeUndefined();
+    expect(result.postConversionAudienceIds).toBeUndefined();
+  });
 });
