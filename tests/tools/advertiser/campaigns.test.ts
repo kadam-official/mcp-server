@@ -88,12 +88,14 @@ describe("campaigns tools", () => {
     api.getCampaign.mockResolvedValue({
       id: 42,
       type: 30,
+      cpType: 0,
       name: "Old Name",
       url: "https://old.com",
       dayMoneyLimit: 50,
       bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
       categories: [],
       status: 10,
+      audiences: { mode: 20, include: [], exclude: [] },
     });
     api.updateCampaign.mockResolvedValue({} as never);
 
@@ -110,11 +112,121 @@ describe("campaigns tools", () => {
         name: "Updated Name",
         url: "https://old.com",
         dayMoneyLimit: 200,
+        newAudiences: [],
+        categories: ["mainstream"],
       }),
     );
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
     expect(payload.id).toBeUndefined();
     expect(payload.status).toBeUndefined();
+  });
+
+  it("update_campaign resolves ISO country codes for bids", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 10,
+      type: 30,
+      cpType: 0,
+      name: "Geo test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 10, bid: 0.05, countries: "US" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    const bids = payload.bids as Array<Record<string, unknown>>;
+    expect(bids[0]!.bid).toBe(0.05);
+    expect(bids[0]!.countries).toEqual([34]);
+    expect(bids[0]!.leadCost).toBe(0);
+  });
+
+  it("update_campaign uses leadCost for CPA campaigns", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 20,
+      type: 30,
+      cpType: 4,
+      name: "CPA campaign",
+      url: "https://example.com",
+      dayMoneyLimit: 100,
+      bids: [{ leadCost: 5, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 20, bid: 3.5 },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    const bids = payload.bids as Array<Record<string, unknown>>;
+    expect(bids[0]!.leadCost).toBe(3.5);
+    expect(bids[0]!.bid).toBeUndefined();
+  });
+
+  it("update_campaign handles connectionType as string enum", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 30,
+      type: 30,
+      cpType: 0,
+      name: "Conn test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      connectionType: 3,
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 30, connectionType: "wifi" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.connectionType).toBe(2);
+  });
+
+  it("update_campaign filters NaN from postConversionAudienceIds", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 40,
+      type: 30,
+      cpType: 0,
+      name: "PC test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      postConversion: { audiences: [100], countFirstConversionOnly: true, countLastCampaignOnly: true, postClickAttrPriority: true, windowLengthPostView: null, windowLengthPostClick: null },
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 40, postConversionAudienceIds: "" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    const pc = payload.postConversion as Record<string, unknown>;
+    expect(pc.audiences).toEqual([]);
   });
 
   it("set_campaign_status with ids 1,2,3 and active calls api with activate", async () => {

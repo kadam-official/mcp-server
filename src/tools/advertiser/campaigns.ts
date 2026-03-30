@@ -271,7 +271,7 @@ const campaignTargetingFields = {
   os: z.string().optional().describe("Comma-separated OS names or IDs (e.g. 'Android,iOS' or '10,20')"),
   browsers: z.string().optional().describe("Comma-separated browser names or IDs (e.g. 'Chrome,Firefox' or '8,16')"),
   languages: z.string().optional().describe("Comma-separated language names or IDs"),
-  connectionType: z.enum(["wifi", "cellular", "unknown"]).optional().describe("Network connection type filter"),
+  connectionType: z.enum(["wifi", "cellular", "all", "unknown"]).optional().describe("Network connection type filter (all = no filter)"),
   gender: z.enum(["male", "female", "unknown"]).optional().describe("Target gender"),
   ageRanges: z.string().optional().describe("Target age ranges (e.g. '18-24,25-34')"),
   audienceIncludeIds: z.string().optional().describe("Comma-separated audience IDs to include"),
@@ -402,32 +402,29 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_update_campaign",
         description:
-          "Update an existing campaign (read-modify-write). Fetches current state from API, merges your changes, sends full payload. " +
-          "Pass only the fields you want to change. For status changes use set_campaign_status instead.",
+          "Update an existing campaign (read-modify-write). Fetches current state, merges your changes, sends full payload. " +
+          "Pass only the fields you want to change. Uses same field names as create. For status changes use set_campaign_status instead.",
         product: "advertiser",
       },
       {
         id: z.number().describe("Campaign ID to update"),
-        name: z.string().min(1).optional().describe("Campaign name"),
+        name: z.string().min(1).optional().describe("Campaign name shown in dashboard"),
         url: z.string().url().optional().describe("Landing page URL"),
         folderId: z.number().optional().describe("Campaign folder ID"),
-        dailyBudget: z.number().optional().describe("Daily spending limit"),
-        totalBudget: z.number().optional().describe("Total campaign budget"),
-        evenDistribution: z.boolean().optional().describe("Spread budget evenly across the day"),
-        bid: z.number().positive().optional().describe("Bid amount"),
-        bidCountries: z.string().optional().describe("Comma-separated GEO IDs for bids"),
-        connectionType: z.number().optional().describe("1=cellular, 2=wifi, 3=all"),
-        disableProxy: z.boolean().optional(),
-        startDate: z.string().optional().describe("Start date (YYYY-MM-DD HH:MM:SS)"),
-        stopDate: z.string().optional().describe("End date (YYYY-MM-DD HH:MM:SS or null to clear)"),
-        timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3, -5 for UTC-5)"),
+        dailyBudget: z.number().optional().describe("Daily spending limit in USD"),
+        bid: z.number().positive().optional().describe("Bid amount in USD. For cpa_target this is the target CPA cost"),
+        disableProxy: z.boolean().optional().describe("Block proxy/VPN traffic"),
+        ...campaignTargetingFields,
+        ...campaignBudgetFields,
         ...postConversionFields,
       },
       async (args, ctx) => {
         const { id, ...changes } = args;
         const current = await ctx.adv.getCampaign(id);
-
         const merged = { ...current };
+
+        const cpType = merged.cpType as number | undefined;
+        const registry = ctx.adv.options;
 
         if (changes.name != null) merged.name = changes.name;
         if (changes.url != null) merged.url = changes.url;
@@ -435,13 +432,60 @@ export const campaignsModule: ToolModule = {
         if (changes.dailyBudget != null) merged.dayMoneyLimit = changes.dailyBudget;
         if (changes.totalBudget != null) merged.commonMoneyLimit = changes.totalBudget;
         if (changes.evenDistribution != null) merged.isEvenDistribution = changes.evenDistribution ? 1 : 0;
-        if (changes.connectionType != null) merged.connectionType = changes.connectionType;
         if (changes.disableProxy != null) merged.disableProxy = changes.disableProxy ? 1 : 0;
         if (changes.startDate != null) merged.startDate = changes.startDate;
-        if (changes.stopDate !== undefined) merged.stopDate = changes.stopDate;
+        if ((changes as Record<string, unknown>).endDate !== undefined) merged.stopDate = (changes as Record<string, unknown>).endDate;
         if (changes.timezone != null) merged.timezone = changes.timezone;
+        if (changes.impTracker !== undefined) merged.impTracker = changes.impTracker;
+        if (changes.secondPush != null) merged.isNeedSecondPush = changes.secondPush ? 1 : 0;
+        if (changes.pauseAfterModeration != null) merged.isPauseAfterModerate = changes.pauseAfterModeration ? 1 : 0;
 
-        const currentPc = (current.postConversion ?? {}) as Record<string, unknown>;
+        if (changes.connectionType != null) {
+          merged.connectionType = typeof changes.connectionType === "string"
+            ? (CONNECTION_TYPE_MAP[changes.connectionType] ?? 3)
+            : changes.connectionType;
+        }
+
+        if (changes.devices != null) merged.devices = await registry.resolveIds("device", changes.devices);
+        if (changes.os != null) merged.platformVersions = await registry.resolveIds("platform", changes.os);
+        if (changes.browsers != null) merged.browsers = await registry.resolveIds("browser", changes.browsers);
+        if (changes.languages != null) merged.languages = await registry.resolveIds("language", changes.languages);
+
+        if (changes.categories != null) {
+          merged.categories = changes.categories.split(",").map((s: string) => {
+            const n = parseInt(s.trim(), 10);
+            return isNaN(n) ? s.trim() : n;
+          });
+        }
+
+        if (changes.audienceIncludeIds != null || changes.audienceExcludeIds != null) {
+          const currentAud = (merged.audiences ?? {}) as Record<string, unknown>;
+          merged.audiences = {
+            mode: currentAud.mode ?? 20,
+            include: changes.audienceIncludeIds
+              ? changes.audienceIncludeIds.split(",").map(s => parseInt(s.trim(), 10))
+              : (currentAud.include ?? []),
+            exclude: changes.audienceExcludeIds
+              ? changes.audienceExcludeIds.split(",").map(s => parseInt(s.trim(), 10))
+              : (currentAud.exclude ?? []),
+          };
+        }
+
+        if (changes.siteWhitelist != null) {
+          merged.sites = { mode: 1, list: changes.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
+        } else if (changes.siteBlacklist != null) {
+          merged.sites = { mode: 2, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+        }
+
+        if (changes.frequencyCapViews != null || changes.frequencyCapHours != null) {
+          const currentMv = (merged.materialViews ?? {}) as Record<string, unknown>;
+          merged.materialViews = {
+            count: changes.frequencyCapViews ?? currentMv.count ?? 0,
+            days: changes.frequencyCapHours ?? currentMv.days ?? 0,
+          };
+        }
+
+        const currentPc = (merged.postConversion ?? {}) as Record<string, unknown>;
         const pcOverrides: Record<string, unknown> = {};
         if (changes.postViewWindow !== undefined) pcOverrides.windowLengthPostView = changes.postViewWindow;
         if (changes.postClickWindow !== undefined) pcOverrides.windowLengthPostClick = changes.postClickWindow;
@@ -449,28 +493,38 @@ export const campaignsModule: ToolModule = {
         if (changes.countLastCampaignOnly !== undefined) pcOverrides.countLastCampaignOnly = changes.countLastCampaignOnly;
         if (changes.postClickAttrPriority !== undefined) pcOverrides.postClickAttrPriority = changes.postClickAttrPriority;
         if (changes.postConversionAudienceIds !== undefined) {
-          pcOverrides.audiences = changes.postConversionAudienceIds
-            ? changes.postConversionAudienceIds.split(",").map(s => parseInt(s.trim(), 10))
+          const raw = changes.postConversionAudienceIds;
+          pcOverrides.audiences = raw
+            ? raw.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
             : [];
         }
         if (Object.keys(pcOverrides).length > 0) {
           merged.postConversion = { ...currentPc, ...pcOverrides };
         }
 
-        // GET now returns bids as array [{bid, leadCost, countries}] matching PUT format
-        const currentBids = current.bids as Array<Record<string, unknown>> | undefined;
+        const currentBids = merged.bids as Array<Record<string, unknown>> | undefined;
         if (changes.bid != null) {
           const existingCountries = (currentBids?.[0]?.countries ?? []) as number[];
-          const countries = changes.bidCountries
-            ? changes.bidCountries.split(",").map(Number)
+          const countries = changes.countries
+            ? await registry.resolveCountryIds(changes.countries)
             : existingCountries;
-          merged.bids = [{ bid: changes.bid, leadCost: 0, countries }];
+          if (cpType === 4) {
+            merged.bids = [{ leadCost: changes.bid, countries }];
+          } else {
+            merged.bids = [{ bid: changes.bid, leadCost: 0, countries }];
+          }
+        } else if (changes.countries != null) {
+          const resolvedCountries = await registry.resolveCountryIds(changes.countries);
+          if (currentBids?.[0]) {
+            merged.bids = [{ ...currentBids[0], countries: resolvedCountries }];
+          }
         }
 
         delete merged.id;
         delete merged.status;
 
-        // Backend PUT rejects empty categories array; "mainstream" = all non-adult (safe default)
+        merged.newAudiences ??= [];
+
         if (Array.isArray(merged.categories) && (merged.categories as unknown[]).length === 0) {
           merged.categories = ["mainstream"];
         }
