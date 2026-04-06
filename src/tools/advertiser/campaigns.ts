@@ -523,6 +523,11 @@ export const campaignsModule: ToolModule = {
         delete merged.id;
         delete merged.status;
 
+        const conv = merged.conversion as Record<string, unknown> | null | undefined;
+        if (conv && typeof conv === "object") {
+          delete conv.id;
+        }
+
         merged.newAudiences ??= [];
 
         if (Array.isArray(merged.categories) && (merged.categories as unknown[]).length === 0) {
