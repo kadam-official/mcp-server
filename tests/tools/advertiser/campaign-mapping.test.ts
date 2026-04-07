@@ -179,17 +179,11 @@ describe("mapCampaignFields", () => {
     expect(result.subAges).toEqual([1, 2, 3, 4]);
   });
 
-  it("applies native-specific defaults (gender, age)", async () => {
-    const registry = createMockRegistry({ categories: [], ages: [{ id: 1, label: "under 17" }] });
+  it("does not set gender/age defaults for native (not supported in Kadam)", async () => {
+    const registry = createMockRegistry({ categories: [] });
     const result = await mapCampaignFields({ type: "native" }, registry);
-    expect(result.gender).toBe(3);
-    expect(result.age).toBeNull();
-  });
-
-  it("applies banner-specific defaults (gender, age)", async () => {
-    const registry = createMockRegistry({ categories: [], ages: [{ id: 1, label: "under 17" }] });
-    const result = await mapCampaignFields({ type: "banner" }, registry);
-    expect(result.gender).toBe(3);
+    expect(result.gender).toBeUndefined();
+    expect(result.age).toBeUndefined();
   });
 
   it("applies popunder-specific defaults (isPauseAfterModerate)", async () => {
@@ -262,6 +256,26 @@ describe("mapCampaignFields", () => {
     expect(result.postViewWindow).toBeUndefined();
     expect(result.countFirstConversionOnly).toBeUndefined();
     expect(result.postConversionAudienceIds).toBeUndefined();
+  });
+
+  it("maps schedule to time structure with specified hours for all 7 days", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      schedule: "9,10,11,12",
+    }, createMockRegistry());
+    expect(result.time).toEqual({
+      mode: 1,
+      list: Array.from({ length: 7 }, (_, i) => ({ day: i + 1, hours: [9, 10, 11, 12] })),
+    });
+    expect(result.schedule).toBeUndefined();
+  });
+
+  it("uses full week schedule as default when no schedule provided", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    const time = result.time as { mode: number; list: Array<{ day: number; hours: number[] }> };
+    expect(time.mode).toBe(1);
+    expect(time.list).toHaveLength(7);
+    expect(time.list[0].hours).toHaveLength(24);
   });
 
   it("maps frequencyCapViews/frequencyCapDays to materialViews", async () => {

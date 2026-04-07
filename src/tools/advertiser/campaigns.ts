@@ -81,6 +81,7 @@ async function mapField(
     case "frequencyCapDays":
     case "campaignCapViews":
     case "campaignCapDays":
+    case "schedule":
       break; // handled after mapField loop
     case "postViewWindow":
     case "postClickWindow":
@@ -169,11 +170,6 @@ function applyTypeDefaults(mapped: Record<string, unknown>, opts: CampaignOption
     if (mapped.isNeedSecondPush === undefined) mapped.isNeedSecondPush = 0;
   }
 
-  if ([native, banner].includes(typeId)) {
-    if (mapped.gender === undefined) mapped.gender = 3;
-    if (mapped.age === undefined) mapped.age = null;
-  }
-
   if (typeId === popunder) {
     if (mapped.isPauseAfterModerate === undefined) mapped.isPauseAfterModerate = 0;
   }
@@ -213,6 +209,14 @@ function buildPostConversion(fields: Record<string, unknown>): Record<string, un
     postClickAttrPriority: clickPriority ?? true,
     windowLengthPostView: pvWindow ?? null,
     windowLengthPostClick: pcWindow ?? null,
+  };
+}
+
+function parseSchedule(schedule: string): { mode: number; list: Array<{ day: number; hours: number[] }> } {
+  const hours = schedule.split(",").map(s => parseInt(s.trim(), 10)).filter(h => h >= 0 && h <= 23);
+  return {
+    mode: 1,
+    list: Array.from({ length: 7 }, (_, i) => ({ day: i + 1, hours })),
   };
 }
 
@@ -264,6 +268,10 @@ export async function mapCampaignFields(
     mapped.postConversion = customPostConversion;
   }
 
+  if (typeof fields.schedule === "string") {
+    mapped.time = parseSchedule(fields.schedule);
+  }
+
   if (fields.frequencyCapViews != null || fields.frequencyCapDays != null) {
     mapped.materialViews = {
       count: (fields.frequencyCapViews as number) ?? 0,
@@ -291,8 +299,6 @@ const campaignTargetingFields = {
   browsers: z.string().optional().describe("Comma-separated browser names or IDs (e.g. 'Chrome,Firefox' or '8,16')"),
   languages: z.string().optional().describe("Comma-separated language names or IDs"),
   connectionType: z.enum(["wifi", "cellular", "all", "unknown"]).optional().describe("Network connection type filter (all = no filter)"),
-  gender: z.enum(["male", "female", "unknown"]).optional().describe("Target gender"),
-  ageRanges: z.string().optional().describe("Target age ranges (e.g. '18-24,25-34')"),
   audienceIncludeIds: z.string().optional().describe("Comma-separated audience IDs to include"),
   audienceExcludeIds: z.string().optional().describe("Comma-separated audience IDs to exclude"),
   siteWhitelist: z.string().optional().describe("Comma-separated site IDs for whitelist"),
@@ -305,7 +311,7 @@ const campaignBudgetFields = {
   startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
   endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
   timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
-  schedule: z.string().optional().describe("Hour schedule bitmask for targeting specific hours"),
+  schedule: z.string().optional().describe("Comma-separated hours (0-23) to show ads, applied to all days (e.g. '9,10,11,12,13,14,15,16,17' for 9am-5pm)"),
   frequencyCapViews: z.number().optional().describe("Max ad (creative) views per user in the cap period"),
   frequencyCapDays: z.number().optional().describe("Frequency cap period in days (e.g. 1 = per day)"),
   campaignCapViews: z.number().optional().describe("Max campaign-level views per user in the cap period (use for pop campaigns)"),
@@ -496,6 +502,10 @@ export const campaignsModule: ToolModule = {
           merged.sites = { mode: 1, list: changes.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
         } else if (changes.siteBlacklist != null) {
           merged.sites = { mode: 2, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+        }
+
+        if (changes.schedule != null) {
+          merged.time = parseSchedule(changes.schedule);
         }
 
         if (changes.frequencyCapViews != null || changes.frequencyCapDays != null) {
