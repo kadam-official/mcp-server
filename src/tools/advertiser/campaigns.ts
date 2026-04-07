@@ -77,6 +77,11 @@ async function mapField(
     case "languages":
       if (typeof value === "string") mapped.languages = await registry.resolveIds("language", value);
       break;
+    case "frequencyCapViews":
+    case "frequencyCapDays":
+    case "campaignCapViews":
+    case "campaignCapDays":
+      break; // handled after mapField loop
     case "postViewWindow":
     case "postClickWindow":
     case "countFirstConversionOnly":
@@ -259,6 +264,20 @@ export async function mapCampaignFields(
     mapped.postConversion = customPostConversion;
   }
 
+  if (fields.frequencyCapViews != null || fields.frequencyCapDays != null) {
+    mapped.materialViews = {
+      count: (fields.frequencyCapViews as number) ?? 0,
+      days: (fields.frequencyCapDays as number) ?? 0,
+    };
+  }
+
+  if (fields.campaignCapViews != null || fields.campaignCapDays != null) {
+    mapped.campaignView = {
+      count: (fields.campaignCapViews as number) ?? 0,
+      days: (fields.campaignCapDays as number) ?? 0,
+    };
+  }
+
   applyDefaults(mapped);
   applyTypeDefaults(mapped, opts);
 
@@ -287,8 +306,10 @@ const campaignBudgetFields = {
   endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
   timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
   schedule: z.string().optional().describe("Hour schedule bitmask for targeting specific hours"),
-  frequencyCapViews: z.number().optional().describe("Max ad views per user in the cap period"),
-  frequencyCapHours: z.number().optional().describe("Frequency cap period in hours"),
+  frequencyCapViews: z.number().optional().describe("Max ad (creative) views per user in the cap period"),
+  frequencyCapDays: z.number().optional().describe("Frequency cap period in days (e.g. 1 = per day)"),
+  campaignCapViews: z.number().optional().describe("Max campaign-level views per user in the cap period (use for pop campaigns)"),
+  campaignCapDays: z.number().optional().describe("Campaign-level cap period in days (e.g. 1 = per day)"),
   impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
   categories: z.string().optional().describe("Comma-separated category IDs or 'mainstream'"),
   secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
@@ -477,11 +498,19 @@ export const campaignsModule: ToolModule = {
           merged.sites = { mode: 2, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
         }
 
-        if (changes.frequencyCapViews != null || changes.frequencyCapHours != null) {
+        if (changes.frequencyCapViews != null || changes.frequencyCapDays != null) {
           const currentMv = (merged.materialViews ?? {}) as Record<string, unknown>;
           merged.materialViews = {
             count: changes.frequencyCapViews ?? currentMv.count ?? 0,
-            days: changes.frequencyCapHours ?? currentMv.days ?? 0,
+            days: changes.frequencyCapDays ?? currentMv.days ?? 0,
+          };
+        }
+
+        if (changes.campaignCapViews != null || changes.campaignCapDays != null) {
+          const currentCv = (merged.campaignView ?? {}) as Record<string, unknown>;
+          merged.campaignView = {
+            count: changes.campaignCapViews ?? currentCv.count ?? 0,
+            days: changes.campaignCapDays ?? currentCv.days ?? 0,
           };
         }
 

@@ -263,4 +263,36 @@ describe("mapCampaignFields", () => {
     expect(result.countFirstConversionOnly).toBeUndefined();
     expect(result.postConversionAudienceIds).toBeUndefined();
   });
+
+  it("maps frequencyCapViews/frequencyCapDays to materialViews", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      frequencyCapViews: 5,
+      frequencyCapDays: 1,
+    }, createMockRegistry());
+    expect(result.materialViews).toEqual({ count: 5, days: 1 });
+    expect(result.frequencyCapViews).toBeUndefined();
+    expect(result.frequencyCapDays).toBeUndefined();
+  });
+
+  it("maps campaignCapViews/campaignCapDays to campaignView", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      campaignCapViews: 5,
+      campaignCapDays: 1,
+    }, createMockRegistry());
+    expect(result.campaignView).toEqual({ count: 5, days: 1 });
+    expect(result.campaignCapViews).toBeUndefined();
+    expect(result.campaignCapDays).toBeUndefined();
+  });
+
+  it("uses default materialViews when no frequency cap fields provided", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result.materialViews).toEqual({ count: 0, days: 0 });
+  });
+
+  it("uses default campaignView when no campaign cap fields provided", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result.campaignView).toEqual({ count: 0, days: 0 });
+  });
 });
