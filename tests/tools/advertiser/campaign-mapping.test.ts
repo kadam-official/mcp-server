@@ -309,4 +309,36 @@ describe("mapCampaignFields", () => {
     const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
     expect(result.campaignView).toEqual({ count: 0, days: 0 });
   });
+
+  it("maps siteWhitelist to sites with mode 1", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      siteWhitelist: "100,200,300",
+    }, createMockRegistry());
+    expect(result.sites).toEqual({ mode: 1, list: [100, 200, 300] });
+    expect(result.siteWhitelist).toBeUndefined();
+  });
+
+  it("maps siteBlacklist to sites with mode 0", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      siteBlacklist: "400,500",
+    }, createMockRegistry());
+    expect(result.sites).toEqual({ mode: 0, list: [400, 500] });
+    expect(result.siteBlacklist).toBeUndefined();
+  });
+
+  it("uses default empty sites when no whitelist/blacklist provided", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result.sites).toEqual({ mode: 0, list: [] });
+  });
+
+  it("prefers siteWhitelist over siteBlacklist when both provided", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      siteWhitelist: "100",
+      siteBlacklist: "200",
+    }, createMockRegistry());
+    expect(result.sites).toEqual({ mode: 1, list: [100] });
+  });
 });

@@ -93,6 +93,8 @@ async function mapField(
     case "countries":
     case "audienceIncludeIds":
     case "audienceExcludeIds":
+    case "siteWhitelist":
+    case "siteBlacklist":
       break;
     default:
       mapped[key] = value;
@@ -262,6 +264,12 @@ export async function mapCampaignFields(
   }
 
   mapped.audiences = buildAudiences(fields);
+
+  if (typeof fields.siteWhitelist === "string") {
+    mapped.sites = { mode: 1, list: fields.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
+  } else if (typeof fields.siteBlacklist === "string") {
+    mapped.sites = { mode: 0, list: fields.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+  }
 
   const customPostConversion = buildPostConversion(fields);
   if (customPostConversion) {
@@ -501,7 +509,7 @@ export const campaignsModule: ToolModule = {
         if (changes.siteWhitelist != null) {
           merged.sites = { mode: 1, list: changes.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
         } else if (changes.siteBlacklist != null) {
-          merged.sites = { mode: 2, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+          merged.sites = { mode: 0, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
         }
 
         if (changes.schedule != null) {
