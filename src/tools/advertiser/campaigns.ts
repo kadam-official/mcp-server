@@ -598,5 +598,103 @@ export const campaignsModule: ToolModule = {
         return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;
       },
     );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_update_campaign_bid",
+        description:
+          "Update bid for a single campaign without sending the full campaign payload. " +
+          "Faster and safer than kadam_adv_update_campaign when only the bid needs changing. " +
+          "Specify countries as ISO codes; they are resolved to geo IDs automatically.",
+        product: "advertiser",
+      },
+      {
+        id: z.number().describe("Campaign ID"),
+        bid: z.number().positive().describe("Bid value in USD (e.g. 0.05)"),
+        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).optional()
+          .describe("Pricing model. If omitted, reads from current campaign settings"),
+        countries: z.string().optional()
+          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). If omitted, keeps current countries"),
+      },
+      async (args, ctx) => {
+        const registry = ctx.adv.options;
+
+        let cpType: number | undefined;
+        if (args.pricingModel != null) {
+          cpType = PRICING_MODEL_MAP[args.pricingModel] ?? undefined;
+        } else {
+          const current = await ctx.adv.getCampaign(args.id);
+          cpType = current.cpType as number | undefined;
+        }
+
+        const countries = args.countries
+          ? await registry.resolveCountryIds(args.countries)
+          : [];
+
+        const bidEntry = cpType === 4
+          ? { leadCost: args.bid, countries }
+          : { bid: args.bid, leadCost: 0, countries };
+
+        await ctx.adv.updateCampaignBid(args.id, [bidEntry]);
+        return `Bid for campaign #${args.id} updated to ${args.bid}.`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_bulk_update_bids",
+        description:
+          "Update bids for multiple campaigns at once. All specified campaigns receive the same bid. " +
+          "Much faster than updating campaigns one by one.",
+        product: "advertiser",
+      },
+      {
+        campaignIds: z.string().min(1).describe("Comma-separated campaign IDs (e.g. '100,200,300')"),
+        bid: z.number().positive().describe("Bid value in USD"),
+        leadCost: z.number().optional().describe("Lead cost for CPA campaigns (if omitted, bid is used as CPC/CPM bid)"),
+        countries: z.string().optional()
+          .describe("Comma-separated ISO country codes. If omitted, applies to all countries (empty array)"),
+      },
+      async (args, ctx) => {
+        const ids = parseCommaSeparatedIds(args.campaignIds);
+        const registry = ctx.adv.options;
+
+        const countries = args.countries
+          ? await registry.resolveCountryIds(args.countries)
+          : [];
+
+        const bidEntry: Record<string, unknown> = {
+          bid: args.bid,
+          leadCost: args.leadCost ?? 0,
+          countries,
+        };
+
+        await ctx.adv.bulkUpdateCampaignBids(ids, [bidEntry]);
+        const idList = ids.map((id) => `#${id}`).join(", ");
+        return `Bids updated for ${ids.length} campaigns: ${idList}. Bid: ${args.bid}`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_update_site_bids",
+        description:
+          "Set per-site (zone) bids for campaigns. Allows bid adjustments on individual publisher sites. " +
+          "Bid can be a number ('0.05'), a multiplier ('x1.5' to multiply base bid), or '0' to remove the site bid.",
+        product: "advertiser",
+      },
+      {
+        campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),
+        zones: z.string().min(1).describe("Comma-separated site (zone) IDs to set bids for"),
+        bid: z.string().describe("Bid value: number ('0.05'), multiplier ('x1.5'), or '0' to remove"),
+      },
+      async (args, ctx) => {
+        const campaignIds = parseCommaSeparatedIds(args.campaignIds);
+        const zoneIds = parseCommaSeparatedIds(args.zones);
+
+        await ctx.adv.updateSiteBids(campaignIds, [{ zones: zoneIds, bid: args.bid }]);
+        return `Site bids updated for ${campaignIds.length} campaign(s). Zones: ${zoneIds.join(", ")} → bid: ${args.bid}`;
+      },
+    );
   },
 };

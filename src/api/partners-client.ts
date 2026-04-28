@@ -76,6 +76,18 @@ export class PartnersClient {
     return this.http.post(`/campaigns/${action}`, { campaignIds: ids });
   }
 
+  async updateCampaignBid(id: number, bids: unknown[]): Promise<unknown> {
+    return this.http.put(`/campaigns/${id}/bid`, { bids });
+  }
+
+  async bulkUpdateCampaignBids(campaignIds: number[], bids: unknown[]): Promise<unknown> {
+    return this.http.put("/campaigns/bids", { campaignIds, bids });
+  }
+
+  async updateSiteBids(campaignIds: number[], bids: unknown[]): Promise<unknown> {
+    return this.http.put("/stats/sites/bids", { campaignIds, bids });
+  }
+
   async listCampaignFolders(params: Record<string, unknown>): Promise<ListResponse<FolderRow>> {
     const raw = await this.http.post("/campaigns/folders", params);
     return folderListSchema.parse(raw);
