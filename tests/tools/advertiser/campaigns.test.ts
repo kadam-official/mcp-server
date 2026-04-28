@@ -260,4 +260,75 @@ describe("campaigns tools", () => {
     expect(text).toContain("Campaigns");
     expect(text).toContain("0");
   });
+
+  it("update_campaign_bid sends PUT /campaigns/{id}/bid with CPC bid", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({ id: 50, cpType: 0 });
+    api.updateCampaignBid.mockResolvedValue({} as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_campaign_bid",
+      arguments: { id: 50, bid: 0.08, countries: "US,DE" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateCampaignBid).toHaveBeenCalledWith(50, [
+      { bid: 0.08, leadCost: 0, countries: [34, 24] },
+    ]);
+    expect(text).toContain("campaign #50");
+  });
+
+  it("update_campaign_bid uses leadCost for CPA campaigns", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({ id: 60, cpType: 4 });
+    api.updateCampaignBid.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign_bid",
+      arguments: { id: 60, bid: 2.5 },
+    });
+
+    expect(api.updateCampaignBid).toHaveBeenCalledWith(60, [
+      { leadCost: 2.5, countries: [] },
+    ]);
+  });
+
+  it("bulk_update_bids sends PUT /campaigns/bids for multiple campaigns", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.bulkUpdateCampaignBids.mockResolvedValue({} as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_bulk_update_bids",
+      arguments: { campaignIds: "10,20,30", bid: 0.05, countries: "US" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.bulkUpdateCampaignBids).toHaveBeenCalledWith(
+      [10, 20, 30],
+      [{ bid: 0.05, leadCost: 0, countries: [34] }],
+    );
+    expect(text).toContain("3 campaigns");
+  });
+
+  it("update_site_bids sends PUT /stats/sites/bids with zones and bid", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateSiteBids.mockResolvedValue({} as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_site_bids",
+      arguments: { campaignIds: "100,200", zones: "500,600,700", bid: "x1.5" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateSiteBids).toHaveBeenCalledWith(
+      [100, 200],
+      [{ zones: [500, 600, 700], bid: "x1.5" }],
+    );
+    expect(text).toContain("2 campaign(s)");
+    expect(text).toContain("x1.5");
+  });
 });
