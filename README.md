@@ -4,11 +4,13 @@ MCP server for [Kadam](https://kadam.net) ad network — manage campaigns, creat
 
 Built on the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), the open standard for connecting LLMs to external tools and data.
 
-## Quick Start
+## Install (one click)
 
-### Cursor / Claude Desktop
+### Cursor
 
-Add to your MCP config (`.cursor/mcp.json` or `claude_desktop_config.json`):
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor" height="32" />](cursor://anysphere.cursor-deeplink/mcp/install?name=kadam&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBrYWRhbS9tY3Atc2VydmVyIl0sImVudiI6eyJLQURBTV9BRFZfQVBJX0tFWSI6InlvdXItYWR2ZXJ0aXNlci1hcGkta2V5In19)
+
+Or add manually to `.cursor/mcp.json`:
 
 ```json
 {
@@ -23,6 +25,38 @@ Add to your MCP config (`.cursor/mcp.json` or `claude_desktop_config.json`):
     }
   }
 }
+```
+
+### Claude Code
+
+```bash
+claude mcp add kadam -- npx -y @kadam/mcp-server
+```
+
+Then set the env var: `export KADAM_ADV_API_KEY=your-key`
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json` (Settings -> Developer -> Edit Config):
+
+```json
+{
+  "mcpServers": {
+    "kadam": {
+      "command": "npx",
+      "args": ["-y", "@kadam/mcp-server"],
+      "env": {
+        "KADAM_ADV_API_KEY": "your-advertiser-api-key"
+      }
+    }
+  }
+}
+```
+
+### Any MCP client (universal one-liner)
+
+```bash
+npx add-mcp @kadam/mcp-server
 ```
 
 ### Docker
@@ -52,9 +86,9 @@ KADAM_ADV_API_KEY=your-key kadam-mcp-server
 
 At least one API key must be provided. Tools for both products are always listed (for discoverability), but calling a tool without the corresponding key returns a clear setup instruction.
 
-## Tools (27)
+## Tools (30)
 
-### Advertiser Tools (18)
+### Advertiser Tools (21)
 
 Requires `KADAM_ADV_API_KEY`.
 
@@ -66,6 +100,14 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_create_campaign` | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences) | — |
 | `kadam_adv_update_campaign` | Update any campaign fields by ID | — |
 | `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived) for comma-separated IDs | idempotent |
+
+#### Bid Management
+
+| Tool | Description | Annotations |
+|---|---|---|
+| `kadam_adv_update_campaign_bid` | Update bid for a single campaign (lightweight, no full payload). Falls back to current countries if omitted | idempotent |
+| `kadam_adv_bulk_update_bids` | Update bids for multiple campaigns at once (all must share the same pricing model) | idempotent |
+| `kadam_adv_update_site_bids` | Set per-site (zone) bids: static (`0.05`), multiplier (`x1.5`), or remove (`0`) | idempotent |
 
 #### Campaign Folders
 
@@ -179,7 +221,7 @@ src/
 │   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
-│   ├── advertiser/           # 18 tools across 6 modules
+│   ├── advertiser/           # 21 tools across 6 modules
 │   └── publisher/            # 9 tools across 4 modules
 ├── resources/                # 7 static reference resources
 └── prompts/                  # 4 workflow prompts
@@ -187,7 +229,7 @@ src/
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 27 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 30 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
@@ -205,8 +247,8 @@ src/
 ### Setup
 
 ```bash
-git clone ssh://git@gitlab.sdev.pw:56777/kadam/api-mcp.git
-cd api-mcp
+git clone https://github.com/kadam-official/mcp-server.git
+cd mcp-server
 npm install
 cp .env.example .env  # Fill in your API keys
 ```
@@ -227,17 +269,17 @@ npm run inspect         # MCP Inspector (visual debugger)
 
 ### Testing
 
-82 tests across 12 files using Vitest + MCP SDK InMemoryTransport:
+202 tests across 23 files using Vitest + MCP SDK InMemoryTransport:
 
 - **Unit tests** — output formatter, config, HTTP client (mocked fetch)
 - **Middleware tests** — ToolWrapper auth, error formatting, logging
-- **Integration tests** — full server with all 27 tools, 7 resources, 4 prompts via in-memory MCP client
+- **Integration tests** — full server with all 30 tools, 7 resources, 4 prompts via in-memory MCP client
 - **Tool handler tests** — each tool module with mocked API clients
 
 ```bash
 npm test
-# Test Files  12 passed (12)
-#      Tests  82 passed (82)
+# Test Files  23 passed (23)
+#      Tests  202 passed (202)
 ```
 
 ### MCP Inspector

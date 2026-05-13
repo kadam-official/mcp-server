@@ -1,6 +1,7 @@
 {
   "name": "@kadam/mcp-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "mcpName": "io.github.kadam-official/mcp-server",
   "description": "MCP server for Kadam ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents",
   "type": "module",
   "bin": {
@@ -38,9 +39,13 @@
   ],
   "author": "Kadam",
   "license": "MIT",
+  "homepage": "https://github.com/kadam-official/mcp-server",
   "repository": {
     "type": "git",
-    "url": "https://gitlab.sdev.pw/kadam/api-mcp"
+    "url": "https://github.com/kadam-official/mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kadam-official/mcp-server/issues"
   },
   "engines": {
     "node": ">=18.0.0"
