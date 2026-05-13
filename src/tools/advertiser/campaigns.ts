@@ -613,31 +613,26 @@ export const campaignsModule: ToolModule = {
         description:
           "Update bid for a single campaign without sending the full campaign payload. " +
           "Faster and safer than kadam_adv_update_campaign when only the bid needs changing. " +
-          "Specify countries as ISO codes; they are resolved to geo IDs automatically.",
+          "If countries omitted, keeps the campaign's current country targeting. " +
+          "Note: this endpoint only updates bids for countries already configured on the campaign; it does not add new countries.",
         product: "advertiser",
+        annotations: { idempotentHint: true },
       },
       {
         id: z.number().describe("Campaign ID"),
         bid: z.number().positive().describe("Bid value in USD (e.g. 0.05)"),
-        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).optional()
-          .describe("Pricing model. If omitted, reads from current campaign settings"),
         countries: z.string().optional()
-          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). If omitted, keeps current countries"),
+          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). If omitted, keeps current countries from campaign settings"),
       },
       async (args, ctx) => {
         const registry = ctx.adv.options;
+        const current = await ctx.adv.getCampaign(args.id);
+        const cpType = current.cpType as number | undefined;
 
-        let cpType: number | undefined;
-        if (args.pricingModel != null) {
-          cpType = PRICING_MODEL_MAP[args.pricingModel] ?? undefined;
-        } else {
-          const current = await ctx.adv.getCampaign(args.id);
-          cpType = current.cpType as number | undefined;
-        }
-
+        const currentBids = current.bids as Array<Record<string, unknown>> | undefined;
         const countries = args.countries
           ? await registry.resolveCountryIds(args.countries)
-          : [];
+          : (currentBids?.[0]?.countries as number[] ?? []);
 
         const bidEntry = cpType === 4
           ? { leadCost: args.bid, countries }
@@ -653,29 +648,30 @@ export const campaignsModule: ToolModule = {
         name: "kadam_adv_bulk_update_bids",
         description:
           "Update bids for multiple campaigns at once. All specified campaigns receive the same bid. " +
-          "Much faster than updating campaigns one by one.",
+          "Much faster than updating campaigns one by one. " +
+          "IMPORTANT: all campaigns in the batch must share the same pricing model (all CPC/CPM or all CPA). " +
+          "Mixing CPC and CPA campaigns will cause a validation error. " +
+          "Countries are required — the backend rejects empty country lists.",
         product: "advertiser",
+        annotations: { idempotentHint: true },
       },
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs (e.g. '100,200,300')"),
-        bid: z.number().positive().describe("Bid value in USD"),
-        leadCost: z.number().optional().describe("Lead cost for CPA campaigns (if omitted, bid is used as CPC/CPM bid)"),
-        countries: z.string().optional()
-          .describe("Comma-separated ISO country codes. If omitted, applies to all countries (empty array)"),
+        bid: z.number().positive().describe("Bid value in USD (for CPA this is the target CPA cost)"),
+        pricingModel: z.enum(["cpc", "cpm", "cpa_target"])
+          .describe("Pricing model of the campaigns. All campaigns must share this model"),
+        countries: z.string().min(1)
+          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). Required — backend rejects empty list"),
       },
       async (args, ctx) => {
         const ids = parseCommaSeparatedIds(args.campaignIds);
         const registry = ctx.adv.options;
+        const countries = await registry.resolveCountryIds(args.countries);
+        const cpType = PRICING_MODEL_MAP[args.pricingModel];
 
-        const countries = args.countries
-          ? await registry.resolveCountryIds(args.countries)
-          : [];
-
-        const bidEntry: Record<string, unknown> = {
-          bid: args.bid,
-          leadCost: args.leadCost ?? 0,
-          countries,
-        };
+        const bidEntry = cpType === 4
+          ? { leadCost: args.bid, countries }
+          : { bid: args.bid, leadCost: 0, countries };
 
         await ctx.adv.bulkUpdateCampaignBids(ids, [bidEntry]);
         const idList = ids.map((id) => `#${id}`).join(", ");
@@ -688,8 +684,10 @@ export const campaignsModule: ToolModule = {
         name: "kadam_adv_update_site_bids",
         description:
           "Set per-site (zone) bids for campaigns. Allows bid adjustments on individual publisher sites. " +
-          "Bid can be a number ('0.05'), a multiplier ('x1.5' to multiply base bid), or '0' to remove the site bid.",
+          "Bid can be a number ('0.05'), a multiplier ('x1.5' to multiply base bid), or '0' to remove the site bid. " +
+          "This is idempotent — calling with the same values has no additional effect.",
         product: "advertiser",
+        annotations: { idempotentHint: true },
       },
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),

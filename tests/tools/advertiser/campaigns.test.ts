@@ -261,10 +261,12 @@ describe("campaigns tools", () => {
     expect(text).toContain("0");
   });
 
-  it("update_campaign_bid sends PUT /campaigns/{id}/bid with CPC bid", async () => {
+  it("update_campaign_bid sends CPC bid with explicit countries", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
-    api.getCampaign.mockResolvedValue({ id: 50, cpType: 0 });
+    api.getCampaign.mockResolvedValue({
+      id: 50, cpType: 0, bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+    });
     api.updateCampaignBid.mockResolvedValue({} as never);
 
     const result = await client.callTool({
@@ -273,16 +275,37 @@ describe("campaigns tools", () => {
     });
     const text = getTextFromResult(result);
 
+    expect(api.getCampaign).toHaveBeenCalledWith(50);
     expect(api.updateCampaignBid).toHaveBeenCalledWith(50, [
       { bid: 0.08, leadCost: 0, countries: [34, 24] },
     ]);
     expect(text).toContain("campaign #50");
   });
 
+  it("update_campaign_bid without countries falls back to campaign's current countries", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 55, cpType: 0, bids: [{ bid: 0.03, leadCost: 0, countries: [34, 24] }],
+    });
+    api.updateCampaignBid.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign_bid",
+      arguments: { id: 55, bid: 0.10 },
+    });
+
+    expect(api.updateCampaignBid).toHaveBeenCalledWith(55, [
+      { bid: 0.10, leadCost: 0, countries: [34, 24] },
+    ]);
+  });
+
   it("update_campaign_bid uses leadCost for CPA campaigns", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
-    api.getCampaign.mockResolvedValue({ id: 60, cpType: 4 });
+    api.getCampaign.mockResolvedValue({
+      id: 60, cpType: 4, bids: [{ leadCost: 5, countries: [40] }],
+    });
     api.updateCampaignBid.mockResolvedValue({} as never);
 
     await client.callTool({
@@ -291,18 +314,18 @@ describe("campaigns tools", () => {
     });
 
     expect(api.updateCampaignBid).toHaveBeenCalledWith(60, [
-      { leadCost: 2.5, countries: [] },
+      { leadCost: 2.5, countries: [40] },
     ]);
   });
 
-  it("bulk_update_bids sends PUT /campaigns/bids for multiple campaigns", async () => {
+  it("bulk_update_bids sends CPC bid for multiple campaigns", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
     api.bulkUpdateCampaignBids.mockResolvedValue({} as never);
 
     const result = await client.callTool({
       name: "kadam_adv_bulk_update_bids",
-      arguments: { campaignIds: "10,20,30", bid: 0.05, countries: "US" },
+      arguments: { campaignIds: "10,20,30", bid: 0.05, pricingModel: "cpc", countries: "US" },
     });
     const text = getTextFromResult(result);
 
@@ -311,6 +334,22 @@ describe("campaigns tools", () => {
       [{ bid: 0.05, leadCost: 0, countries: [34] }],
     );
     expect(text).toContain("3 campaigns");
+  });
+
+  it("bulk_update_bids sends leadCost for CPA campaigns", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.bulkUpdateCampaignBids.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_bulk_update_bids",
+      arguments: { campaignIds: "10,20", bid: 3.0, pricingModel: "cpa_target", countries: "DE" },
+    });
+
+    expect(api.bulkUpdateCampaignBids).toHaveBeenCalledWith(
+      [10, 20],
+      [{ leadCost: 3.0, countries: [24] }],
+    );
   });
 
   it("update_site_bids sends PUT /stats/sites/bids with zones and bid", async () => {
