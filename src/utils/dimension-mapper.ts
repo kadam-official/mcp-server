@@ -89,8 +89,7 @@ export function resolveMetricIds(
   const available = flattenConfig(config.metrics);
   return names
     .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .map((name) => METRIC_ALIASES[name] ?? name)
+    .map((s) => resolveAlias(s, METRIC_ALIASES))
     .filter((id) => available.has(id));
 }
 
@@ -102,7 +101,6 @@ export function resolveGroupIds(
   const available = flattenConfig(config.groups);
   return names
     .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .map((name) => GROUP_ALIASES[name] ?? name)
+    .map((s) => resolveAlias(s, GROUP_ALIASES))
     .filter((id) => available.has(id));
 }

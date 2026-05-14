@@ -41,6 +41,28 @@ describe("publisher stats tools", () => {
     expect(text).toContain("Publisher Stats");
   });
 
+  it("resolves sortBy alias 'revenue' to 'finance_moneyIn'", async () => {
+    const { client, mockApi } = await createToolClient(pubStatsModule);
+    const api = mockApi as MockPubClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyIn" }], traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }] },
+    });
+    api.getReportData.mockResolvedValue({
+      rows: [{ time_day: "2025-03-01", finance_moneyIn: 50 }],
+      totalRows: 1, page: 1, perPage: 25,
+    });
+
+    await client.callTool({
+      name: "kadam_pub_get_stats",
+      arguments: { groupBy: "day", period: "7days", sortBy: "revenue", sortOrder: "desc" },
+    });
+
+    const params = api.getReportData.mock.calls[0][0];
+    expect(params.sortBy).toBe("finance_moneyIn");
+    expect(params.sortOrder).toBe("desc");
+  });
+
   it("config caching - call get_stats twice, getReportConfig called expected times", async () => {
     const { client, mockApi } = await createToolClient(pubStatsModule);
     const api = mockApi as MockPubClient;

@@ -39,6 +39,54 @@ describe("advertiser stats tools", () => {
     expect(api.getReportData).toHaveBeenCalled();
   });
 
+  it("custom report resolves sortBy alias 'spend' to 'finance_moneyOut'", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }] },
+    });
+    api.getReportData.mockResolvedValue({
+      rows: [{ time_day: "2025-03-01", finance_moneyOut: 100 }],
+      totalRows: 1, page: 1, perPage: 25,
+    });
+
+    await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: { reportType: "custom", period: "7days", sortBy: "spend", sortOrder: "desc" },
+    });
+
+    const params = api.getReportData.mock.calls[0][0];
+    expect(params.sortBy).toBe("finance_moneyOut");
+    expect(params.sortOrder).toBe("desc");
+  });
+
+  it("custom report wires countries and creativeIds into filters", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }] },
+    });
+    api.getReportData.mockResolvedValue({
+      rows: [{ time_day: "2025-03-01", finance_moneyOut: 100 }],
+      totalRows: 1, page: 1, perPage: 25,
+    });
+
+    await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: {
+        reportType: "custom", period: "7days",
+        countries: "US, DE", creativeIds: "101,202",
+      },
+    });
+
+    const params = api.getReportData.mock.calls[0][0] as Record<string, unknown>;
+    const filters = (params.filters as Record<string, unknown>).filters as Array<Record<string, unknown>>;
+    expect(filters).toContainEqual({ id: "traffic_region", type: "list", list: ["US", "DE"] });
+    expect(filters).toContainEqual({ id: "advertiser_ad", type: "list", list: [101, 202] });
+  });
+
   it("get_stats with reportType sites calls getSiteStats", async () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
@@ -59,6 +107,24 @@ describe("advertiser stats tools", () => {
     expect(text).toContain("Site stats");
   });
 
+  it("sites report passes sortBy/sortOrder through to API", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getSiteStats.mockResolvedValue({
+      rows: [{ siteName: "example.com", spend: 5 }],
+      totalRows: 1, page: 1, perPage: 25,
+    });
+
+    await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: { reportType: "sites", period: "7days", sortBy: "spend", sortOrder: "desc" },
+    });
+
+    const params = api.getSiteStats.mock.calls[0][0];
+    expect(params.sortBy).toBe("spend");
+    expect(params.sortOrder).toBe("desc");
+  });
+
   it("get_stats with reportType conversions calls getConversionDetails", async () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
@@ -77,5 +143,22 @@ describe("advertiser stats tools", () => {
 
     expect(api.getConversionDetails).toHaveBeenCalled();
     expect(text).toContain("Conversion Details");
+  });
+
+  it("conversions report resolves sortBy alias in sort key", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getConversionDetails.mockResolvedValue({
+      rows: [{ conversionType: "Approve", campaign: "Test", adId: 1, conversionTime: "01.03.2026" }],
+      totalRows: 1, page: 1, perPage: 25,
+    });
+
+    await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: { reportType: "conversions", period: "7days", sortBy: "spend", sortOrder: "asc" },
+    });
+
+    const params = api.getConversionDetails.mock.calls[0][0];
+    expect(params.sort).toEqual({ finance_moneyOut: "asc" });
   });
 });
