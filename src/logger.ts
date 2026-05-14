@@ -21,7 +21,7 @@ export const logger = {
   info: ((obj: unknown, msg?: string) => write("info", obj, msg)) as LogFn,
   debug: ((obj: unknown, msg?: string) => write("debug", obj, msg)) as LogFn,
   trace: ((obj: unknown, msg?: string) => write("trace", obj, msg)) as LogFn,
-  child: () => logger,
+  child: (_bindings?: Record<string, unknown>) => logger,
 };
 
 export function createToolLogger(_toolName: string) {
