@@ -21,7 +21,7 @@ Steps:
    Call kadam_adv_list_campaigns with status "active", sortField "moneyOut", sortOrder "desc" to see top spending campaigns.
 
 3. Get 7-day performance summary:
-   Call kadam_adv_get_stats with reportType "custom", groupBy "campaign", period "7days", metrics "spend,clicks,impressions,ctr,conversions,cpa", sortBy "spend"
+   Call kadam_adv_get_stats with reportType "custom", groupBy "campaign", period "7days", metrics "spend,clicks,impressions,ctr,conversions,cpa", sortBy "spend", sortOrder "desc"
 
 4. Summarize:
    - Account balance and recent deposits/charges

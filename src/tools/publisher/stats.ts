@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatTable, extractCellValue, clampPerPage } from "../../output-formatter.js";
-import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
+import { resolveMetricIds, resolveGroupIds, resolveAlias, METRIC_ALIASES } from "../../utils/dimension-mapper.js";
 
 function resolveDateRange(
   period: string,
@@ -88,7 +88,7 @@ export const pubStatsModule: ToolModule = {
           },
           page: args.page,
           perPage,
-          ...(args.sortBy != null && { sortBy: args.sortBy }),
+          ...(args.sortBy != null && { sortBy: resolveAlias(args.sortBy, METRIC_ALIASES) }),
           ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
         };
 

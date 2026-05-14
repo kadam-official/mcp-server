@@ -28,7 +28,7 @@ Steps:
    Call kadam_adv_get_stats with reportType "custom", groupBy "creative", campaignIds "${campaignId}", period "${period}", metrics "spend,clicks,impressions,ctr,conversions,cpa"
 
 3. Get top performing sites:
-   Call kadam_adv_get_stats with reportType "sites", campaignIds "${campaignId}", sortBy "spend", perPage 10
+   Call kadam_adv_get_stats with reportType "sites", campaignIds "${campaignId}", sortBy "spend", sortOrder "desc", perPage 10
 
 4. Summarize findings:
    - Daily trend: is spend/CTR/CPA improving or declining?

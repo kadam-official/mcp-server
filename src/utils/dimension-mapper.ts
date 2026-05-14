@@ -1,7 +1,7 @@
 import type { ReportConfig } from "../api/schemas/common.js";
 import type { ReportConfigGroup, ReportConfigMetric } from "../api/schemas/common.js";
 
-const METRIC_ALIASES: Record<string, string> = {
+export const METRIC_ALIASES: Record<string, string> = {
   // Advertiser metrics
   spend: "finance_moneyOut",
   spending: "finance_moneyOut",
@@ -75,6 +75,10 @@ function flattenConfig(
     for (const item of items) ids.add(item.id);
   }
   return ids;
+}
+
+export function resolveAlias(name: string, aliases: Record<string, string>): string {
+  return aliases[name.trim().toLowerCase()] ?? name;
 }
 
 export function resolveMetricIds(

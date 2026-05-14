@@ -8,7 +8,7 @@ import {
   clampPerPage,
 } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
-import { resolveMetricIds, resolveGroupIds } from "../../utils/dimension-mapper.js";
+import { resolveMetricIds, resolveGroupIds, resolveAlias, METRIC_ALIASES } from "../../utils/dimension-mapper.js";
 import { resolvePeriodToDates } from "../../utils/date-helpers.js";
 
 
@@ -73,6 +73,15 @@ export const statsModule: ToolModule = {
           if (args.campaignIds != null) {
             customFilters.push({ id: "advertiser_campaign", type: "list", list: args.campaignIds.split(",").map(Number) });
           }
+          if (args.countries != null) {
+            customFilters.push({ id: "traffic_region", type: "list", list: args.countries.split(",").map(s => s.trim()) });
+          }
+          if (args.creativeIds != null) {
+            customFilters.push({ id: "advertiser_ad", type: "list", list: args.creativeIds.split(",").map(Number) });
+          }
+
+          const resolvedSort = args.sortBy != null
+            ? resolveAlias(args.sortBy, METRIC_ALIASES) : undefined;
 
           const params: Record<string, unknown> = {
             groups: groupIds.length > 0 ? groupIds : ["time_day"],
@@ -84,7 +93,7 @@ export const statsModule: ToolModule = {
             },
             page: args.page,
             perPage,
-            ...(args.sortBy != null && { sortBy: args.sortBy }),
+            ...(resolvedSort != null && { sortBy: resolvedSort }),
             ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
           };
           const res = await ctx.adv.getReportData(params);
@@ -121,6 +130,8 @@ export const statsModule: ToolModule = {
             ...(args.searchQuery != null && {
               searchQuery: args.searchQuery,
             }),
+            ...(args.sortBy != null && { sortBy: args.sortBy }),
+            ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
           };
           const res = await ctx.adv.getSiteStats(params);
           const pagination = extractPagination(res);
@@ -158,7 +169,7 @@ export const statsModule: ToolModule = {
             page: args.page,
             perPage,
             filters,
-            ...(args.sortBy != null && { sort: { [args.sortBy]: args.sortOrder ?? "desc" } }),
+            ...(args.sortBy != null && { sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" } }),
           };
           const res = await ctx.adv.getConversionDetails(params);
           const rows = res.rows ?? [];

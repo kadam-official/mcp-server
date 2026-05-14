@@ -25,7 +25,7 @@ Criteria:
 
 Steps:
 1. Get site statistics:
-   Call kadam_adv_get_stats with reportType "sites", campaignIds "${campaignId}", sortBy "spend", perPage 100
+   Call kadam_adv_get_stats with reportType "sites", campaignIds "${campaignId}", sortBy "spend", sortOrder "desc", perPage 100
 
 2. Analyze the data:
    - Separate sites into: good (CPA < $${maxCPA}), borderline (CPA near $${maxCPA}), bad (CPA > $${maxCPA} or 0 conversions with spend)
