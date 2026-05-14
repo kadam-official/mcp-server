@@ -132,6 +132,6 @@ export type PubUser = z.infer<typeof pubUserSchema>;
 // ---------------------------------------------------------------------------
 
 export function parseNumericString(s: string): number {
-  const cleaned = s.replace(/[^\d.\-]/g, "");
+  const cleaned = s.replace(/[^\d.-]/g, "");
   return cleaned ? parseFloat(cleaned) : 0;
 }

@@ -1,6 +1,6 @@
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import { formatSingleEntity, formatCurrency } from "../../output-formatter.js";
+import { formatSingleEntity } from "../../output-formatter.js";
 
 const CURRENCY_SYMBOL: Record<string, string> = {
   rub: "₽",

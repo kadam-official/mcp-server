@@ -155,7 +155,7 @@ function applyDefaults(mapped: Record<string, unknown>): void {
 
 function applyTypeDefaults(mapped: Record<string, unknown>, opts: CampaignOptions): void {
   const typeId = mapped.type as number;
-  const { push, inpage_push, native, banner, popunder } = CAMPAIGN_TYPE_MAP;
+  const { push, inpage_push, popunder } = CAMPAIGN_TYPE_MAP;
 
   if (opts.categories.length > 0 && mapped.categories === undefined) {
     mapped.categories = flattenCategoryIds(opts.categories);
