@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Install Kadam MCP — Cursor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #e5e5e5; }
+    .card { text-align: center; max-width: 420px; padding: 2rem; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+    p { color: #999; line-height: 1.5; }
+    a { color: #58a6ff; }
+    .btn { display: inline-block; margin-top: 1.5rem; padding: 0.75rem 1.5rem; background: #2563eb; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 500; }
+    .btn:hover { background: #1d4ed8; }
+    code { background: #1e1e1e; padding: 0.6rem 1rem; border-radius: 6px; display: block; margin-top: 1rem; word-break: break-all; font-size: 0.8rem; color: #a5d6ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Installing Kadam MCP Server in Cursor</h1>
+    <p>You should be redirected to Cursor automatically.<br>If nothing happens, click the button below or paste the link into your browser address bar.</p>
+    <a class="btn" id="link" href="cursor://anysphere.cursor-deeplink/mcp/install?name=kadam&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBrYWRhbS1uZXQvbWNwLXNlcnZlciJdLCJlbnYiOnsiS0FEQU1fQURWX0FQSV9LRVkiOiJ5b3VyLWFkdmVydGlzZXItYXBpLWtleSJ9fQ==">Open in Cursor</a>
+    <code id="url"></code>
+    <p style="margin-top:2rem;font-size:0.85rem;">Need help? See the <a href="https://github.com/kadam-official/mcp-server#install-one-click">installation docs</a>.</p>
+  </div>
+  <script>
+    var deeplink = document.getElementById('link').href;
+    document.getElementById('url').textContent = deeplink;
+    window.location.href = deeplink;
+  </script>
+</body>
+</html>
