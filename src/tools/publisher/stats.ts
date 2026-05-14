@@ -48,7 +48,7 @@ export const pubStatsModule: ToolModule = {
           "Available metrics: revenue, clicks, views, impressions, pub_cpm, pub_cpc, block_ctr, block_cpm, subscriptions, unsubscriptions, block_views, viewrate. " +
           "Available groups: day, hour, week, month, source, block, country, browser, os, device, devicetype, domain, subid, pid, category, sub_age, block_format, block_size.",
         product: "publisher",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "Get publisher statistics", readOnlyHint: true },
       },
       {
         groupBy: z.string(),

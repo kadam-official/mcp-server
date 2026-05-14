@@ -34,7 +34,7 @@ export const adUnitsModule: ToolModule = {
         description:
           "Lists ad units for a site. Optionally filter by format: native, banner, push, popunder, inpagepush.",
         product: "publisher",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List ad units", readOnlyHint: true },
       },
       {
         sourceId: z.number(),
@@ -91,7 +91,7 @@ export const adUnitsModule: ToolModule = {
         description:
           "Changes ad unit status. active=resume, paused=stop, archived=delete, restored=restore.",
         product: "publisher",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Set ad unit status", idempotentHint: true },
       },
       {
         id: z.number(),

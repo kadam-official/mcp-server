@@ -128,7 +128,7 @@ export const creativesModule: ToolModule = {
         description:
           "List advertiser creatives with pagination. Filter by campaign, status, or search query.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List creatives", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),
@@ -171,7 +171,7 @@ Campaign type determines required fields:
 
 Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Downloads/banner.jpg).`,
         product: "advertiser",
-        annotations: { readOnlyHint: false },
+        annotations: { title: "Create creative", readOnlyHint: false },
       },
       {
         campaignId: z.number().describe("Campaign ID to add creative to"),
@@ -245,7 +245,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           "Update an existing creative (read-modify-write). Fetches current state, merges your changes, sends full payload. " +
           "Pass only the fields you want to change. For image changes, create a new creative instead.",
         product: "advertiser",
-        annotations: { readOnlyHint: false },
+        annotations: { title: "Update creative", readOnlyHint: false },
       },
       {
         creativeId: z.number().describe("Creative (material) ID to update"),
@@ -300,7 +300,7 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         description:
           "Set status for multiple creatives. Pass comma-separated IDs and status: active, paused, or archived.",
         product: "advertiser",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Set creative status", idempotentHint: true },
       },
       {
         ids: z.string().min(1),

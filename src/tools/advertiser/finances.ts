@@ -22,7 +22,7 @@ export const financesModule: ToolModule = {
         description:
           "Lists financial operations (deposits, charges, refunds). Use to check account balance, recent transactions, and spending history.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List finance operations", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),

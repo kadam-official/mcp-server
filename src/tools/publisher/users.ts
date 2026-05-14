@@ -17,7 +17,7 @@ export const usersModule: ToolModule = {
         description:
           "Gets current publisher account info: balance, currency, and notification counts.",
         product: "publisher",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "Get publisher account info", readOnlyHint: true },
       },
       {},
       async (_args, ctx) => {

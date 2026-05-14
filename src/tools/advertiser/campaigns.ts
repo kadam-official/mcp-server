@@ -354,7 +354,7 @@ export const campaignsModule: ToolModule = {
         description:
           "List advertiser campaigns with pagination. Filter by folder, status, type, date range, or search query.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List campaigns", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),
@@ -405,6 +405,7 @@ export const campaignsModule: ToolModule = {
         description:
           "Create a new advertiser campaign. Required: type, name, url, folderId, pricingModel, bid, dailyBudget.",
         product: "advertiser",
+        annotations: { title: "Create campaign", readOnlyHint: false },
       },
       {
         type: z.enum(["push", "inpage_push", "native", "banner", "video", "popunder"]).describe("Ad format"),
@@ -440,6 +441,7 @@ export const campaignsModule: ToolModule = {
           "Update an existing campaign (read-modify-write). Fetches current state, merges your changes, sends full payload. " +
           "Pass only the fields you want to change. Uses same field names as create. For status changes use set_campaign_status instead.",
         product: "advertiser",
+        annotations: { title: "Update campaign", readOnlyHint: false },
       },
       {
         id: z.number().describe("Campaign ID to update"),
@@ -592,7 +594,7 @@ export const campaignsModule: ToolModule = {
         description:
           "Set status for multiple campaigns. Pass comma-separated IDs and status: active, paused, or archived.",
         product: "advertiser",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Set campaign status", idempotentHint: true },
       },
       {
         ids: z.string().min(1),
@@ -616,7 +618,7 @@ export const campaignsModule: ToolModule = {
           "If countries omitted, keeps the campaign's current country targeting. " +
           "Note: this endpoint only updates bids for countries already configured on the campaign; it does not add new countries.",
         product: "advertiser",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Update campaign bid", idempotentHint: true },
       },
       {
         id: z.number().describe("Campaign ID"),
@@ -653,7 +655,7 @@ export const campaignsModule: ToolModule = {
           "Mixing CPC and CPA campaigns will cause a validation error. " +
           "Countries are required — the backend rejects empty country lists.",
         product: "advertiser",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Bulk update bids", idempotentHint: true },
       },
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs (e.g. '100,200,300')"),
@@ -687,7 +689,7 @@ export const campaignsModule: ToolModule = {
           "Bid can be a number ('0.05'), a multiplier ('x1.5' to multiply base bid), or '0' to remove the site bid. " +
           "This is idempotent — calling with the same values has no additional effect.",
         product: "advertiser",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Update site bids", idempotentHint: true },
       },
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),

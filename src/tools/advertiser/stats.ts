@@ -21,7 +21,7 @@ export const statsModule: ToolModule = {
         description:
           "Unified advertiser statistics. Use reportType to select: 'custom' (default) for full report builder, 'sites' for per-site breakdown, 'conversions' for individual conversion event log. For custom reports use human-readable names like 'spend,clicks,impressions,ctr' for metrics and 'day,campaign,country' for groupBy.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "Get advertiser statistics", readOnlyHint: true },
       },
       {
         reportType: z

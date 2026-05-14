@@ -22,7 +22,7 @@ export const campaignFoldersModule: ToolModule = {
         description:
           "List advertiser campaign folders with pagination. Optional search by name.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List campaign folders", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),
@@ -53,6 +53,7 @@ export const campaignFoldersModule: ToolModule = {
         name: "kadam_adv_create_campaign_folder",
         description: "Create a new campaign folder. Name must be at least 4 characters.",
         product: "advertiser",
+        annotations: { title: "Create campaign folder", readOnlyHint: false },
       },
       {
         name: z.string().min(4),
@@ -69,6 +70,7 @@ export const campaignFoldersModule: ToolModule = {
         description:
           "Update campaign folder settings: budgets and distribution.",
         product: "advertiser",
+        annotations: { title: "Update campaign folder", readOnlyHint: false },
       },
       {
         id: z.number(),

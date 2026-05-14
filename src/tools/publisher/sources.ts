@@ -53,7 +53,7 @@ export const sourcesModule: ToolModule = {
         description:
           "List publisher sites with pagination. Filter by search, dates, or archived status.",
         product: "publisher",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List publisher sites", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),
@@ -97,7 +97,7 @@ export const sourcesModule: ToolModule = {
           "Creates a new publisher site. After creation, the publisher must verify domain ownership via the scriptTag meta tag. " +
           "Lifecycle: onconfirm → onstat → onmoderate → accepted/deny.",
         product: "publisher",
-        annotations: { readOnlyHint: false },
+        annotations: { title: "Create publisher site", readOnlyHint: false },
       },
       {
         name: z.string().min(1).max(100),
@@ -124,7 +124,7 @@ export const sourcesModule: ToolModule = {
         name: "kadam_pub_get_source",
         description: "Get a single publisher site by ID with detail info.",
         product: "publisher",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "Get site details", readOnlyHint: true },
       },
       {
         id: z.number(),
@@ -140,7 +140,7 @@ export const sourcesModule: ToolModule = {
         name: "kadam_pub_update_source",
         description: "Update an existing publisher site name.",
         product: "publisher",
-        annotations: { readOnlyHint: false },
+        annotations: { title: "Update publisher site", readOnlyHint: false },
       },
       {
         id: z.number(),
@@ -158,7 +158,7 @@ export const sourcesModule: ToolModule = {
         description:
           "Changes site status. active=resume ads, paused=stop ads, archived=remove from list, unarchived=restore.",
         product: "publisher",
-        annotations: { idempotentHint: true },
+        annotations: { title: "Set site status", idempotentHint: true },
       },
       {
         id: z.number(),

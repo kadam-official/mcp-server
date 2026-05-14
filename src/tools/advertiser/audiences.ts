@@ -61,7 +61,7 @@ export const audiencesModule: ToolModule = {
         description:
           "List advertiser audiences with pagination. Filter by search query, sort by field and order.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "List audiences", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),
@@ -96,7 +96,7 @@ export const audiencesModule: ToolModule = {
         name: "kadam_adv_get_audience",
         description: "Get a single audience by ID. Returns type-specific details: tracking code for pixel/s2s, campaign links for stat, linked audiences for s2s.",
         product: "advertiser",
-        annotations: { readOnlyHint: true },
+        annotations: { title: "Get audience details", readOnlyHint: true },
       },
       {
         id: z.number(),
@@ -118,7 +118,7 @@ export const audiencesModule: ToolModule = {
           "• fingerprint — cannot be created directly; set createFingerprint=true on pixel or stat audience.",
         ].join("\n"),
         product: "advertiser",
-        annotations: { readOnlyHint: false },
+        annotations: { title: "Create audience", readOnlyHint: false },
       },
       {
         type: z.enum(["audience", "audience_code", "s2s"]),
@@ -163,7 +163,7 @@ export const audiencesModule: ToolModule = {
         name: "kadam_adv_update_audience",
         description: "Update an existing audience (read-modify-write). Fetches current state, merges your changes, sends full payload. Type cannot be changed. Pass only the fields you want to change.",
         product: "advertiser",
-        annotations: { readOnlyHint: false },
+        annotations: { title: "Update audience", readOnlyHint: false },
       },
       {
         id: z.number(),
@@ -213,7 +213,7 @@ export const audiencesModule: ToolModule = {
         description:
           "Permanently delete an audience. Requires confirm=true for safety.",
         product: "advertiser",
-        annotations: { destructiveHint: true },
+        annotations: { title: "Delete audience", destructiveHint: true },
       },
       {
         id: z.number(),
