@@ -1,5 +1,11 @@
 # @kadam-net/mcp-server
 
+[![npm version](https://img.shields.io/npm/v/@kadam-net/mcp-server)](https://www.npmjs.com/package/@kadam-net/mcp-server)
+[![npm downloads](https://img.shields.io/npm/dm/@kadam-net/mcp-server)](https://www.npmjs.com/package/@kadam-net/mcp-server)
+[![license](https://img.shields.io/npm/l/@kadam-net/mcp-server)](https://github.com/kadam-official/mcp-server/blob/main/LICENSE)
+[![node](https://img.shields.io/node/v/@kadam-net/mcp-server)](https://nodejs.org)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-listed-blue)](https://registry.modelcontextprotocol.io)
+
 MCP server for [Kadam](https://kadam.net) ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents.
 
 Built on the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), the open standard for connecting LLMs to external tools and data.
