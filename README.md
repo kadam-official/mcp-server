@@ -43,7 +43,9 @@ Then set the env var: `export KADAM_ADV_API_KEY=your-key`
 
 ### Claude Desktop
 
-Add to `claude_desktop_config.json` (Settings -> Developer -> Edit Config):
+<a href="https://github.com/kadam-official/mcp-server/releases/latest/download/kadam-mcp-server.mcpb"><img alt="Download for Claude Desktop" src="https://img.shields.io/badge/Claude_Desktop-Download_.mcpb-orange?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSAxNXYtNEg4bDQtNiA0IDZoLTN2NGgtMnoiLz48L3N2Zz4=" height="32" /></a>
+
+Download → double-click → Install. Or add manually to `claude_desktop_config.json` (Settings → Developer → Edit Config):
 
 ```json
 {
