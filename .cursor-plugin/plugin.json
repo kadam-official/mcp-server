@@ -1,0 +1,14 @@
+{
+  "name": "kadam",
+  "version": "0.2.0",
+  "description": "Kadam ad network — manage campaigns, creatives, audiences, bids, and analytics via AI",
+  "author": {
+    "name": "Kadam",
+    "email": "support@kadam.net"
+  },
+  "homepage": "https://kadam.net",
+  "repository": "https://github.com/kadam-official/mcp-server",
+  "license": "MIT",
+  "keywords": ["kadam", "advertising", "ads", "campaigns", "ad-network", "mcp", "analytics"],
+  "mcpServers": "mcp.json"
+}
