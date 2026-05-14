@@ -54,7 +54,8 @@ Download → double-click → Install. Or add manually to `claude_desktop_config
       "command": "npx",
       "args": ["-y", "@kadam-net/mcp-server"],
       "env": {
-        "KADAM_ADV_API_KEY": "your-advertiser-api-key"
+        "KADAM_ADV_API_KEY": "your-advertiser-api-key",
+        "KADAM_PUB_API_KEY": "your-publisher-api-key"
       }
     }
   }
