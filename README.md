@@ -14,7 +14,7 @@ Built on the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), t
 
 ### Cursor
 
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor" height="32" />](cursor://anysphere.cursor-deeplink/mcp/install?name=kadam&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBrYWRhbS1uZXQvbWNwLXNlcnZlciJdLCJlbnYiOnsiS0FEQU1fQURWX0FQSV9LRVkiOiJ5b3VyLWFkdmVydGlzZXItYXBpLWtleSJ9fQ==)
+<a href="cursor://anysphere.cursor-deeplink/mcp/install?name=kadam&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBrYWRhbS1uZXQvbWNwLXNlcnZlciJdLCJlbnYiOnsiS0FEQU1fQURWX0FQSV9LRVkiOiJ5b3VyLWFkdmVydGlzZXItYXBpLWtleSJ9fQ%3D%3D"><img alt="Install in Cursor" src="https://cursor.com/deeplink/mcp-install-dark.png" height="32" /></a>
 
 Or add manually to `.cursor/mcp.json`:
 
