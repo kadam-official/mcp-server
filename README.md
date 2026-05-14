@@ -1,4 +1,4 @@
-# @kadam/mcp-server
+# @kadam-net/mcp-server
 
 MCP server for [Kadam](https://kadam.net) ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents.
 
@@ -8,7 +8,7 @@ Built on the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), t
 
 ### Cursor
 
-[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor" height="32" />](cursor://anysphere.cursor-deeplink/mcp/install?name=kadam&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBrYWRhbS9tY3Atc2VydmVyIl0sImVudiI6eyJLQURBTV9BRFZfQVBJX0tFWSI6InlvdXItYWR2ZXJ0aXNlci1hcGkta2V5In19)
+[<img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor" height="32" />](cursor://anysphere.cursor-deeplink/mcp/install?name=kadam&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBrYWRhbS1uZXQvbWNwLXNlcnZlciJdLCJlbnYiOnsiS0FEQU1fQURWX0FQSV9LRVkiOiJ5b3VyLWFkdmVydGlzZXItYXBpLWtleSJ9fQ==)
 
 Or add manually to `.cursor/mcp.json`:
 
@@ -17,7 +17,7 @@ Or add manually to `.cursor/mcp.json`:
   "mcpServers": {
     "kadam": {
       "command": "npx",
-      "args": ["-y", "@kadam/mcp-server"],
+      "args": ["-y", "@kadam-net/mcp-server"],
       "env": {
         "KADAM_ADV_API_KEY": "your-advertiser-api-key",
         "KADAM_PUB_API_KEY": "your-publisher-api-key"
@@ -30,7 +30,7 @@ Or add manually to `.cursor/mcp.json`:
 ### Claude Code
 
 ```bash
-claude mcp add kadam -- npx -y @kadam/mcp-server
+claude mcp add kadam -- npx -y @kadam-net/mcp-server
 ```
 
 Then set the env var: `export KADAM_ADV_API_KEY=your-key`
@@ -44,7 +44,7 @@ Add to `claude_desktop_config.json` (Settings -> Developer -> Edit Config):
   "mcpServers": {
     "kadam": {
       "command": "npx",
-      "args": ["-y", "@kadam/mcp-server"],
+      "args": ["-y", "@kadam-net/mcp-server"],
       "env": {
         "KADAM_ADV_API_KEY": "your-advertiser-api-key"
       }
@@ -56,7 +56,7 @@ Add to `claude_desktop_config.json` (Settings -> Developer -> Edit Config):
 ### Any MCP client (universal one-liner)
 
 ```bash
-npx add-mcp @kadam/mcp-server
+npx add-mcp @kadam-net/mcp-server
 ```
 
 ### Docker
@@ -70,7 +70,7 @@ docker run -i --rm \
 ### npm global
 
 ```bash
-npm install -g @kadam/mcp-server
+npm install -g @kadam-net/mcp-server
 KADAM_ADV_API_KEY=your-key kadam-mcp-server
 ```
 

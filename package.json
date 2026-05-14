@@ -1,5 +1,5 @@
 {
-  "name": "@kadam/mcp-server",
+  "name": "@kadam-net/mcp-server",
   "version": "0.2.0",
   "mcpName": "io.github.kadam-official/mcp-server",
   "description": "MCP server for Kadam ad network — manage campaigns, creatives, audiences, sites, and analytics via AI agents",
