@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.kadam-official/mcp-server",
   "title": "Kadam Ad Network",
-  "description": "Manage Kadam ad network campaigns, creatives, audiences, and analytics via AI",
+  "description": "Kadam advertising platform — manage ads, campaigns, creatives, audiences and stats",
   "websiteUrl": "https://kadam.net",
   "repository": {
     "url": "https://github.com/kadam-official/mcp-server",
     "source": "github"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "packages": [
     {
       "registryType": "npm",
