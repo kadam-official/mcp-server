@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  mcpb:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Prepare mcpb bundle
+        run: |
+          mkdir -p mcpb-bundle/server
+          cp dist/index.js mcpb-bundle/server/index.js
+          cp package.json mcpb-bundle/package.json
+          cd mcpb-bundle
+          cat package.json | node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('/dev/stdin','utf8'));
+            delete pkg.scripts;
+            delete pkg.devDependencies;
+            pkg.main = 'server/index.js';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          npm install --production --omit=dev
+      - name: Write manifest.json
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const manifest = {
+              manifest_version: '0.3',
+              name: 'kadam-mcp-server',
+              display_name: 'Kadam Ad Network',
+              version: pkg.version,
+              description: pkg.description,
+              author: { name: 'Kadam', url: 'https://kadam.net' },
+              repository: { type: 'git', url: 'https://github.com/kadam-official/mcp-server.git' },
+              homepage: 'https://kadam.net',
+              license: 'MIT',
+              privacy_policies: ['https://kadam.net/en/privacy'],
+              keywords: ['advertising','ads','campaigns','analytics','kadam','marketing'],
+              server: {
+                type: 'node',
+                entry_point: 'server/index.js',
+                mcp_config: {
+                  command: 'node',
+                  args: ['\${__dirname}/server/index.js'],
+                  env: {
+                    KADAM_ADV_API_KEY: '\${user_config.adv_api_key}',
+                    KADAM_PUB_API_KEY: '\${user_config.pub_api_key}'
+                  }
+                }
+              },
+              user_config: {
+                terms_accepted: {
+                  type: 'boolean',
+                  title: 'I agree to Kadam Terms of Service',
+                  description: 'https://www.kadam.net/en/terms-service',
+                  required: true,
+                  default: false
+                },
+                adv_api_key: {
+                  type: 'string',
+                  title: 'Advertiser API Key',
+                  description: 'For campaign management. Get at partners.kadam.net → Profile → API',
+                  sensitive: true,
+                  required: false
+                },
+                pub_api_key: {
+                  type: 'string',
+                  title: 'Publisher API Key',
+                  description: 'For site/ad-unit management. Get at pub.kadam.net → Profile → API',
+                  sensitive: true,
+                  required: false
+                }
+              },
+              compatibility: {
+                platforms: ['darwin','win32'],
+                runtimes: { node: '>=18.0.0' }
+              }
+            };
+            require('fs').writeFileSync('mcpb-bundle/manifest.json', JSON.stringify(manifest, null, 2));
+          "
+      - name: Write .mcpbignore
+        run: |
+          echo -e "package-lock.json\nREADME.md\nLICENSE" > mcpb-bundle/.mcpbignore
+      - name: Validate and pack mcpb
+        run: |
+          cd mcpb-bundle
+          npx -y @anthropic-ai/mcpb pack .
+      - name: Smoke test mcpb
+        run: |
+          mkdir -p /tmp/mcpb-test
+          cd /tmp/mcpb-test
+          unzip -q $GITHUB_WORKSPACE/mcpb-bundle/*.mcpb
+          echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}},"id":0}' | node server/index.js 2>/dev/null | node -e "
+            let data='';
+            process.stdin.on('data',c=>data+=c);
+            process.stdin.on('end',()=>{
+              const r=JSON.parse(data);
+              if(r.result&&r.result.serverInfo) {
+                console.log('✓ MCP server responds:', r.result.serverInfo.name, r.result.serverInfo.version);
+                process.exit(0);
+              } else {
+                console.error('✗ Unexpected response:', data);
+                process.exit(1);
+              }
+            });
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcpb
+          path: mcpb-bundle/*.mcpb
