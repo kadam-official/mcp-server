@@ -57,8 +57,7 @@ describe("advertiser stats tools", () => {
     });
 
     const params = api.getReportData.mock.calls[0][0];
-    expect(params.sortBy).toBe("finance_moneyOut");
-    expect(params.sortOrder).toBe("desc");
+    expect(params.sort).toEqual({ finance_moneyOut: "desc" });
   });
 
   it("custom report wires countries and creativeIds into filters", async () => {
@@ -83,8 +82,8 @@ describe("advertiser stats tools", () => {
 
     const params = api.getReportData.mock.calls[0][0] as Record<string, unknown>;
     const filters = (params.filters as Record<string, unknown>).filters as Array<Record<string, unknown>>;
-    expect(filters).toContainEqual({ id: "traffic_region", type: "list", list: ["US", "DE"] });
-    expect(filters).toContainEqual({ id: "advertiser_ad", type: "list", list: [101, 202] });
+    expect(filters).toContainEqual({ id: "traffic_region", type: "list", include: ["US", "DE"] });
+    expect(filters).toContainEqual({ id: "advertiser_ad", type: "list", include: [101, 202] });
   });
 
   it("get_stats with reportType sites calls getSiteStats", async () => {
@@ -107,7 +106,7 @@ describe("advertiser stats tools", () => {
     expect(text).toContain("Site stats");
   });
 
-  it("sites report passes sortBy/sortOrder through to API", async () => {
+  it("sites report nests params under filters and uses sort object", async () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
     api.getSiteStats.mockResolvedValue({
@@ -117,12 +116,15 @@ describe("advertiser stats tools", () => {
 
     await client.callTool({
       name: "kadam_adv_get_stats",
-      arguments: { reportType: "sites", period: "7days", sortBy: "spend", sortOrder: "desc" },
+      arguments: { reportType: "sites", period: "7days", sortBy: "spend", sortOrder: "desc", campaignIds: "863067" },
     });
 
-    const params = api.getSiteStats.mock.calls[0][0];
-    expect(params.sortBy).toBe("spend");
-    expect(params.sortOrder).toBe("desc");
+    const params = api.getSiteStats.mock.calls[0][0] as Record<string, unknown>;
+    expect(params.sort).toEqual({ spend: "desc" });
+    const filters = params.filters as Record<string, unknown>;
+    expect(filters.campaignIds).toEqual([863067]);
+    expect(filters.view).toBe("all");
+    expect(filters.dateFrom).toBeDefined();
   });
 
   it("get_stats with reportType conversions calls getConversionDetails", async () => {

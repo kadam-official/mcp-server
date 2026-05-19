@@ -59,8 +59,7 @@ describe("publisher stats tools", () => {
     });
 
     const params = api.getReportData.mock.calls[0][0];
-    expect(params.sortBy).toBe("finance_moneyIn");
-    expect(params.sortOrder).toBe("desc");
+    expect(params.sort).toEqual({ finance_moneyIn: "desc" });
   });
 
   it("config caching - call get_stats twice, getReportConfig called expected times", async () => {

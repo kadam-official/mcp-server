@@ -71,13 +71,13 @@ export const statsModule: ToolModule = {
 
           const customFilters: unknown[] = [];
           if (args.campaignIds != null) {
-            customFilters.push({ id: "advertiser_campaign", type: "list", list: args.campaignIds.split(",").map(Number) });
+            customFilters.push({ id: "advertiser_campaign", type: "list", include: args.campaignIds.split(",").map(Number) });
           }
           if (args.countries != null) {
-            customFilters.push({ id: "traffic_region", type: "list", list: args.countries.split(",").map(s => s.trim()) });
+            customFilters.push({ id: "traffic_region", type: "list", include: args.countries.split(",").map(s => s.trim()) });
           }
           if (args.creativeIds != null) {
-            customFilters.push({ id: "advertiser_ad", type: "list", list: args.creativeIds.split(",").map(Number) });
+            customFilters.push({ id: "advertiser_ad", type: "list", include: args.creativeIds.split(",").map(Number) });
           }
 
           const resolvedSort = args.sortBy != null
@@ -93,8 +93,7 @@ export const statsModule: ToolModule = {
             },
             page: args.page,
             perPage,
-            ...(resolvedSort != null && { sortBy: resolvedSort }),
-            ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
+            ...(resolvedSort != null && { sort: { [resolvedSort]: args.sortOrder ?? "desc" } }),
           };
           const res = await ctx.adv.getReportData(params);
           const rows = res.rows ?? [];
@@ -116,22 +115,21 @@ export const statsModule: ToolModule = {
 
         if (args.reportType === "sites") {
           const params: Record<string, unknown> = {
-            dateFrom: df,
-            dateTo: dt,
             page: args.page,
             perPage,
-            view: args.view,
-            ...(args.campaignIds != null && {
-              campaignIds: args.campaignIds,
-            }),
-            ...(args.creativeIds != null && {
-              creativeIds: args.creativeIds,
-            }),
-            ...(args.searchQuery != null && {
-              searchQuery: args.searchQuery,
-            }),
-            ...(args.sortBy != null && { sortBy: args.sortBy }),
-            ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
+            filters: {
+              dateFrom: df,
+              dateTo: dt,
+              view: args.view,
+              ...(args.campaignIds != null && {
+                campaignIds: args.campaignIds.split(",").map(Number),
+              }),
+              ...(args.creativeIds != null && {
+                adIds: args.creativeIds.split(",").map(Number),
+              }),
+              ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
+            },
+            ...(args.sortBy != null && { sort: { [args.sortBy]: args.sortOrder ?? "desc" } }),
           };
           const res = await ctx.adv.getSiteStats(params);
           const pagination = extractPagination(res);

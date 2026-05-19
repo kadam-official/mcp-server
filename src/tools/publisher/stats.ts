@@ -88,8 +88,7 @@ export const pubStatsModule: ToolModule = {
           },
           page: args.page,
           perPage,
-          ...(args.sortBy != null && { sortBy: resolveAlias(args.sortBy, METRIC_ALIASES) }),
-          ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
+          ...(args.sortBy != null && { sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" } }),
         };
 
         const res = await ctx.pub.getReportData(params);
