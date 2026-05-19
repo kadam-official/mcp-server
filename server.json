@@ -8,13 +8,13 @@
     "url": "https://github.com/kadam-official/mcp-server",
     "source": "github"
   },
-  "version": "0.3.4",
+  "version": "0.3.6",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@kadam-net/mcp-server",
-      "version": "0.3.4",
+      "version": "0.3.6",
       "transport": {
         "type": "stdio"
       },
