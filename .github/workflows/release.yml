@@ -116,10 +116,11 @@ jobs:
         run: |
           cd mcpb-bundle
           npx -y @anthropic-ai/mcpb pack .
+          mv *.mcpb kadam-mcp-server.mcpb
       - name: Smoke test
         run: |
           mkdir -p /tmp/mcpb-test && cd /tmp/mcpb-test
-          unzip -q $GITHUB_WORKSPACE/mcpb-bundle/*.mcpb
+          unzip -q $GITHUB_WORKSPACE/mcpb-bundle/kadam-mcp-server.mcpb
           echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"1.0"}},"id":0}' | node server/index.js 2>/dev/null | node -e "
             let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
               const r=JSON.parse(d);
@@ -132,6 +133,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Upload mcpb to release
-        run: gh release upload ${{ github.ref_name }} mcpb-bundle/*.mcpb --clobber
+        run: gh release upload ${{ github.ref_name }} mcpb-bundle/kadam-mcp-server.mcpb --clobber
         env:
           GH_TOKEN: ${{ github.token }}
