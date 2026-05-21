@@ -341,4 +341,40 @@ describe("mapCampaignFields", () => {
     }, createMockRegistry());
     expect(result.sites).toEqual({ mode: 1, list: [100] });
   });
+
+  it("maps sspIds with sspMode=whitelist to ssps with mode=true", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      sspMode: "whitelist",
+      sspIds: "5,12,30",
+    }, createMockRegistry());
+    expect(result.ssps).toEqual({ mode: true, list: [5, 12, 30] });
+    expect(result.sspMode).toBeUndefined();
+    expect(result.sspIds).toBeUndefined();
+  });
+
+  it("maps sspIds with sspMode=blacklist to ssps with mode=false", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      sspMode: "blacklist",
+      sspIds: "7,14",
+    }, createMockRegistry());
+    expect(result.ssps).toEqual({ mode: false, list: [7, 14] });
+  });
+
+  it("defaults sspMode to whitelist (mode=true) when only sspIds provided", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      sspIds: "10,20",
+    }, createMockRegistry());
+    expect(result.ssps).toEqual({ mode: true, list: [10, 20] });
+  });
+
+  it("does not set ssps when sspIds is not provided", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      sspMode: "whitelist",
+    }, createMockRegistry());
+    expect(result.ssps).toBeUndefined();
+  });
 });

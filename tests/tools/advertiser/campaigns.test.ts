@@ -352,6 +352,88 @@ describe("campaigns tools", () => {
     );
   });
 
+  it("create_campaign with sspIds sends ssps object to API", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 101 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "SSP test",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 50,
+        countries: "US",
+        sspMode: "whitelist",
+        sspIds: "5,12",
+      },
+    });
+
+    expect(api.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ssps: { mode: true, list: [5, 12] },
+      }),
+    );
+  });
+
+  it("create_campaign with sspMode=blacklist sends ssps.mode=false", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 102 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "SSP blacklist",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 50,
+        countries: "US",
+        sspMode: "blacklist",
+        sspIds: "7,14",
+      },
+    });
+
+    expect(api.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ssps: { mode: false, list: [7, 14] },
+      }),
+    );
+  });
+
+  it("update_campaign merges sspIds into existing campaign", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 70,
+      type: 30,
+      cpType: 0,
+      name: "SSP update test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      ssps: { mode: true, list: [1, 2] },
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 70, sspMode: "blacklist", sspIds: "10,20,30" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.ssps).toEqual({ mode: false, list: [10, 20, 30] });
+  });
+
   it("update_site_bids sends PUT /stats/sites/bids with zones and bid", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;

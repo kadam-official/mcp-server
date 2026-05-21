@@ -95,6 +95,8 @@ async function mapField(
     case "audienceExcludeIds":
     case "siteWhitelist":
     case "siteBlacklist":
+    case "sspMode":
+    case "sspIds":
       break;
     default:
       mapped[key] = value;
@@ -271,6 +273,13 @@ export async function mapCampaignFields(
     mapped.sites = { mode: 0, list: fields.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
   }
 
+  if (fields.sspIds != null) {
+    mapped.ssps = {
+      mode: fields.sspMode === "whitelist" || fields.sspMode == null,
+      list: (fields.sspIds as string).split(",").map(Number),
+    };
+  }
+
   const customPostConversion = buildPostConversion(fields);
   if (customPostConversion) {
     mapped.postConversion = customPostConversion;
@@ -311,6 +320,10 @@ const campaignTargetingFields = {
   audienceExcludeIds: z.string().optional().describe("Comma-separated audience IDs to exclude"),
   siteWhitelist: z.string().optional().describe("Comma-separated site IDs for whitelist"),
   siteBlacklist: z.string().optional().describe("Comma-separated site IDs for blacklist"),
+  sspMode: z.enum(["whitelist", "blacklist"]).optional()
+    .describe("SSP source list mode: 'whitelist' = only allow listed SSPs, 'blacklist' = block listed SSPs"),
+  sspIds: z.string().optional()
+    .describe("Comma-separated SSP IDs for the source whitelist/blacklist (see ssps in campaign options)"),
 };
 
 const campaignBudgetFields = {
@@ -320,12 +333,17 @@ const campaignBudgetFields = {
   endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
   timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
   schedule: z.string().optional().describe("Comma-separated hours (0-23) to show ads, applied to all days (e.g. '9,10,11,12,13,14,15,16,17' for 9am-5pm)"),
-  frequencyCapViews: z.number().optional().describe("Max ad (creative) views per user in the cap period"),
-  frequencyCapDays: z.number().optional().describe("Frequency cap period in days (e.g. 1 = per day)"),
-  campaignCapViews: z.number().optional().describe("Max campaign-level views per user in the cap period (use for pop campaigns)"),
-  campaignCapDays: z.number().optional().describe("Campaign-level cap period in days (e.g. 1 = per day)"),
+  frequencyCapViews: z.number().optional()
+    .describe("Creative-level: max times ONE creative is shown to a user within frequencyCapDays (e.g. 3 = user sees this creative at most 3 times)"),
+  frequencyCapDays: z.number().optional()
+    .describe("Creative-level: time window in days for the cap (e.g. 1 = per day, 7 = per week). Used with frequencyCapViews"),
+  campaignCapViews: z.number().optional()
+    .describe("Campaign-level: max times ANY creative from this campaign is shown to a user within campaignCapDays (e.g. 1 = one pop per user)"),
+  campaignCapDays: z.number().optional()
+    .describe("Campaign-level: time window in days (e.g. 1 = per day). Used with campaignCapViews. Example: campaignCapViews=1, campaignCapDays=1 means 'show campaign to each user max once per day'"),
   impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
-  categories: z.string().optional().describe("Comma-separated category IDs or 'mainstream'"),
+  categories: z.string().optional()
+    .describe("Comma-separated category IDs for content classification (e.g. '1,2,3' or 'mainstream,adult'). Multiple values allowed. Use campaign options to see available IDs."),
   secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
   pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
 };
@@ -512,6 +530,13 @@ export const campaignsModule: ToolModule = {
           merged.sites = { mode: 1, list: changes.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
         } else if (changes.siteBlacklist != null) {
           merged.sites = { mode: 0, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+        }
+
+        if (changes.sspIds != null) {
+          merged.ssps = {
+            mode: changes.sspMode === "whitelist" || changes.sspMode == null,
+            list: changes.sspIds.split(",").map(s => parseInt(s.trim(), 10)),
+          };
         }
 
         if (changes.schedule != null) {
