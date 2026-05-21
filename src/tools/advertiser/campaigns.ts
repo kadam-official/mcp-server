@@ -90,6 +90,11 @@ async function mapField(
     case "postClickAttrPriority":
     case "postConversionAudienceIds":
       break; // handled in buildPostConversion
+    case "conversionTemplateId":
+    case "conversionApproved":
+    case "conversionHold":
+    case "conversionReject":
+      break; // handled after loop
     case "countries":
     case "audienceIncludeIds":
     case "audienceExcludeIds":
@@ -280,6 +285,15 @@ export async function mapCampaignFields(
     };
   }
 
+  if (fields.conversionTemplateId != null || fields.conversionApproved != null) {
+    mapped.conversion = {
+      id: (fields.conversionTemplateId as number) ?? 0,
+      approved: (fields.conversionApproved as string) ?? "",
+      hold: (fields.conversionHold as string) ?? "",
+      reject: (fields.conversionReject as string) ?? "",
+    };
+  }
+
   const customPostConversion = buildPostConversion(fields);
   if (customPostConversion) {
     mapped.postConversion = customPostConversion;
@@ -346,6 +360,14 @@ const campaignBudgetFields = {
     .describe("Comma-separated category IDs for content classification (e.g. '1,2,3' or 'mainstream,adult'). Multiple values allowed. Use campaign options to see available IDs."),
   secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
   pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
+  conversionTemplateId: z.number().optional()
+    .describe("Conversion acceptance template ID from campaign options (conversionTemplates list). Use 0 for custom mapping with conversionApproved/Hold/Reject."),
+  conversionApproved: z.string().optional()
+    .describe("Postback status name for 'Approved' conversions (e.g. 'dep', 'sale'). Used with conversionTemplateId=0 for custom mapping."),
+  conversionHold: z.string().optional()
+    .describe("Postback status name for 'Hold' conversions (e.g. 'reg', 'lead'). Used with conversionTemplateId=0 for custom mapping."),
+  conversionReject: z.string().optional()
+    .describe("Postback status name for 'Rejected' conversions. Used with conversionTemplateId=0 for custom mapping."),
 };
 
 const postConversionFields = {
@@ -594,13 +616,19 @@ export const campaignsModule: ToolModule = {
           }
         }
 
+        if (changes.conversionTemplateId != null || changes.conversionApproved != null ||
+            changes.conversionHold != null || changes.conversionReject != null) {
+          const currentConv = (merged.conversion ?? {}) as Record<string, unknown>;
+          merged.conversion = {
+            id: changes.conversionTemplateId ?? currentConv.id ?? 0,
+            approved: changes.conversionApproved ?? currentConv.approved ?? "",
+            hold: changes.conversionHold ?? currentConv.hold ?? "",
+            reject: changes.conversionReject ?? currentConv.reject ?? "",
+          };
+        }
+
         delete merged.id;
         delete merged.status;
-
-        const conv = merged.conversion as Record<string, unknown> | null | undefined;
-        if (conv && typeof conv === "object") {
-          delete conv.id;
-        }
 
         merged.newAudiences ??= [];
 

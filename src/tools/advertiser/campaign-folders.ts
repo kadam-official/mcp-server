@@ -51,12 +51,12 @@ export const campaignFoldersModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_create_campaign_folder",
-        description: "Create a new campaign folder. Name must be at least 4 characters.",
+        description: "Create a new campaign folder.",
         product: "advertiser",
         annotations: { title: "Create campaign folder", readOnlyHint: false },
       },
       {
-        name: z.string().min(4),
+        name: z.string().min(1).max(50).describe("Folder name (1-50 characters, e.g. 'SA', 'US campaigns')"),
       },
       async (args, ctx) => {
         const result = await ctx.adv.createCampaignFolder(args.name);

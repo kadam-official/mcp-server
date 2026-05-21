@@ -97,4 +97,19 @@ describe("campaign-folders tools", () => {
       limitsEnabled: false,
     }));
   });
+
+  it("create_campaign_folder accepts short names (1-3 chars)", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaignFolder.mockResolvedValue({ id: 99 } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_campaign_folder",
+      arguments: { name: "SA" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.createCampaignFolder).toHaveBeenCalledWith("SA");
+    expect(text).toContain("[ID: 99]");
+  });
 });

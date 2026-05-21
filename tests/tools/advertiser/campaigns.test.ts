@@ -434,6 +434,59 @@ describe("campaigns tools", () => {
     expect(payload.ssps).toEqual({ mode: false, list: [10, 20, 30] });
   });
 
+  it("update_campaign merges conversion template into existing campaign", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 80,
+      type: 30,
+      cpType: 0,
+      name: "Conv test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      conversion: { id: 3, approved: "old_dep", hold: "old_reg", reject: "" },
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 80, conversionTemplateId: 0, conversionApproved: "dep", conversionHold: "reg" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.conversion).toEqual({ id: 0, approved: "dep", hold: "reg", reject: "" });
+  });
+
+  it("update_campaign preserves conversion.id when not changing conversion", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 81,
+      type: 30,
+      cpType: 0,
+      name: "Conv preserve test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      conversion: { id: 5, approved: "dep", hold: "reg", reject: "" },
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 81, name: "Renamed" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    const conv = payload.conversion as Record<string, unknown>;
+    expect(conv.id).toBe(5);
+  });
+
   it("update_site_bids sends PUT /stats/sites/bids with zones and bid", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;

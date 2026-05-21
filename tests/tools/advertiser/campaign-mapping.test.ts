@@ -377,4 +377,36 @@ describe("mapCampaignFields", () => {
     }, createMockRegistry());
     expect(result.ssps).toBeUndefined();
   });
+
+  it("maps conversionTemplateId to conversion.id", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      conversionTemplateId: 5,
+    }, createMockRegistry());
+    expect(result.conversion).toEqual({ id: 5, approved: "", hold: "", reject: "" });
+  });
+
+  it("maps custom conversion with approved/hold/reject strings", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      conversionTemplateId: 0,
+      conversionApproved: "dep",
+      conversionHold: "reg",
+      conversionReject: "trash",
+    }, createMockRegistry());
+    expect(result.conversion).toEqual({ id: 0, approved: "dep", hold: "reg", reject: "trash" });
+  });
+
+  it("maps conversionApproved without templateId (defaults id to 0)", async () => {
+    const result = await mapCampaignFields({
+      type: "push",
+      conversionApproved: "sale",
+    }, createMockRegistry());
+    expect(result.conversion).toEqual({ id: 0, approved: "sale", hold: "", reject: "" });
+  });
+
+  it("does not set conversion when no conversion fields provided", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result.conversion).toBeNull();
+  });
 });
