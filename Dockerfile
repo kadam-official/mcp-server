@@ -1,7 +1,9 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# --ignore-scripts: the "prepare" hook runs `npm run build`, but src/ isn't
+# copied yet at install time. We build explicitly after COPY below.
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -9,7 +11,7 @@ FROM node:22-alpine
 RUN apk add --no-cache tini
 WORKDIR /app
 COPY --from=build /app/package.json /app/package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 USER node
 # Transport defaults to stdio (keeps the published image usable as `docker run -i`).
