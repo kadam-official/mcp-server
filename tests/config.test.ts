@@ -10,27 +10,30 @@ describe("config", () => {
     process.env = originalEnv;
   });
 
-  it("getConfig returns defaults in http mode (no keys required)", async () => {
+  it("getConfig returns defaults when no keys set (keys optional in all modes)", async () => {
     delete process.env.KADAM_ADV_API_KEY;
     delete process.env.KADAM_PUB_API_KEY;
     delete process.env.KADAM_ADV_API_BASE;
     delete process.env.KADAM_PUB_API_BASE;
     delete process.env.LOG_LEVEL;
-    process.env.MCP_TRANSPORT = "http";
+    delete process.env.MCP_TRANSPORT;
     const { getConfig } = await import("../src/config.js");
     const config = getConfig();
     expect(config.KADAM_ADV_API_BASE).toBe("https://partners.kadam.net/api/v1");
     expect(config.KADAM_PUB_API_BASE).toBe("https://pub.kadam.net/api");
     expect(config.LOG_LEVEL).toBe("info");
-    expect(config.MCP_TRANSPORT).toBe("http");
+    expect(config.MCP_TRANSPORT).toBe("stdio");
   });
 
-  it("getConfig throws in stdio mode when no keys set", async () => {
+  it("getConfig reads http transport + domains from env", async () => {
     delete process.env.KADAM_ADV_API_KEY;
     delete process.env.KADAM_PUB_API_KEY;
-    delete process.env.MCP_TRANSPORT;
+    process.env.MCP_TRANSPORT = "http";
     const { getConfig } = await import("../src/config.js");
-    expect(() => getConfig()).toThrow(/At least one of KADAM_ADV_API_KEY/);
+    const config = getConfig();
+    expect(config.MCP_TRANSPORT).toBe("http");
+    expect(config.KADAM_ADV_DOMAIN).toBe("https://partners.kadam.net");
+    expect(config.KADAM_PUB_DOMAIN).toBe("https://pub.kadam.net");
   });
 
   it("getConfig with custom env reads KADAM_ADV_API_KEY, LOG_LEVEL from env", async () => {
