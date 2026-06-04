@@ -72,3 +72,24 @@ publish-docker:
     - docker push kadam/mcp-server:$CI_COMMIT_TAG
     - docker push kadam/mcp-server:latest
   when: manual
+
+# Publishes the image consumed by the K8s deployment (arranger KadamMcp -> ECR kadam-mcp:main).
+# Requires CI variables: AWS_REGION, AWS_ECR_REGISTRY (e.g. <acct>.dkr.ecr.<region>.amazonaws.com)
+# plus runner AWS credentials (IAM role or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY).
+publish-ecr:
+  stage: publish
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    ECR_IMAGE: kadam-mcp
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  before_script:
+    - apk add --no-cache aws-cli
+    - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$AWS_ECR_REGISTRY"
+  script:
+    - docker build -t "$AWS_ECR_REGISTRY/$ECR_IMAGE:main" -t "$AWS_ECR_REGISTRY/$ECR_IMAGE:$CI_COMMIT_SHORT_SHA" .
+    - docker push "$AWS_ECR_REGISTRY/$ECR_IMAGE:main"
+    - docker push "$AWS_ECR_REGISTRY/$ECR_IMAGE:$CI_COMMIT_SHORT_SHA"
+  when: manual

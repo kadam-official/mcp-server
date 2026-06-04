@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -25,12 +25,21 @@ interface Session {
   server: McpServer;
   bearer: string;
   cabinet: CabinetType;
+  lastActivity: number;
 }
 
 const sessions = new Map<string, Session>();
 
-function sessionKey(bearer: string, host: string): string {
-  return createHash("sha256").update(`${bearer}:${host}`).digest("hex");
+// Evict sessions with no activity for this long to bound memory when clients
+// disconnect without sending DELETE.
+const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
+const SESSION_SWEEP_MS = 5 * 60 * 1000; // sweep every 5 minutes
+
+function touchSession(sessionId: string): void {
+  const session = sessions.get(sessionId);
+  if (session) {
+    session.lastActivity = Date.now();
+  }
 }
 
 function detectCabinet(host: string, config: Config): CabinetType | null {
@@ -161,8 +170,6 @@ export async function bootstrapHttp(): Promise<void> {
           return;
         }
 
-        const key = sessionKey(bearer, requestHost);
-
         if (method === "POST") {
           const body = await readBody(req);
           const parsed = JSON.parse(body);
@@ -181,6 +188,7 @@ export async function bootstrapHttp(): Promise<void> {
               });
               return;
             }
+            touchSession(existingSessionId);
             await session.transport.handleRequest(req, res, parsed);
             return;
           }
@@ -204,9 +212,10 @@ export async function bootstrapHttp(): Promise<void> {
                   server: mcpServer,
                   bearer,
                   cabinet,
+                  lastActivity: Date.now(),
                 });
                 logger.info(
-                  { sessionId, cabinet, key: key.slice(0, 8) },
+                  { sessionId, cabinet },
                   "New HTTP session created",
                 );
               },
@@ -249,6 +258,7 @@ export async function bootstrapHttp(): Promise<void> {
             sendJson(res, 403, { error: "Token/cabinet mismatch" });
             return;
           }
+          touchSession(existingSessionId);
           await session.transport.handleRequest(req, res);
           return;
         }
@@ -290,8 +300,23 @@ export async function bootstrapHttp(): Promise<void> {
     );
   });
 
+  const sweeper = setInterval(() => {
+    const now = Date.now();
+    for (const [sid, session] of sessions.entries()) {
+      if (now - session.lastActivity > SESSION_IDLE_MS) {
+        sessions.delete(sid);
+        void session.transport.close().catch((e) => {
+          logger.error({ sessionId: sid, error: e }, "Error closing idle session");
+        });
+        logger.info({ sessionId: sid }, "Evicted idle HTTP session");
+      }
+    }
+  }, SESSION_SWEEP_MS);
+  sweeper.unref();
+
   const shutdown = async () => {
     logger.info("Shutting down HTTP server...");
+    clearInterval(sweeper);
     for (const [sid, session] of sessions.entries()) {
       try {
         await session.transport.close();
