@@ -103,6 +103,7 @@ describe("createMcpServer", () => {
     const { client, cleanup } = await connectServer({
       KADAM_ADV_API_KEY: undefined,
       KADAM_PUB_API_KEY: undefined,
+      MCP_TRANSPORT: "http",
     });
     try {
       const resources = await client.listResources();

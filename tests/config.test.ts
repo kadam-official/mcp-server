@@ -10,17 +10,27 @@ describe("config", () => {
     process.env = originalEnv;
   });
 
-  it("getConfig returns defaults when no keys set", async () => {
+  it("getConfig returns defaults in http mode (no keys required)", async () => {
     delete process.env.KADAM_ADV_API_KEY;
     delete process.env.KADAM_PUB_API_KEY;
     delete process.env.KADAM_ADV_API_BASE;
     delete process.env.KADAM_PUB_API_BASE;
     delete process.env.LOG_LEVEL;
+    process.env.MCP_TRANSPORT = "http";
     const { getConfig } = await import("../src/config.js");
     const config = getConfig();
     expect(config.KADAM_ADV_API_BASE).toBe("https://partners.kadam.net/api/v1");
     expect(config.KADAM_PUB_API_BASE).toBe("https://pub.kadam.net/api");
     expect(config.LOG_LEVEL).toBe("info");
+    expect(config.MCP_TRANSPORT).toBe("http");
+  });
+
+  it("getConfig throws in stdio mode when no keys set", async () => {
+    delete process.env.KADAM_ADV_API_KEY;
+    delete process.env.KADAM_PUB_API_KEY;
+    delete process.env.MCP_TRANSPORT;
+    const { getConfig } = await import("../src/config.js");
+    expect(() => getConfig()).toThrow(/At least one of KADAM_ADV_API_KEY/);
   });
 
   it("getConfig with custom env reads KADAM_ADV_API_KEY, LOG_LEVEL from env", async () => {
@@ -44,19 +54,22 @@ describe("config", () => {
     expect(hasAdvKey()).toBe(true);
   });
 
-  it("hasAdvKey returns false when not set", async () => {
+  it("hasAdvKey returns false when not set (http mode)", async () => {
     delete process.env.KADAM_ADV_API_KEY;
+    process.env.MCP_TRANSPORT = "http";
     const { hasAdvKey } = await import("../src/config.js");
     expect(hasAdvKey()).toBe(false);
   });
 
-  it("hasPubKey returns true when set, false when not", async () => {
+  it("hasPubKey returns true when set, false when not (http mode)", async () => {
     process.env.KADAM_PUB_API_KEY = "pubkey";
+    process.env.MCP_TRANSPORT = "http";
     const { hasPubKey } = await import("../src/config.js");
     expect(hasPubKey()).toBe(true);
 
     vi.resetModules();
     delete process.env.KADAM_PUB_API_KEY;
+    process.env.MCP_TRANSPORT = "http";
     const { hasPubKey: hasPubKey2 } = await import("../src/config.js");
     expect(hasPubKey2()).toBe(false);
   });
