@@ -93,7 +93,45 @@ KADAM_ADV_API_KEY=your-key kadam-mcp-server
 | `KADAM_PUB_API_BASE` | No | Publisher API URL (default: `https://pub.kadam.net/api`) |
 | `LOG_LEVEL` | No | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `info`) |
 
-At least one API key must be provided. Tools for both products are always listed (for discoverability), but calling a tool without the corresponding key returns a clear setup instruction.
+At least one API key must be provided in stdio mode. In HTTP mode, tokens are passed per-request via Bearer authentication.
+
+### HTTP Transport (multi-tenant deployment)
+
+For server-side deployment serving multiple users:
+
+| Variable | Required | Description |
+|---|---|---|
+| `MCP_TRANSPORT` | No | `"stdio"` (default) or `"http"` |
+| `MCP_HTTP_PORT` | No | HTTP port (default: `8080`) |
+| `MCP_HTTP_HOST` | No | Bind address (default: `0.0.0.0`) |
+| `KADAM_ADV_DOMAIN` | No | Advertiser domain for PRM (default: `https://partners.kadam.net`) |
+| `KADAM_PUB_DOMAIN` | No | Publisher domain for PRM (default: `https://pub.kadam.net`) |
+
+```bash
+docker run -d --name kadam-mcp \
+  -e MCP_TRANSPORT=http \
+  -p 8080:8080 \
+  kadam/mcp-server:latest
+```
+
+### Connecting via HTTP (Cursor / Claude)
+
+```json
+{
+  "mcpServers": {
+    "kadam-adv": {
+      "url": "https://partners.kadam.net/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_ADV_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Connecting via OAuth (ChatGPT)
+
+Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
 ## Tools (30)
 

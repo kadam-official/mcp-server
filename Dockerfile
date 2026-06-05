@@ -1,14 +1,23 @@
-FROM node:22-alpine AS builder
+FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
-COPY tsconfig.json vite.config.ts ./
-COPY src/ src/
+COPY package.json package-lock.json ./
+# --ignore-scripts: the "prepare" hook runs `npm run build`, but src/ isn't
+# copied yet at install time. We build explicitly after COPY below.
+RUN npm ci --ignore-scripts
+COPY . .
 RUN npm run build
 
 FROM node:22-alpine
+RUN apk add --no-cache tini
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
-COPY --from=builder /app/dist ./dist
-ENTRYPOINT ["node", "dist/index.js"]
+COPY --from=build /app/package.json /app/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY --from=build /app/dist ./dist
+USER node
+# Transport defaults to stdio (keeps the published image usable as `docker run -i`).
+# HTTP deployments (K8s ConfigMap, docker-compose.mcp.yml) set MCP_TRANSPORT=http explicitly.
+ENV MCP_HTTP_PORT=8080
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+ENTRYPOINT ["tini", "--"]
+CMD ["node", "dist/index.js"]
