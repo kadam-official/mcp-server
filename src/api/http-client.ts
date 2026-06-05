@@ -222,11 +222,14 @@ function formatApiError(status: number, parsed: unknown, raw: string): string {
     if (obj.message) return String(obj.message);
     if (obj.error) return String(obj.error);
     if (obj.errors && Array.isArray(obj.errors)) {
-      return obj.errors.map((e: unknown) => {
-        if (typeof e === "string") return e;
-        if (typeof e === "object" && e !== null && "message" in e) return String((e as { message: unknown }).message);
-        return JSON.stringify(e);
-      }).join("; ");
+      return obj.errors
+        .map((e: unknown) => {
+          if (typeof e === "string") return e;
+          if (typeof e === "object" && e !== null && "message" in e)
+            return String((e as { message: unknown }).message);
+          return JSON.stringify(e);
+        })
+        .join("; ");
     }
   }
 

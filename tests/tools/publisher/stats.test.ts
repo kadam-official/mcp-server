@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPubClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPubClient,
+} from "../../helpers/tool-client.js";
 import { pubStatsModule } from "../../../src/tools/publisher/stats.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -21,7 +25,10 @@ describe("publisher stats tools", () => {
     const api = mockApi as MockPubClient;
     api.getReportConfig.mockResolvedValue({
       groups: { time: [{ id: "time_day" }] },
-      metrics: { finance: [{ id: "finance_revenue" }], traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }] },
+      metrics: {
+        finance: [{ id: "finance_revenue" }],
+        traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }],
+      },
     });
     api.getReportData.mockResolvedValue({
       rows: [{ time_day: "2025-03-01", finance_revenue: 50 }],
@@ -46,11 +53,16 @@ describe("publisher stats tools", () => {
     const api = mockApi as MockPubClient;
     api.getReportConfig.mockResolvedValue({
       groups: { time: [{ id: "time_day" }] },
-      metrics: { finance: [{ id: "finance_moneyIn" }], traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }] },
+      metrics: {
+        finance: [{ id: "finance_moneyIn" }],
+        traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }],
+      },
     });
     api.getReportData.mockResolvedValue({
       rows: [{ time_day: "2025-03-01", finance_moneyIn: 50 }],
-      totalRows: 1, page: 1, perPage: 25,
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     await client.callTool({
@@ -67,7 +79,10 @@ describe("publisher stats tools", () => {
     const api = mockApi as MockPubClient;
     api.getReportConfig.mockResolvedValue({
       groups: { time: [{ id: "time_day" }] },
-      metrics: { finance: [{ id: "finance_revenue" }], traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }] },
+      metrics: {
+        finance: [{ id: "finance_revenue" }],
+        traffic: [{ id: "traffic_views" }, { id: "traffic_clicks" }],
+      },
     });
     api.getReportData.mockResolvedValue({
       rows: [{ time_day: "2025-03-01", finance_revenue: 50 }],

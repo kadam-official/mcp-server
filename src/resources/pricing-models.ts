@@ -34,7 +34,9 @@ async function generateContent(registry: OptionsRegistry | null): Promise<string
           allCpTypes.set(id, { label: cp.label, types: [key] });
         }
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
 
   if (allCpTypes.size === 0) return staticFallback();
@@ -48,7 +50,10 @@ async function generateContent(registry: OptionsRegistry | null): Promise<string
   return lines.join("\n");
 }
 
-export function registerPricingModelsResource(server: McpServer, registry: OptionsRegistry | null): void {
+export function registerPricingModelsResource(
+  server: McpServer,
+  registry: OptionsRegistry | null,
+): void {
   server.resource("pricing-models", "kadam://reference/pricing-models", async () => ({
     contents: [
       {

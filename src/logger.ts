@@ -2,7 +2,14 @@ import process from "node:process";
 
 type LogFn = (obj: unknown, msg?: string) => void;
 
-const LEVELS: Record<string, number> = { fatal: 60, error: 50, warn: 40, info: 30, debug: 20, trace: 10 };
+const LEVELS: Record<string, number> = {
+  fatal: 60,
+  error: 50,
+  warn: 40,
+  info: 30,
+  debug: 20,
+  trace: 10,
+};
 const threshold = LEVELS[process.env.LOG_LEVEL ?? "info"] ?? 30;
 
 function write(level: string, obj: unknown, msg?: string) {

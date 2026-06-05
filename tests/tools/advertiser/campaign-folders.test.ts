@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPartnersClient,
+} from "../../helpers/tool-client.js";
 import { campaignFoldersModule } from "../../../src/tools/advertiser/campaign-folders.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -76,10 +80,13 @@ describe("campaign-folders tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(api.updateCampaignFolder).toHaveBeenCalledWith(1, expect.objectContaining({
-      groupDailyLimit: 500,
-      limitsEnabled: true,
-    }));
+    expect(api.updateCampaignFolder).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        groupDailyLimit: 500,
+        limitsEnabled: true,
+      }),
+    );
     expect(text).toContain("updated successfully");
   });
 
@@ -93,9 +100,12 @@ describe("campaign-folders tools", () => {
       arguments: { id: 2, limitsEnabled: false },
     });
 
-    expect(api.updateCampaignFolder).toHaveBeenCalledWith(2, expect.objectContaining({
-      limitsEnabled: false,
-    }));
+    expect(api.updateCampaignFolder).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({
+        limitsEnabled: false,
+      }),
+    );
   });
 
   it("create_campaign_folder accepts short names (1-3 chars)", async () => {

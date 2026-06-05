@@ -22,24 +22,30 @@ export type ListResponse<T> = {
   isHasNextPage?: boolean;
 };
 
-export const reportConfigGroupSchema = z.object({
-  id: z.string(),
-  icon: z.string().optional(),
-  sources: z.array(z.number()).optional(),
-  filterType: z.string().optional(),
-  filterSync: z.boolean().optional(),
-}).passthrough();
+export const reportConfigGroupSchema = z
+  .object({
+    id: z.string(),
+    icon: z.string().optional(),
+    sources: z.array(z.number()).optional(),
+    filterType: z.string().optional(),
+    filterSync: z.boolean().optional(),
+  })
+  .passthrough();
 
-export const reportConfigMetricSchema = z.object({
-  id: z.string(),
-  unit: z.string().nullable().optional(),
-  sources: z.array(z.number()).optional(),
-}).passthrough();
+export const reportConfigMetricSchema = z
+  .object({
+    id: z.string(),
+    unit: z.string().nullable().optional(),
+    sources: z.array(z.number()).optional(),
+  })
+  .passthrough();
 
-export const reportConfigSchema = z.object({
-  groups: z.record(z.array(reportConfigGroupSchema)),
-  metrics: z.record(z.array(reportConfigMetricSchema)),
-}).passthrough();
+export const reportConfigSchema = z
+  .object({
+    groups: z.record(z.array(reportConfigGroupSchema)),
+    metrics: z.record(z.array(reportConfigMetricSchema)),
+  })
+  .passthrough();
 
 export const reportDataResponseSchema = z.object({
   rows: z.array(z.record(z.unknown())).default([]),

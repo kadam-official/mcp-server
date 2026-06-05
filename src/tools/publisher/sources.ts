@@ -31,16 +31,9 @@ function formatSourceDetail(source: SourceDetail): string {
     ["Direct Link", source.isDirectLink ? "Yes" : "No"],
     [
       "Created",
-      source.createTime
-        ? new Date(source.createTime * 1000).toISOString().slice(0, 10)
-        : undefined,
+      source.createTime ? new Date(source.createTime * 1000).toISOString().slice(0, 10) : undefined,
     ],
-    [
-      "Script Tag",
-      source.scriptTag && source.scriptTag.length > 0
-        ? source.scriptTag
-        : undefined,
-    ],
+    ["Script Tag", source.scriptTag && source.scriptTag.length > 0 ? source.scriptTag : undefined],
   ]);
 }
 
@@ -81,12 +74,11 @@ export const sourcesModule: ToolModule = {
         };
         const res = await ctx.pub.listSources(params);
         const totalPages = perPage > 0 ? Math.ceil(res.totalRows / perPage) : 1;
-        return formatEntityList(
-          res.rows,
-          formatSourceRow,
-          "Sources",
-          { page: args.page, totalPages, totalRows: res.totalRows },
-        );
+        return formatEntityList(res.rows, formatSourceRow, "Sources", {
+          page: args.page,
+          totalPages,
+          totalRows: res.totalRows,
+        });
       },
     );
 

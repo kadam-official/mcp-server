@@ -1,6 +1,4 @@
-export function resolvePeriodToDates(
-  period: string,
-): { dateFrom: string; dateTo: string } {
+export function resolvePeriodToDates(period: string): { dateFrom: string; dateTo: string } {
   const now = new Date();
   const toDate = (d: Date) => d.toISOString().slice(0, 10);
 

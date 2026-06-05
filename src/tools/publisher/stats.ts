@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatTable, extractCellValue, clampPerPage } from "../../output-formatter.js";
-import { resolveMetricIds, resolveGroupIds, resolveAlias, METRIC_ALIASES } from "../../utils/dimension-mapper.js";
+import {
+  resolveMetricIds,
+  resolveGroupIds,
+  resolveAlias,
+  METRIC_ALIASES,
+} from "../../utils/dimension-mapper.js";
 
 function resolveDateRange(
   period: string,
@@ -88,7 +93,9 @@ export const pubStatsModule: ToolModule = {
           },
           page: args.page,
           perPage,
-          ...(args.sortBy != null && { sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" } }),
+          ...(args.sortBy != null && {
+            sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" },
+          }),
         };
 
         const res = await ctx.pub.getReportData(params);
@@ -103,9 +110,7 @@ export const pubStatsModule: ToolModule = {
           for (const k of Object.keys(row)) if (k !== "id") allKeys.add(k);
         }
         const headers = [...allKeys];
-        const tableRows = rows.map((r) =>
-          headers.map((h) => extractCellValue(r[h])),
-        );
+        const tableRows = rows.map((r) => headers.map((h) => extractCellValue(r[h])));
 
         const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
         return formatTable(

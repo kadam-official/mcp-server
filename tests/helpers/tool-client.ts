@@ -16,8 +16,16 @@ export function createMockClientPool(): ClientPool {
 
 function createMockOptionsRegistry() {
   const defaultOpts = {
-    cpTypes: [{ id: 0, label: "CPC" }, { id: 2, label: "CPM" }, { id: 4, label: "CPA Target" }],
-    countries: [{ id: 34, code: "US", label: "United States", tier: 1 }, { id: 24, code: "DE", label: "Germany", tier: 1 }, { id: 40, code: "BR", label: "Brazil", tier: null }],
+    cpTypes: [
+      { id: 0, label: "CPC" },
+      { id: 2, label: "CPM" },
+      { id: 4, label: "CPA Target" },
+    ],
+    countries: [
+      { id: 34, code: "US", label: "United States", tier: 1 },
+      { id: 24, code: "DE", label: "Germany", tier: 1 },
+      { id: 40, code: "BR", label: "Brazil", tier: null },
+    ],
     countriesPresets: [],
     browsers: [{ id: 8, label: "Chrome" }],
     devices: [{ id: 1, label: "Desktop" }],
@@ -29,11 +37,21 @@ function createMockOptionsRegistry() {
       { id: "mainstream", label: "Mainstream" },
     ],
     ages: [],
-    subAges: [{ id: 1, label: "Newest", period: "1 day" }, { id: 2, label: "New", period: "2-6 days" }, { id: 3, label: "Medium", period: "7-13 days" }, { id: 4, label: "Old", period: "14+ days" }],
+    subAges: [
+      { id: 1, label: "Newest", period: "1 day" },
+      { id: 2, label: "New", period: "2-6 days" },
+      { id: 3, label: "Medium", period: "7-13 days" },
+      { id: 4, label: "Old", period: "14+ days" },
+    ],
     audiences: [],
     limits: { dayMoneyLimit: 300 },
     bidCoefficients: { maxWithoutStatCPC: 65 },
-    options: { allowAgeSelection: true, allowGenderSelection: true, showInterests: false, postbackLink: "" },
+    options: {
+      allowAgeSelection: true,
+      allowGenderSelection: true,
+      showInterests: false,
+      postbackLink: "",
+    },
     folders: [],
     conversionTemplates: [],
   };
@@ -51,9 +69,11 @@ function createMockOptionsRegistry() {
         return id;
       }),
     ),
-    resolveIds: vi.fn().mockImplementation(async (_kind: string, input: string) =>
-      input.split(",").map((s: string) => s.trim()),
-    ),
+    resolveIds: vi
+      .fn()
+      .mockImplementation(async (_kind: string, input: string) =>
+        input.split(",").map((s: string) => s.trim()),
+      ),
     getCountryMap: vi.fn().mockResolvedValue(countryMap),
     getNameResolvers: vi.fn(),
     preload: vi.fn(),
@@ -116,8 +136,12 @@ export async function createToolClient(
 ) {
   const pool = createMockClientPool();
 
-  const mockAdv = module.product === "advertiser" ? (mockApi ?? createMockPartnersClient()) : createMockPartnersClient();
-  const mockPub = module.product === "publisher" ? (mockApi ?? createMockPubClient()) : createMockPubClient();
+  const mockAdv =
+    module.product === "advertiser"
+      ? (mockApi ?? createMockPartnersClient())
+      : createMockPartnersClient();
+  const mockPub =
+    module.product === "publisher" ? (mockApi ?? createMockPubClient()) : createMockPubClient();
 
   vi.spyOn(pool, "resolve").mockReturnValue({
     adv: mockAdv as never,
@@ -130,10 +154,7 @@ export async function createToolClient(
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.1" });
-  await Promise.all([
-    client.connect(clientTransport),
-    server.connect(serverTransport),
-  ]);
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
   return { client, mockApi: module.product === "advertiser" ? mockAdv : mockPub };
 }
 

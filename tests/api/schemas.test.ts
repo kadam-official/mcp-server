@@ -1,7 +1,16 @@
 import { z } from "zod";
 import { listResponseSchema, reportConfigSchema } from "../../src/api/schemas/common.js";
-import { campaignRowSchema, audienceRowSchema_, audienceDetailSchema } from "../../src/api/schemas/advertiser.js";
-import { sourceDetailSchema, sourceTableRowSchema, adUnitTableRowSchema, pubUserSchema } from "../../src/api/schemas/publisher.js";
+import {
+  campaignRowSchema,
+  audienceRowSchema_,
+  audienceDetailSchema,
+} from "../../src/api/schemas/advertiser.js";
+import {
+  sourceDetailSchema,
+  sourceTableRowSchema,
+  adUnitTableRowSchema,
+  pubUserSchema,
+} from "../../src/api/schemas/publisher.js";
 
 describe("listResponseSchema", () => {
   const schema = listResponseSchema(z.object({ id: z.number() }));
@@ -133,7 +142,10 @@ describe("audienceDetailSchema", () => {
       fp: null,
     });
     expect(result.linkedAudiencesIds).toEqual([1, 2]);
-    expect(result.linkedAudiences).toEqual({ "1": "aud1 [audience_code]", "2": "aud2 [fingerprint]" });
+    expect(result.linkedAudiences).toEqual({
+      "1": "aud1 [audience_code]",
+      "2": "aud2 [fingerprint]",
+    });
   });
 });
 

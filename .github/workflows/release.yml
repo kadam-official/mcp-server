@@ -23,10 +23,16 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm run build
-      - run: npm publish --access public
+      # --provenance: mint a sigstore attestation via GitHub OIDC (npm Trusted
+      # Publisher). Self-hosted GitLab is not in npm's OIDC trust list, which is
+      # why npm publishing lives here on GitHub Actions, not in .gitlab-ci.yml.
+      - run: npm publish --access public --provenance
 
   publish-mcpb:
     runs-on: ubuntu-latest
+    # Only ship the .mcpb after npm publish succeeds — never leave a desktop
+    # extension on a tag whose npm release failed.
+    needs: [publish-npm]
     permissions:
       contents: write
     steps:

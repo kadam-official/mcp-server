@@ -1,4 +1,9 @@
-import { resolveMetricIds, resolveGroupIds, resolveAlias, METRIC_ALIASES } from "../../src/utils/dimension-mapper.js";
+import {
+  resolveMetricIds,
+  resolveGroupIds,
+  resolveAlias,
+  METRIC_ALIASES,
+} from "../../src/utils/dimension-mapper.js";
 import type { ReportConfig } from "../../src/api/schemas/common.js";
 
 const mockConfig: ReportConfig = {
@@ -47,9 +52,7 @@ describe("resolveMetricIds", () => {
   });
 
   it("passes through already-qualified IDs (case-sensitive match)", () => {
-    expect(resolveMetricIds("traffic_clicks", mockConfig)).toEqual([
-      "traffic_clicks",
-    ]);
+    expect(resolveMetricIds("traffic_clicks", mockConfig)).toEqual(["traffic_clicks"]);
   });
 
   it("filters out unknown metrics", () => {

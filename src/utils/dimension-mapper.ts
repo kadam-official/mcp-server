@@ -25,13 +25,13 @@ export const METRIC_ALIASES: Record<string, string> = {
   revenue: "finance_moneyIn",
   money: "finance_moneyIn",
   earnings: "finance_moneyIn",
-  "block_ctr": "webmaster_blockCTR",
-  "block_cpm": "webmaster_blockCPM",
-  "pub_cpm": "webmaster_cpm",
-  "pub_cpc": "webmaster_cpc",
+  block_ctr: "webmaster_blockCTR",
+  block_cpm: "webmaster_blockCPM",
+  pub_cpm: "webmaster_cpm",
+  pub_cpc: "webmaster_cpc",
   subscriptions: "traffic_subscriptions",
   unsubscriptions: "traffic_unsubscriptions",
-  "block_views": "traffic_blockViews",
+  block_views: "traffic_blockViews",
   viewrate: "traffic_viewRate",
 };
 
@@ -50,8 +50,8 @@ const GROUP_ALIASES: Record<string, string> = {
   device: "traffic_device",
   devicetype: "traffic_deviceType",
   format: "traffic_format",
-  "block_format": "traffic_blockFormat",
-  "block_size": "traffic_blockSize",
+  block_format: "traffic_blockFormat",
+  block_size: "traffic_blockSize",
   site: "traffic_macros",
   isp: "traffic_isp",
   city: "traffic_city",
@@ -63,7 +63,7 @@ const GROUP_ALIASES: Record<string, string> = {
   subid: "webmaster_subId",
   domain: "traffic_domain",
   pid: "traffic_pid",
-  "sub_age": "traffic_subsAge",
+  sub_age: "traffic_subsAge",
   category: "traffic_pageCategory",
 };
 
@@ -81,10 +81,7 @@ export function resolveAlias(name: string, aliases: Record<string, string>): str
   return aliases[name.trim().toLowerCase()] ?? name;
 }
 
-export function resolveMetricIds(
-  names: string | undefined,
-  config: ReportConfig,
-): string[] {
+export function resolveMetricIds(names: string | undefined, config: ReportConfig): string[] {
   if (!names?.trim()) return [];
   const available = flattenConfig(config.metrics);
   return names
@@ -93,10 +90,7 @@ export function resolveMetricIds(
     .filter((id) => available.has(id));
 }
 
-export function resolveGroupIds(
-  names: string | undefined,
-  config: ReportConfig,
-): string[] {
+export function resolveGroupIds(names: string | undefined, config: ReportConfig): string[] {
   if (!names?.trim()) return [];
   const available = flattenConfig(config.groups);
   return names

@@ -174,7 +174,9 @@ export class OptionsRegistry {
       .map((code) => {
         const id = map.get(code);
         if (id === undefined) {
-          throw new Error(`Unknown country code: ${code}. Use ISO 3166-1 alpha-2 codes (e.g. US, DE, BR).`);
+          throw new Error(
+            `Unknown country code: ${code}. Use ISO 3166-1 alpha-2 codes (e.g. US, DE, BR).`,
+          );
         }
         return id;
       });
@@ -222,9 +224,7 @@ export class OptionsRegistry {
             hints.push(`${numId}=${label}`);
             if (hints.length >= 15) break;
           }
-          throw new Error(
-            `Unknown ${kind}: "${name}". Available (first 15): ${hints.join(", ")}`,
-          );
+          throw new Error(`Unknown ${kind}: "${name}". Available (first 15): ${hints.join(", ")}`);
         }
         return id;
       });
@@ -283,16 +283,53 @@ function buildLabelMap(items: DictItem[]): Map<string, number> {
  * in buildLanguageMap takes precedence and this map serves only as extra aliases.
  */
 const ENGLISH_LANGUAGE_NAMES: Record<string, string> = {
-  EN: "english", RU: "russian", DE: "german", FR: "french", ES: "spanish",
-  PT: "portuguese", IT: "italian", PL: "polish", NL: "dutch", TR: "turkish",
-  AR: "arabic", JA: "japanese", KO: "korean", ZH: "chinese", VI: "vietnamese",
-  TH: "thai", ID: "indonesian", HI: "hindi", BN: "bengali", UK: "ukrainian",
-  RO: "romanian", CS: "czech", EL: "greek", HU: "hungarian", SV: "swedish",
-  DA: "danish", FI: "finnish", NO: "norwegian", SK: "slovak", BG: "bulgarian",
-  HR: "croatian", SR: "serbian", SL: "slovenian", LT: "lithuanian", LV: "latvian",
-  ET: "estonian", HE: "hebrew", FA: "persian", MS: "malay", TL: "filipino",
-  SW: "swahili", AZ: "azerbaijani", KA: "georgian", HY: "armenian", BE: "belarusian",
-  KK: "kazakh", UZ: "uzbek",
+  EN: "english",
+  RU: "russian",
+  DE: "german",
+  FR: "french",
+  ES: "spanish",
+  PT: "portuguese",
+  IT: "italian",
+  PL: "polish",
+  NL: "dutch",
+  TR: "turkish",
+  AR: "arabic",
+  JA: "japanese",
+  KO: "korean",
+  ZH: "chinese",
+  VI: "vietnamese",
+  TH: "thai",
+  ID: "indonesian",
+  HI: "hindi",
+  BN: "bengali",
+  UK: "ukrainian",
+  RO: "romanian",
+  CS: "czech",
+  EL: "greek",
+  HU: "hungarian",
+  SV: "swedish",
+  DA: "danish",
+  FI: "finnish",
+  NO: "norwegian",
+  SK: "slovak",
+  BG: "bulgarian",
+  HR: "croatian",
+  SR: "serbian",
+  SL: "slovenian",
+  LT: "lithuanian",
+  LV: "latvian",
+  ET: "estonian",
+  HE: "hebrew",
+  FA: "persian",
+  MS: "malay",
+  TL: "filipino",
+  SW: "swahili",
+  AZ: "azerbaijani",
+  KA: "georgian",
+  HY: "armenian",
+  BE: "belarusian",
+  KK: "kazakh",
+  UZ: "uzbek",
 };
 
 function buildLanguageMap(items: LanguageItem[]): Map<string, number> {

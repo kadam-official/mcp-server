@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPartnersClient,
+} from "../../helpers/tool-client.js";
 import { financesModule } from "../../../src/tools/advertiser/finances.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -21,8 +25,22 @@ describe("finances tools", () => {
     const api = mockApi as MockPartnersClient;
     api.listFinanceOperations.mockResolvedValue({
       rows: [
-        { date: "2025-01-15", money: "100.00", type: "deposit", extType: "bank", comment: "Top up", status: 1 },
-        { date: "2025-01-16", money: "-50.00", type: "charge", extType: "campaign", comment: "", status: 1 },
+        {
+          date: "2025-01-15",
+          money: "100.00",
+          type: "deposit",
+          extType: "bank",
+          comment: "Top up",
+          status: 1,
+        },
+        {
+          date: "2025-01-16",
+          money: "-50.00",
+          type: "charge",
+          extType: "campaign",
+          comment: "",
+          status: 1,
+        },
       ],
       totalRows: 2,
       page: 1,

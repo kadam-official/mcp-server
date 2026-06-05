@@ -1,83 +1,179 @@
+# GitLab CI for @kadam-net/mcp-server.
+#
+# GitLab is the source of truth; GitHub (kadam-official/mcp-server) is a
+# downstream push-mirror. npm publishing lives on GitHub Actions
+# (.github/workflows/release.yml) because npm provenance/OIDC is only available
+# from GitHub Actions / GitLab.com SaaS / CircleCI — self-hosted GitLab is not
+# in npm's OIDC trust list. This pipeline owns all quality/security/build gates.
+#
+# Stages: setup -> quality -> arch_gates -> security -> test -> build -> publish
+
+default:
+  image: node:22-alpine
+  before_script:
+    - command -v apk >/dev/null 2>&1 && apk add --no-cache git || true
+
 stages:
-  - validate
+  - setup
+  - quality
+  - arch_gates
+  - security
   - test
   - build
   - publish
 
+# Single pipeline per commit: suppress the detached merge_request_event pipeline
+# (every job targets $CI_COMMIT_BRANCH, so the MR-event pipeline runs zero jobs
+# and pollutes the MR head-pipeline badge).
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 variables:
-  NODE_IMAGE: node:22-alpine
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
 
-lint:
-  stage: validate
-  image: $NODE_IMAGE
+# ─────────────────────────── setup ───────────────────────────
+setup:
+  stage: setup
   script:
-    - npm ci
-    - npm run lint
-    - npm run typecheck
+    # --ignore-scripts: the "prepare" hook runs `npm run build`; we build
+    # explicitly in the build stage instead.
+    - npm ci --ignore-scripts
   cache:
-    key: $CI_COMMIT_REF_SLUG
+    key:
+      files:
+        - package-lock.json
     paths:
-      - node_modules/
-
-test:
-  stage: test
-  image: $NODE_IMAGE
-  script:
-    - npm ci
-    - npm run test:coverage
+      - .npm-cache/
+    policy: pull-push
   artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage/cobertura-coverage.xml
-  cache:
-    key: $CI_COMMIT_REF_SLUG
+    expire_in: 1 hour
     paths:
       - node_modules/
 
+# ─────────────────────────── quality ─────────────────────────
+lint:
+  stage: quality
+  needs: [setup]
+  script: npm run lint
+
+format-check:
+  stage: quality
+  needs: [setup]
+  script: npm run format:check
+
+typecheck:
+  stage: quality
+  needs: [setup]
+  script: npm run typecheck
+
+# ───────────────────────── arch_gates ────────────────────────
+check:file-sizes:
+  stage: arch_gates
+  needs: [setup]
+  script: npm run check:file-sizes
+
+check:tool-naming:
+  stage: arch_gates
+  needs: [setup]
+  script: npm run check:tool-naming
+
+check:imports:
+  stage: arch_gates
+  needs: [setup]
+  script: npm run check:imports
+
+# ───────────────────────── security ──────────────────────────
+audit:deps:
+  stage: security
+  needs: [setup]
+  script: npm run audit:deps
+
+audit:licenses:
+  stage: security
+  needs: [setup]
+  script: npm run audit:licenses
+
+# ─────────────────────────── test ────────────────────────────
+test:unit:
+  stage: test
+  needs: [setup, lint, typecheck]
+  script: npm run test:unit -- --coverage
+
+test:integration:
+  stage: test
+  needs: [setup, test:unit]
+  script: npm run test:integration
+
+# Multi-tenant isolation suite — NON-NEGOTIABLE merge gate.
+test:isolation:
+  stage: test
+  needs: [setup, test:unit]
+  script: npm run test:isolation
+
+# ─────────────────────────── build ───────────────────────────
 build:
   stage: build
-  image: $NODE_IMAGE
+  needs:
+    - setup
+    - lint
+    - format-check
+    - typecheck
+    - check:file-sizes
+    - check:tool-naming
+    - check:imports
+    - audit:deps
+    - audit:licenses
+    - test:unit
+    - test:integration
+    - test:isolation
   script:
-    - npm ci
     - npm run build
+    - npm run check:bundle-size
   artifacts:
+    expire_in: 7 days
     paths:
       - dist/
-  cache:
-    key: $CI_COMMIT_REF_SLUG
-    paths:
-      - node_modules/
 
+# Exercises the SAME Dockerfile production runs (kaniko, no docker daemon).
+docker:build:
+  stage: build
+  needs: [setup]
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  before_script: []
+  script:
+    - /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/Dockerfile" --no-push --destination "kadam-mcp:ci" --tar-path image.tar
+    - mkdir -p image-extracted && tar -xf image.tar -C image-extracted
+    - find image-extracted -type f -exec sh -c 'tar -tf "$1" 2>/dev/null || true' _ {} \; | sort -u > files.txt
+    - 'echo "files.txt has $(wc -l < files.txt) entries"'
+    - 'grep -q "^app/dist/index.js$" files.txt || { echo "MISSING IN IMAGE: app/dist/index.js"; head -50 files.txt; exit 1; }'
+    - echo "image contains dist/index.js"
+
+# ────────────────────────── publish ──────────────────────────
+
+# DISABLED — npm publish moved to GitHub Actions (.github/workflows/release.yml)
+# for OIDC provenance. Self-hosted GitLab is not in npm's OIDC trust list, so a
+# --provenance publish from here would ship unsigned or fail. Stub kept for
+# traceability; releases tag in GitLab, mirror propagates the tag to GitHub, and
+# GitHub release.yml publishes npm + .mcpb.
 publish-npm:
   stage: publish
-  image: $NODE_IMAGE
-  only:
-    - tags
+  rules:
+    - when: never
   script:
-    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-    - npm publish --access public
-  when: manual
+    - echo "Publishing moved to GitHub Actions (.github/workflows/release.yml)."
 
-publish-docker:
-  stage: publish
-  image: docker:latest
-  services:
-    - docker:dind
-  only:
-    - tags
-  script:
-    - docker build -t kadam/mcp-server:$CI_COMMIT_TAG -t kadam/mcp-server:latest .
-    - docker login -u $DOCKER_USER -p $DOCKER_PASS
-    - docker push kadam/mcp-server:$CI_COMMIT_TAG
-    - docker push kadam/mcp-server:latest
-  when: manual
-
-# Publishes the image consumed by the K8s deployment (arranger KadamMcp -> ECR kadam-mcp:main).
-# Requires CI variables: AWS_REGION, AWS_ECR_REGISTRY (e.g. <acct>.dkr.ecr.<region>.amazonaws.com)
-# plus runner AWS credentials (IAM role or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY).
+# Server image for the K8s deployment (arranger pulls kadam-mcp from ECR).
+# Manual; requires CI vars AWS_REGION, AWS_ECR_REGISTRY + runner AWS creds.
 publish-ecr:
   stage: publish
+  needs: [build]
   image: docker:latest
   services:
     - docker:dind

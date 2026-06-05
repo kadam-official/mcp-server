@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPartnersClient,
+} from "../../helpers/tool-client.js";
 import { statsModule } from "../../../src/tools/advertiser/stats.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -48,7 +52,9 @@ describe("advertiser stats tools", () => {
     });
     api.getReportData.mockResolvedValue({
       rows: [{ time_day: "2025-03-01", finance_moneyOut: 100 }],
-      totalRows: 1, page: 1, perPage: 25,
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     await client.callTool({
@@ -69,19 +75,25 @@ describe("advertiser stats tools", () => {
     });
     api.getReportData.mockResolvedValue({
       rows: [{ time_day: "2025-03-01", finance_moneyOut: 100 }],
-      totalRows: 1, page: 1, perPage: 25,
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     await client.callTool({
       name: "kadam_adv_get_stats",
       arguments: {
-        reportType: "custom", period: "7days",
-        countries: "US, DE", creativeIds: "101,202",
+        reportType: "custom",
+        period: "7days",
+        countries: "US, DE",
+        creativeIds: "101,202",
       },
     });
 
     const params = api.getReportData.mock.calls[0][0] as Record<string, unknown>;
-    const filters = (params.filters as Record<string, unknown>).filters as Array<Record<string, unknown>>;
+    const filters = (params.filters as Record<string, unknown>).filters as Array<
+      Record<string, unknown>
+    >;
     expect(filters).toContainEqual({ id: "traffic_region", type: "list", include: ["US", "DE"] });
     expect(filters).toContainEqual({ id: "advertiser_ad", type: "list", include: [101, 202] });
   });
@@ -111,12 +123,20 @@ describe("advertiser stats tools", () => {
     const api = mockApi as MockPartnersClient;
     api.getSiteStats.mockResolvedValue({
       rows: [{ siteName: "example.com", spend: 5 }],
-      totalRows: 1, page: 1, perPage: 25,
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     await client.callTool({
       name: "kadam_adv_get_stats",
-      arguments: { reportType: "sites", period: "7days", sortBy: "spend", sortOrder: "desc", campaignIds: "863067" },
+      arguments: {
+        reportType: "sites",
+        period: "7days",
+        sortBy: "spend",
+        sortOrder: "desc",
+        campaignIds: "863067",
+      },
     });
 
     const params = api.getSiteStats.mock.calls[0][0] as Record<string, unknown>;
@@ -131,7 +151,14 @@ describe("advertiser stats tools", () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
     api.getConversionDetails.mockResolvedValue({
-      rows: [{ conversionType: "Approve", campaign: "Test (123)", adId: 100, conversionTime: "01.03.2026 12:00:00" }],
+      rows: [
+        {
+          conversionType: "Approve",
+          campaign: "Test (123)",
+          adId: 100,
+          conversionTime: "01.03.2026 12:00:00",
+        },
+      ],
       totalRows: 1,
       page: 1,
       perPage: 25,
@@ -151,8 +178,12 @@ describe("advertiser stats tools", () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
     api.getConversionDetails.mockResolvedValue({
-      rows: [{ conversionType: "Approve", campaign: "Test", adId: 1, conversionTime: "01.03.2026" }],
-      totalRows: 1, page: 1, perPage: 25,
+      rows: [
+        { conversionType: "Approve", campaign: "Test", adId: 1, conversionTime: "01.03.2026" },
+      ],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
     });
 
     await client.callTool({

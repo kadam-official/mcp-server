@@ -1,5 +1,9 @@
 import type { HttpClient } from "./http-client.js";
-import { listResponseSchema, reportConfigSchema, reportDataResponseSchema } from "./schemas/common.js";
+import {
+  listResponseSchema,
+  reportConfigSchema,
+  reportDataResponseSchema,
+} from "./schemas/common.js";
 import type { ListResponse, ReportConfig, ReportDataResponse } from "./schemas/common.js";
 import {
   campaignRowSchema,
@@ -166,12 +170,16 @@ export class PartnersClient {
     return reportDataResponseSchema.parse(raw);
   }
 
-  async getSiteStats(params: Record<string, unknown>): Promise<ListResponse<Record<string, unknown>>> {
+  async getSiteStats(
+    params: Record<string, unknown>,
+  ): Promise<ListResponse<Record<string, unknown>>> {
     const raw = await this.http.post("/stats/sites", params);
     return listResponseSchema(z.record(z.unknown())).parse(raw);
   }
 
-  async getConversionDetails(params: Record<string, unknown>): Promise<ListResponse<Record<string, unknown>>> {
+  async getConversionDetails(
+    params: Record<string, unknown>,
+  ): Promise<ListResponse<Record<string, unknown>>> {
     const raw = await this.http.post("/stats/conversions", params);
     return listResponseSchema(z.record(z.unknown())).parse(raw);
   }

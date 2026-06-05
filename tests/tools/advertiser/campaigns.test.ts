@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPartnersClient,
+} from "../../helpers/tool-client.js";
 import { campaignsModule } from "../../../src/tools/advertiser/campaigns.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -44,7 +48,10 @@ describe("campaigns tools", () => {
       perPage: 25,
     });
 
-    const result = await client.callTool({ name: "kadam_adv_list_campaigns", arguments: { page: 1 } });
+    const result = await client.callTool({
+      name: "kadam_adv_list_campaigns",
+      arguments: { page: 1 },
+    });
     const text = getTextFromResult(result);
 
     expect(text).toContain("[ID: 1]");
@@ -214,7 +221,14 @@ describe("campaigns tools", () => {
       dayMoneyLimit: 50,
       bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
       categories: ["mainstream"],
-      postConversion: { audiences: [100], countFirstConversionOnly: true, countLastCampaignOnly: true, postClickAttrPriority: true, windowLengthPostView: null, windowLengthPostClick: null },
+      postConversion: {
+        audiences: [100],
+        countFirstConversionOnly: true,
+        countLastCampaignOnly: true,
+        postClickAttrPriority: true,
+        windowLengthPostView: null,
+        windowLengthPostClick: null,
+      },
       status: 10,
     });
     api.updateCampaign.mockResolvedValue({} as never);
@@ -254,7 +268,10 @@ describe("campaigns tools", () => {
       perPage: 25,
     });
 
-    const result = await client.callTool({ name: "kadam_adv_list_campaigns", arguments: { page: 1 } });
+    const result = await client.callTool({
+      name: "kadam_adv_list_campaigns",
+      arguments: { page: 1 },
+    });
     const text = getTextFromResult(result);
 
     expect(text).toContain("Campaigns");
@@ -265,7 +282,9 @@ describe("campaigns tools", () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
     api.getCampaign.mockResolvedValue({
-      id: 50, cpType: 0, bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      id: 50,
+      cpType: 0,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
     });
     api.updateCampaignBid.mockResolvedValue({} as never);
 
@@ -286,17 +305,19 @@ describe("campaigns tools", () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
     api.getCampaign.mockResolvedValue({
-      id: 55, cpType: 0, bids: [{ bid: 0.03, leadCost: 0, countries: [34, 24] }],
+      id: 55,
+      cpType: 0,
+      bids: [{ bid: 0.03, leadCost: 0, countries: [34, 24] }],
     });
     api.updateCampaignBid.mockResolvedValue({} as never);
 
     await client.callTool({
       name: "kadam_adv_update_campaign_bid",
-      arguments: { id: 55, bid: 0.10 },
+      arguments: { id: 55, bid: 0.1 },
     });
 
     expect(api.updateCampaignBid).toHaveBeenCalledWith(55, [
-      { bid: 0.10, leadCost: 0, countries: [34, 24] },
+      { bid: 0.1, leadCost: 0, countries: [34, 24] },
     ]);
   });
 
@@ -304,7 +325,9 @@ describe("campaigns tools", () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
     api.getCampaign.mockResolvedValue({
-      id: 60, cpType: 4, bids: [{ leadCost: 5, countries: [40] }],
+      id: 60,
+      cpType: 4,
+      bids: [{ leadCost: 5, countries: [40] }],
     });
     api.updateCampaignBid.mockResolvedValue({} as never);
 
@@ -313,9 +336,7 @@ describe("campaigns tools", () => {
       arguments: { id: 60, bid: 2.5 },
     });
 
-    expect(api.updateCampaignBid).toHaveBeenCalledWith(60, [
-      { leadCost: 2.5, countries: [40] },
-    ]);
+    expect(api.updateCampaignBid).toHaveBeenCalledWith(60, [{ leadCost: 2.5, countries: [40] }]);
   });
 
   it("bulk_update_bids sends CPC bid for multiple campaigns", async () => {
@@ -453,7 +474,12 @@ describe("campaigns tools", () => {
 
     await client.callTool({
       name: "kadam_adv_update_campaign",
-      arguments: { id: 80, conversionTemplateId: 0, conversionApproved: "dep", conversionHold: "reg" },
+      arguments: {
+        id: 80,
+        conversionTemplateId: 0,
+        conversionApproved: "dep",
+        conversionHold: "reg",
+      },
     });
 
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;

@@ -2,10 +2,7 @@ import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import type { FolderRow } from "../../api/schemas/advertiser.js";
-import {
-  formatEntityList,
-  clampPerPage,
-} from "../../output-formatter.js";
+import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 function formatFolderRow(row: FolderRow, index: number): string {
@@ -19,8 +16,7 @@ export const campaignFoldersModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_list_campaign_folders",
-        description:
-          "List advertiser campaign folders with pagination. Optional search by name.",
+        description: "List advertiser campaign folders with pagination. Optional search by name.",
         product: "advertiser",
         annotations: { title: "List campaign folders", readOnlyHint: true },
       },
@@ -39,12 +35,7 @@ export const campaignFoldersModule: ToolModule = {
         const res = await ctx.adv.listCampaignFolders(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
-        return formatEntityList(
-          items,
-          formatFolderRow,
-          "Campaign Folders",
-          pagination,
-        );
+        return formatEntityList(items, formatFolderRow, "Campaign Folders", pagination);
       },
     );
 
@@ -56,7 +47,11 @@ export const campaignFoldersModule: ToolModule = {
         annotations: { title: "Create campaign folder", readOnlyHint: false },
       },
       {
-        name: z.string().min(1).max(50).describe("Folder name (1-50 characters, e.g. 'SA', 'US campaigns')"),
+        name: z
+          .string()
+          .min(1)
+          .max(50)
+          .describe("Folder name (1-50 characters, e.g. 'SA', 'US campaigns')"),
       },
       async (args, ctx) => {
         const result = await ctx.adv.createCampaignFolder(args.name);
@@ -67,8 +62,7 @@ export const campaignFoldersModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_update_campaign_folder",
-        description:
-          "Update campaign folder settings: budgets and distribution.",
+        description: "Update campaign folder settings: budgets and distribution.",
         product: "advertiser",
         annotations: { title: "Update campaign folder", readOnlyHint: false },
       },
@@ -84,9 +78,9 @@ export const campaignFoldersModule: ToolModule = {
         const data: Record<string, unknown> = {};
         if (rest.totalBudget != null) data.groupTotalLimit = rest.totalBudget;
         if (rest.dailyBudget != null) data.groupDailyLimit = rest.dailyBudget;
-        if (rest.evenDistribution != null)
-          data.groupSpendingEvenly = rest.evenDistribution;
-        data.limitsEnabled = rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
+        if (rest.evenDistribution != null) data.groupSpendingEvenly = rest.evenDistribution;
+        data.limitsEnabled =
+          rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
 
         await ctx.adv.updateCampaignFolder(id, data);
         return `Folder #${id} updated successfully.`;

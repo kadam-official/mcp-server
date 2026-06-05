@@ -1,11 +1,7 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import {
-  formatEntityList,
-  clampPerPage,
-  formatNumber,
-} from "../../output-formatter.js";
+import { formatEntityList, clampPerPage, formatNumber } from "../../output-formatter.js";
 import type { AdUnitRow } from "../../api/schemas/publisher.js";
 
 const AD_UNIT_STATUS_ACTION_MAP = {
@@ -45,9 +41,7 @@ export const adUnitsModule: ToolModule = {
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
         timezone: z.number().optional(),
-        adFormat: z
-          .enum(["native", "banner", "push", "popunder", "inpagepush"])
-          .optional(),
+        adFormat: z.enum(["native", "banner", "push", "popunder", "inpagepush"]).optional(),
         sortField: z.string().optional(),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
@@ -76,12 +70,11 @@ export const adUnitsModule: ToolModule = {
         };
         const res = await ctx.pub.listAdUnits(args.sourceId, params);
         const totalPages = perPage > 0 ? Math.ceil(res.totalRows / perPage) : 1;
-        return formatEntityList(
-          res.rows,
-          formatAdUnitRow,
-          "Ad Units",
-          { page: args.page, totalPages, totalRows: res.totalRows },
-        );
+        return formatEntityList(res.rows, formatAdUnitRow, "Ad Units", {
+          page: args.page,
+          totalPages,
+          totalRows: res.totalRows,
+        });
       },
     );
 
