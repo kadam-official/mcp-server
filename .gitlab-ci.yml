@@ -87,6 +87,12 @@ check:imports:
   needs: [setup]
   script: npm run check:imports
 
+# Tenant-isolation gate (no module-level mutable state) — merge blocker.
+check:shared-state:
+  stage: arch_gates
+  needs: [setup]
+  script: npm run check:shared-state
+
 # ───────────────────────── security ──────────────────────────
 audit:deps:
   stage: security
@@ -115,6 +121,18 @@ test:isolation:
   needs: [setup, test:unit]
   script: npm run test:isolation
 
+# Prod smoke — read-only liveness/auth probe against the deployed endpoint.
+# Manual + allow_failure so it appears in the UI without burning CI minutes.
+# Flip to a schedule once a sandbox bearer is provisioned. Requires CI vars
+# (Masked + Protected): KADAM_MCP_PROD_TOKEN, KADAM_MCP_PROD_URL (optional).
+prod:smoke:
+  stage: test
+  needs: [setup]
+  rules:
+    - when: manual
+      allow_failure: true
+  script: npm run prod:smoke
+
 # ─────────────────────────── build ───────────────────────────
 build:
   stage: build
@@ -126,6 +144,7 @@ build:
     - check:file-sizes
     - check:tool-naming
     - check:imports
+    - check:shared-state
     - audit:deps
     - audit:licenses
     - test:unit
@@ -152,8 +171,8 @@ docker:build:
     - mkdir -p image-extracted && tar -xf image.tar -C image-extracted
     - find image-extracted -type f -exec sh -c 'tar -tf "$1" 2>/dev/null || true' _ {} \; | sort -u > files.txt
     - 'echo "files.txt has $(wc -l < files.txt) entries"'
-    - 'grep -q "^app/dist/index.js$" files.txt || { echo "MISSING IN IMAGE: app/dist/index.js"; head -50 files.txt; exit 1; }'
-    - echo "image contains dist/index.js"
+    - 'for f in app/package.json app/dist/index.js; do grep -q "^${f}$" files.txt || { echo "MISSING IN IMAGE: ${f}"; head -50 files.txt; exit 1; }; done'
+    - echo "image contains expected runtime files"
 
 # ────────────────────────── publish ──────────────────────────
 

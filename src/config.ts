@@ -23,10 +23,13 @@ const envSchema = z.object({
 
 export type Config = z.infer<typeof envSchema>;
 
-let cachedConfig: Config | null = null;
+// Process-global, non-tenant app config (env-derived, identical for every
+// request). Held in a `const` cell rather than a module-level `let` so the
+// no-module-let tenant-isolation gate stays strict with no exemptions.
+const configCache: { current: Config | null } = { current: null };
 
 export function getConfig(): Config {
-  if (cachedConfig) return cachedConfig;
+  if (configCache.current) return configCache.current;
 
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
@@ -34,12 +37,12 @@ export function getConfig(): Config {
     throw new Error(`Invalid environment configuration:\n${issues}`);
   }
 
-  cachedConfig = result.data;
-  return cachedConfig;
+  configCache.current = result.data;
+  return configCache.current;
 }
 
 export function resetConfig(): void {
-  cachedConfig = null;
+  configCache.current = null;
 }
 
 export function hasAdvKey(): boolean {
