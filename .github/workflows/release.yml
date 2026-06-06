@@ -1,8 +1,18 @@
 name: Release
 
+# Tag-driven publish. Push `vMAJOR.MINOR.PATCH` (e.g. `v0.4.1`) whose value
+# matches package.json `version`, and this workflow:
+#   1. Verifies npm supports OIDC publish and the tag matches package.json.
+#   2. Runs the full sanity gate (lint / format / typecheck / arch gates /
+#      licenses / tests / build) — never publish a broken tag.
+#   3. `npm publish --provenance` via GitHub OIDC (npm Trusted Publisher) —
+#      mints a SLSA provenance attestation. Self-hosted GitLab is not in npm's
+#      OIDC trust list, which is why publishing lives here, not .gitlab-ci.yml.
+#   4. Builds + uploads the Claude Desktop .mcpb to the GitHub Release.
+
 on:
   push:
-    tags: ["v*"]
+    tags: ["v*.*.*"]
 
 permissions:
   contents: write
@@ -16,16 +26,86 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history so release-note generation can diff against the
+          # previous tag.
+          fetch-depth: 0
+      # Node 24 ships npm >= 11.5.1, the first npm with OIDC Trusted Publisher
+      # support. Node 22 LTS bundles npm 10.x → `npm publish --provenance` signs
+      # the attestation but sends the PUT unauthenticated → HTTP 404.
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - run: npm ci
+
+      - name: Verify npm supports OIDC publish (>= 11.5.1)
+        run: |
+          NPM_VER=$(npm --version)
+          echo "npm version: $NPM_VER"
+          MAJOR=$(echo "$NPM_VER" | cut -d. -f1)
+          if [ "$MAJOR" -lt 11 ]; then
+            echo "ERROR: npm $NPM_VER is too old for OIDC publish (need >= 11.5.1)"
+            exit 1
+          fi
+
+      - run: npm ci --ignore-scripts
+
+      - name: Verify tag matches package.json version
+        # Belt-and-suspenders against "tagged but forgot to bump package.json" —
+        # would otherwise re-publish the previous version under a new tag.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "ERROR: git tag '$GITHUB_REF_NAME' (-> $TAG_VERSION)"
+            echo "       does NOT match package.json version ($PKG_VERSION)."
+            echo "       Bump package.json and re-tag."
+            exit 1
+          fi
+          echo "Tag/version match: $TAG_VERSION"
+
+      # Full sanity gate — mirrors .github/workflows/ci.yml `checks` + `test`.
+      # Never publish a tag that wouldn't pass CI.
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run check:file-sizes
+      - run: npm run check:tool-naming
+      - run: npm run check:imports
+      - run: npm run audit:licenses
+      - run: npm run test
       - run: npm run build
-      # --provenance: mint a sigstore attestation via GitHub OIDC (npm Trusted
-      # Publisher). Self-hosted GitLab is not in npm's OIDC trust list, which is
-      # why npm publishing lives here on GitHub Actions, not in .gitlab-ci.yml.
+      - run: npm run check:bundle-size
+
+      # Diagnostic: print the OIDC claims npm matches against. npm hides auth
+      # failures as HTTP 404 for security obscurity, so if the publish below
+      # 404s, compare these claims against the npm Trusted Publisher config.
+      # Logs only the public JWT payload — the signed token is not printed.
+      - name: Debug OIDC subject claim for npm
+        # Diagnostic only — must never block a release if the OIDC introspection
+        # endpoint or claim parsing hiccups.
+        continue-on-error: true
+        run: |
+          set -e
+          RESPONSE=$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org")
+          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['value'])")
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          PAD=$(( (4 - ${#PAYLOAD} % 4) % 4 ))
+          if [ "$PAD" -gt 0 ]; then PAYLOAD="${PAYLOAD}$(printf '=%.0s' $(seq 1 $PAD))"; fi
+          echo "::group::OIDC claims (audience: npm:registry.npmjs.org)"
+          echo "$PAYLOAD" | base64 -d 2>/dev/null | python3 -c "
+          import json, sys
+          c = json.load(sys.stdin)
+          for k in ('sub','repository','repository_owner','workflow','workflow_ref','job_workflow_ref','ref','event_name','environment'):
+              print(f'  {k} = {c.get(k)!r}')
+          "
+          echo "::endgroup::"
+
+      # --provenance: mint a sigstore/SLSA attestation via GitHub OIDC (npm
+      # Trusted Publisher). Requires id-token:write + npm >= 11.5.1 (verified
+      # above) + publishConfig.provenance:true in package.json.
       - run: npm publish --access public --provenance
 
   publish-mcpb:
@@ -42,6 +122,18 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+
+      - name: Verify tag matches package.json version
+        # Repeated locally: this job depends only on publish-npm's success
+        # conclusion (not its artefacts), so re-check before trusting package.json.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "ERROR: git tag '$GITHUB_REF_NAME' (-> $TAG_VERSION) != package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
       - run: npm run build
       - name: Prepare mcpb bundle
         run: |
