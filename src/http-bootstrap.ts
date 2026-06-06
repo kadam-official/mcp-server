@@ -242,6 +242,10 @@ export async function bootstrapHttp(): Promise<void> {
             return;
           }
           const session = sessions.get(existingSessionId)!;
+          if (!isSessionAuthorized(session, bearer, cabinet)) {
+            sendJson(res, 403, { error: "Token/cabinet mismatch" });
+            return;
+          }
           await session.transport.handleRequest(req, res);
           return;
         }
