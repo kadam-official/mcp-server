@@ -21,6 +21,15 @@ permissions:
 jobs:
   publish-npm:
     runs-on: ubuntu-latest
+    # Single-approver gate: the `npm-publish` GitHub Environment has a required
+    # reviewer, so every tagged release pauses for one-click human approval
+    # before npm publish — guards against an accidental tag push. npm's Trusted
+    # Publisher is configured without an environment constraint, so the extra
+    # OIDC `environment` claim is harmless to the match (the debug step below
+    # prints the claims if a mismatch ever surfaces).
+    environment:
+      name: npm-publish
+      url: https://www.npmjs.com/package/@kadam-net/mcp-server
     permissions:
       id-token: write
       contents: read
@@ -73,6 +82,7 @@ jobs:
       - run: npm run check:file-sizes
       - run: npm run check:tool-naming
       - run: npm run check:imports
+      - run: npm run check:shared-state
       - run: npm run audit:licenses
       - run: npm run test
       - run: npm run build
@@ -211,10 +221,20 @@ jobs:
       - name: Write .mcpbignore
         run: echo -e "package-lock.json\nREADME.md\nLICENSE" > mcpb-bundle/.mcpbignore
       - name: Pack mcpb
+        # Pin the mcpb CLI — an unpinned @latest could ship a breaking pack
+        # change that fails the release. Bump deliberately after local verify.
         run: |
           cd mcpb-bundle
-          npx -y @anthropic-ai/mcpb pack .
+          npx -y @anthropic-ai/mcpb@2.1.2 pack .
           mv *.mcpb kadam-mcp-server.mcpb
+      - name: Verify .mcpb size (< 15 MB)
+        # Ceiling well under GitHub's 25 MB release-asset limit; current ~3.3 MB.
+        # A jump means accidental dep bloat in the bundle.
+        run: |
+          SIZE=$(stat -c%s mcpb-bundle/kadam-mcp-server.mcpb)
+          MB=$((SIZE / 1024 / 1024))
+          echo "mcpb size: ${MB} MB (${SIZE} bytes)"
+          if [ "$MB" -gt 15 ]; then echo "ERROR: .mcpb exceeds 15 MB"; exit 1; fi
       - name: Smoke test
         run: |
           mkdir -p /tmp/mcpb-test && cd /tmp/mcpb-test

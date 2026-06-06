@@ -1,0 +1,43 @@
+# Pre-commit hooks for @kadam-net/mcp-server.
+#
+# Installed via the `prepare` script (`lefthook install`). Hooks run on staged
+# files only — fast feedback. CI re-runs the full suite, so these are a
+# productivity aid, not a replacement for the CI gates.
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.{ts,mts,js,mjs,json,jsonc,md,yml,yaml}"
+      run: npx prettier --write {staged_files}
+      stage_fixed: true
+    lint:
+      glob: "*.{ts,mts}"
+      run: npx eslint --no-warn-ignored --fix {staged_files}
+      stage_fixed: true
+    no-secrets-quick:
+      glob: "*"
+      run: |
+        for f in {staged_files}; do
+          case "$f" in
+            *.env.example|.env.example)
+              continue
+              ;;
+            *.env|*.env.*|*id_rsa*|*.pem|*.key|*.p12|*.pfx|.npmrc)
+              echo "Refusing to commit potential secret: $f"
+              exit 1
+              ;;
+          esac
+        done
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no-install commitlint --edit {1}
+
+pre-push:
+  commands:
+    typecheck:
+      run: npx tsc --noEmit
+    test-unit:
+      run: npx vitest run --exclude '**/integration/**' --exclude '**/isolation/**' --reporter=dot
