@@ -21,15 +21,6 @@ permissions:
 jobs:
   publish-npm:
     runs-on: ubuntu-latest
-    # Optional single-approver gate. The `npm-publish` GitHub Environment has no
-    # protection rules by default (publishes immediately). Add required
-    # reviewers in repo Settings → Environments → npm-publish to turn it into a
-    # human approval gate against accidental tag pushes. npm's Trusted Publisher
-    # is configured without an environment constraint, so the extra OIDC claim
-    # is harmless to the match.
-    environment:
-      name: npm-publish
-      url: https://www.npmjs.com/package/@kadam-net/mcp-server
     permissions:
       id-token: write
       contents: read
@@ -92,6 +83,9 @@ jobs:
       # 404s, compare these claims against the npm Trusted Publisher config.
       # Logs only the public JWT payload — the signed token is not printed.
       - name: Debug OIDC subject claim for npm
+        # Diagnostic only — must never block a release if the OIDC introspection
+        # endpoint or claim parsing hiccups.
+        continue-on-error: true
         run: |
           set -e
           RESPONSE=$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
