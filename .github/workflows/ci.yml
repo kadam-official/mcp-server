@@ -1,5 +1,10 @@
 name: CI
 
+# Public CI for community PRs + push to main. Mirrors the static + unit-level
+# gates of the private GitLab pipeline (.gitlab-ci.yml). Deeper gates
+# (docker:build via kaniko, ECR publish) live in GitLab. GitLab is the source
+# of truth; main is mirrored here, so this runs on the mirrored push to main.
+
 on:
   push:
     branches: [main]
@@ -7,7 +12,7 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-typecheck:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,9 +20,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # --ignore-scripts: skip the `prepare` build hook; gates don't need dist.
+      - run: npm ci --ignore-scripts
       - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
+      - run: npm run check:file-sizes
+      - run: npm run check:tool-naming
+      - run: npm run check:imports
+      - run: npm run audit:licenses
 
   test:
     runs-on: ubuntu-latest
@@ -27,7 +38,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:coverage
 
   build:
@@ -38,8 +49,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
+      - run: npm run check:bundle-size
       - uses: actions/upload-artifact@v4
         with:
           name: dist

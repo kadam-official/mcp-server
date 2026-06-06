@@ -32,10 +32,7 @@ async function createTestSetup() {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
   const client = new Client({ name: "test-client", version: "0.0.1" });
-  await Promise.all([
-    client.connect(clientTransport),
-    server.connect(serverTransport),
-  ]);
+  await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
 
   return { server, wrapper, client };
 }
@@ -253,7 +250,9 @@ describe("ToolWrapper", () => {
     });
     expect(result.isError).toBe(true);
     const textContent = result.content![0] as { text: string };
-    expect(textContent.text).toBe("API key is invalid or expired. Check your API key configuration.");
+    expect(textContent.text).toBe(
+      "API key is invalid or expired. Check your API key configuration.",
+    );
   });
 
   it("handler that throws ApiError(500) returns generic API error", async () => {

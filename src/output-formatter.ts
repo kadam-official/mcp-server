@@ -44,8 +44,7 @@ export function formatTable(data: TableData, title?: string): string {
     Math.max(...allRows.map((row) => (row[colIdx] ?? "").length)),
   );
 
-  const formatRow = (row: string[]) =>
-    row.map((cell, i) => cell.padEnd(colWidths[i]!)).join(" | ");
+  const formatRow = (row: string[]) => row.map((cell, i) => cell.padEnd(colWidths[i]!)).join(" | ");
 
   const separator = colWidths.map((w) => "-".repeat(w)).join("-+-");
 
@@ -122,8 +121,7 @@ function truncateOutput(text: string): string {
   const clean = lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated;
 
   return (
-    clean +
-    "\n\n[Response truncated at 50KB. Narrow your query with filters or reduce perPage.]"
+    clean + "\n\n[Response truncated at 50KB. Narrow your query with filters or reduce perPage.]"
   );
 }
 

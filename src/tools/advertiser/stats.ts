@@ -8,9 +8,13 @@ import {
   clampPerPage,
 } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
-import { resolveMetricIds, resolveGroupIds, resolveAlias, METRIC_ALIASES } from "../../utils/dimension-mapper.js";
+import {
+  resolveMetricIds,
+  resolveGroupIds,
+  resolveAlias,
+  METRIC_ALIASES,
+} from "../../utils/dimension-mapper.js";
 import { resolvePeriodToDates } from "../../utils/date-helpers.js";
-
 
 export const statsModule: ToolModule = {
   product: "advertiser",
@@ -24,10 +28,7 @@ export const statsModule: ToolModule = {
         annotations: { title: "Get advertiser statistics", readOnlyHint: true },
       },
       {
-        reportType: z
-          .enum(["custom", "sites", "conversions"])
-          .optional()
-          .default("custom"),
+        reportType: z.enum(["custom", "sites", "conversions"]).optional().default("custom"),
         period: z
           .enum(["today", "yesterday", "7days", "week", "month"])
           .optional()
@@ -43,15 +44,24 @@ export const statsModule: ToolModule = {
         campaignIds: z.string().optional(),
         countries: z.string().optional(),
         creativeIds: z.string().optional(),
-        view: z
-          .enum(["all", "blacklist", "bids"])
-          .optional()
-          .default("all"),
+        view: z.enum(["all", "blacklist", "bids"]).optional().default("all"),
         searchQuery: z.string().optional(),
-        conversionTypes: z.string().optional().describe("Comma-separated conversion type IDs (for reportType=conversions)"),
-        folderIds: z.string().optional().describe("Comma-separated folder IDs (for reportType=conversions)"),
-        audienceIds: z.string().optional().describe("Comma-separated audience IDs (for reportType=conversions)"),
-        timezone: z.number().optional().describe("Timezone offset in hours (for reportType=conversions)"),
+        conversionTypes: z
+          .string()
+          .optional()
+          .describe("Comma-separated conversion type IDs (for reportType=conversions)"),
+        folderIds: z
+          .string()
+          .optional()
+          .describe("Comma-separated folder IDs (for reportType=conversions)"),
+        audienceIds: z
+          .string()
+          .optional()
+          .describe("Comma-separated audience IDs (for reportType=conversions)"),
+        timezone: z
+          .number()
+          .optional()
+          .describe("Timezone offset in hours (for reportType=conversions)"),
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
@@ -71,17 +81,29 @@ export const statsModule: ToolModule = {
 
           const customFilters: unknown[] = [];
           if (args.campaignIds != null) {
-            customFilters.push({ id: "advertiser_campaign", type: "list", include: args.campaignIds.split(",").map(Number) });
+            customFilters.push({
+              id: "advertiser_campaign",
+              type: "list",
+              include: args.campaignIds.split(",").map(Number),
+            });
           }
           if (args.countries != null) {
-            customFilters.push({ id: "traffic_region", type: "list", include: args.countries.split(",").map(s => s.trim()) });
+            customFilters.push({
+              id: "traffic_region",
+              type: "list",
+              include: args.countries.split(",").map((s) => s.trim()),
+            });
           }
           if (args.creativeIds != null) {
-            customFilters.push({ id: "advertiser_ad", type: "list", include: args.creativeIds.split(",").map(Number) });
+            customFilters.push({
+              id: "advertiser_ad",
+              type: "list",
+              include: args.creativeIds.split(",").map(Number),
+            });
           }
 
-          const resolvedSort = args.sortBy != null
-            ? resolveAlias(args.sortBy, METRIC_ALIASES) : undefined;
+          const resolvedSort =
+            args.sortBy != null ? resolveAlias(args.sortBy, METRIC_ALIASES) : undefined;
 
           const params: Record<string, unknown> = {
             groups: groupIds.length > 0 ? groupIds : ["time_day"],
@@ -105,9 +127,7 @@ export const statsModule: ToolModule = {
             for (const k of Object.keys(row)) if (k !== "id") allKeys.add(k);
           }
           const headers = [...allKeys];
-          const tableRows = rows.map((row) =>
-            headers.map((h) => extractCellValue(row[h])),
-          );
+          const tableRows = rows.map((row) => headers.map((h) => extractCellValue(row[h])));
           const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
           const title = `Stats (${df} to ${dt}, page ${res.page ?? 1}/${totalPages})`;
           return formatTable({ headers, rows: tableRows }, title);
@@ -133,10 +153,7 @@ export const statsModule: ToolModule = {
           };
           const res = await ctx.adv.getSiteStats(params);
           const pagination = extractPagination(res);
-          const formatSiteRow = (
-            s: Record<string, unknown>,
-            i: number,
-          ): string => {
+          const formatSiteRow = (s: Record<string, unknown>, i: number): string => {
             const parts = Object.entries(s)
               .filter(([k]) => k !== "checkbox" && k !== "isInBlackList" && k !== "hasBid")
               .map(([k, v]) => `${k}: ${v}`)
@@ -156,9 +173,11 @@ export const statsModule: ToolModule = {
             dateFrom: df,
             dateTo: dt,
           };
-          if (args.campaignIds != null) filters.campaignIds = args.campaignIds.split(",").map(Number);
+          if (args.campaignIds != null)
+            filters.campaignIds = args.campaignIds.split(",").map(Number);
           if (args.creativeIds != null) filters.adsIds = args.creativeIds.split(",").map(Number);
-          if (args.conversionTypes != null) filters.conversionTypes = args.conversionTypes.split(",").map(Number);
+          if (args.conversionTypes != null)
+            filters.conversionTypes = args.conversionTypes.split(",").map(Number);
           if (args.folderIds != null) filters.folderIds = args.folderIds.split(",").map(Number);
           if (args.audienceIds != null) filters.audIds = args.audienceIds.split(",").map(Number);
           if (args.timezone != null) filters.timezone = args.timezone;
@@ -167,7 +186,9 @@ export const statsModule: ToolModule = {
             page: args.page,
             perPage,
             filters,
-            ...(args.sortBy != null && { sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" } }),
+            ...(args.sortBy != null && {
+              sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" },
+            }),
           };
           const res = await ctx.adv.getConversionDetails(params);
           const rows = res.rows ?? [];
@@ -179,9 +200,7 @@ export const statsModule: ToolModule = {
             for (const k of Object.keys(row)) allKeys.add(k);
           }
           const headers = [...allKeys];
-          const tableRows = rows.map((row) =>
-            headers.map((h) => String(row[h] ?? "")),
-          );
+          const tableRows = rows.map((row) => headers.map((h) => String(row[h] ?? "")));
           const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
           const title = `Conversion Details (${df} to ${dt}, page ${res.page ?? 1}/${totalPages})`;
           return formatTable({ headers, rows: tableRows }, title);

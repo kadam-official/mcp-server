@@ -51,7 +51,9 @@ async function generateContent(registry: OptionsRegistry | null): Promise<string
           lines.push("  Categories:");
           lines.push(...formatCategoryTree(opts.categories, "    "));
         }
-      } catch { /* options unavailable — skip dynamic info */ }
+      } catch {
+        /* options unavailable — skip dynamic info */
+      }
     }
 
     const creatives = CREATIVE_INFO[key];
@@ -61,7 +63,10 @@ async function generateContent(registry: OptionsRegistry | null): Promise<string
   return lines.join("\n");
 }
 
-export function registerCampaignTypesResource(server: McpServer, registry: OptionsRegistry | null): void {
+export function registerCampaignTypesResource(
+  server: McpServer,
+  registry: OptionsRegistry | null,
+): void {
   server.resource("campaign-types", "kadam://reference/campaign-types", async () => ({
     contents: [
       {

@@ -1,10 +1,7 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import {
-  formatEntityList,
-  clampPerPage,
-} from "../../output-formatter.js";
+import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
@@ -52,9 +49,10 @@ async function mapField(
       const rawPm = fields.pricingModel;
       const cpType = typeof rawPm === "string" ? (PRICING_MODEL_MAP[rawPm] ?? rawPm) : rawPm;
       const countriesArg = fields.countries;
-      const geoIds = typeof countriesArg === "string" && countriesArg
-        ? await registry.resolveCountryIds(countriesArg)
-        : [];
+      const geoIds =
+        typeof countriesArg === "string" && countriesArg
+          ? await registry.resolveCountryIds(countriesArg)
+          : [];
       if (cpType === 4) {
         mapped.bids = [{ leadCost: bidVal, countries: geoIds }];
       } else {
@@ -69,13 +67,15 @@ async function mapField(
       if (typeof value === "string") mapped.devices = await registry.resolveIds("device", value);
       break;
     case "os":
-      if (typeof value === "string") mapped.platformVersions = await registry.resolveIds("platform", value);
+      if (typeof value === "string")
+        mapped.platformVersions = await registry.resolveIds("platform", value);
       break;
     case "browsers":
       if (typeof value === "string") mapped.browsers = await registry.resolveIds("browser", value);
       break;
     case "languages":
-      if (typeof value === "string") mapped.languages = await registry.resolveIds("language", value);
+      if (typeof value === "string")
+        mapped.languages = await registry.resolveIds("language", value);
       break;
     case "frequencyCapViews":
     case "frequencyCapDays":
@@ -202,13 +202,19 @@ function buildPostConversion(fields: Record<string, unknown>): Record<string, un
   const clickPriority = fields.postClickAttrPriority as boolean | undefined;
   const audienceIdsStr = fields.postConversionAudienceIds as string | undefined;
 
-  if (pvWindow == null && pcWindow == null && firstOnly == null &&
-      lastCampaign == null && clickPriority == null && audienceIdsStr == null) {
+  if (
+    pvWindow == null &&
+    pcWindow == null &&
+    firstOnly == null &&
+    lastCampaign == null &&
+    clickPriority == null &&
+    audienceIdsStr == null
+  ) {
     return undefined;
   }
 
   const audiences = audienceIdsStr
-    ? audienceIdsStr.split(",").map(s => parseInt(s.trim(), 10))
+    ? audienceIdsStr.split(",").map((s) => parseInt(s.trim(), 10))
     : [];
 
   return {
@@ -221,8 +227,14 @@ function buildPostConversion(fields: Record<string, unknown>): Record<string, un
   };
 }
 
-function parseSchedule(schedule: string): { mode: number; list: Array<{ day: number; hours: number[] }> } {
-  const hours = schedule.split(",").map(s => parseInt(s.trim(), 10)).filter(h => h >= 0 && h <= 23);
+function parseSchedule(schedule: string): {
+  mode: number;
+  list: Array<{ day: number; hours: number[] }>;
+} {
+  const hours = schedule
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((h) => h >= 0 && h <= 23);
   return {
     mode: 1,
     list: Array.from({ length: 7 }, (_, i) => ({ day: i + 1, hours })),
@@ -234,8 +246,14 @@ function buildAudiences(fields: Record<string, unknown>): Record<string, unknown
   const excludeIds = fields.audienceExcludeIds;
   return {
     mode: 20,
-    include: typeof includeIds === "string" ? includeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
-    exclude: typeof excludeIds === "string" ? excludeIds.split(",").map(s => parseInt(s.trim(), 10)) : [],
+    include:
+      typeof includeIds === "string"
+        ? includeIds.split(",").map((s) => parseInt(s.trim(), 10))
+        : [],
+    exclude:
+      typeof excludeIds === "string"
+        ? excludeIds.split(",").map((s) => parseInt(s.trim(), 10))
+        : [],
   };
 }
 
@@ -265,7 +283,9 @@ export async function mapCampaignFields(
       const maxKey = cpType === 2 ? "maxWithoutStatCPM" : "maxWithoutStatCPC";
       const maxBid = opts.bidCoefficients[maxKey];
       if (maxBid != null && bidVal > maxBid) {
-        throw new Error(`Bid ${bidVal} exceeds maximum ${maxBid} for this account. Reduce bid or contact support.`);
+        throw new Error(
+          `Bid ${bidVal} exceeds maximum ${maxBid} for this account. Reduce bid or contact support.`,
+        );
       }
     }
   }
@@ -273,9 +293,15 @@ export async function mapCampaignFields(
   mapped.audiences = buildAudiences(fields);
 
   if (typeof fields.siteWhitelist === "string") {
-    mapped.sites = { mode: 1, list: fields.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
+    mapped.sites = {
+      mode: 1,
+      list: fields.siteWhitelist.split(",").map((s) => parseInt(s.trim(), 10)),
+    };
   } else if (typeof fields.siteBlacklist === "string") {
-    mapped.sites = { mode: 0, list: fields.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+    mapped.sites = {
+      mode: 0,
+      list: fields.siteBlacklist.split(",").map((s) => parseInt(s.trim(), 10)),
+    };
   }
 
   if (fields.sspIds != null) {
@@ -325,19 +351,39 @@ export async function mapCampaignFields(
 
 const campaignTargetingFields = {
   countries: z.string().optional().describe("Comma-separated ISO country codes (e.g. 'US,DE,BR')"),
-  devices: z.string().optional().describe("Comma-separated device names or IDs (e.g. 'Desktop,Smartphone' or '1,4')"),
-  os: z.string().optional().describe("Comma-separated OS names or IDs (e.g. 'Android,iOS' or '10,20')"),
-  browsers: z.string().optional().describe("Comma-separated browser names or IDs (e.g. 'Chrome,Firefox' or '8,16')"),
+  devices: z
+    .string()
+    .optional()
+    .describe("Comma-separated device names or IDs (e.g. 'Desktop,Smartphone' or '1,4')"),
+  os: z
+    .string()
+    .optional()
+    .describe("Comma-separated OS names or IDs (e.g. 'Android,iOS' or '10,20')"),
+  browsers: z
+    .string()
+    .optional()
+    .describe("Comma-separated browser names or IDs (e.g. 'Chrome,Firefox' or '8,16')"),
   languages: z.string().optional().describe("Comma-separated language names or IDs"),
-  connectionType: z.enum(["wifi", "cellular", "all", "unknown"]).optional().describe("Network connection type filter (all = no filter)"),
+  connectionType: z
+    .enum(["wifi", "cellular", "all", "unknown"])
+    .optional()
+    .describe("Network connection type filter (all = no filter)"),
   audienceIncludeIds: z.string().optional().describe("Comma-separated audience IDs to include"),
   audienceExcludeIds: z.string().optional().describe("Comma-separated audience IDs to exclude"),
   siteWhitelist: z.string().optional().describe("Comma-separated site IDs for whitelist"),
   siteBlacklist: z.string().optional().describe("Comma-separated site IDs for blacklist"),
-  sspMode: z.enum(["whitelist", "blacklist"]).optional()
-    .describe("SSP source list mode: 'whitelist' = only allow listed SSPs, 'blacklist' = block listed SSPs"),
-  sspIds: z.string().optional()
-    .describe("Comma-separated SSP IDs for the source whitelist/blacklist (see ssps in campaign options)"),
+  sspMode: z
+    .enum(["whitelist", "blacklist"])
+    .optional()
+    .describe(
+      "SSP source list mode: 'whitelist' = only allow listed SSPs, 'blacklist' = block listed SSPs",
+    ),
+  sspIds: z
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated SSP IDs for the source whitelist/blacklist (see ssps in campaign options)",
+    ),
 };
 
 const campaignBudgetFields = {
@@ -346,42 +392,111 @@ const campaignBudgetFields = {
   startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
   endDate: z.string().optional().describe("End date (YYYY-MM-DD)"),
   timezone: z.number().optional().describe("Timezone offset in hours (e.g. 3 for UTC+3)"),
-  schedule: z.string().optional().describe("Comma-separated hours (0-23) to show ads, applied to all days (e.g. '9,10,11,12,13,14,15,16,17' for 9am-5pm)"),
-  frequencyCapViews: z.number().optional()
-    .describe("Creative-level: max times ONE creative is shown to a user within frequencyCapDays (e.g. 3 = user sees this creative at most 3 times)"),
-  frequencyCapDays: z.number().optional()
-    .describe("Creative-level: time window in days for the cap (e.g. 1 = per day, 7 = per week). Used with frequencyCapViews"),
-  campaignCapViews: z.number().optional()
-    .describe("Campaign-level: max times ANY creative from this campaign is shown to a user within campaignCapDays (e.g. 1 = one pop per user)"),
-  campaignCapDays: z.number().optional()
-    .describe("Campaign-level: time window in days (e.g. 1 = per day). Used with campaignCapViews. Example: campaignCapViews=1, campaignCapDays=1 means 'show campaign to each user max once per day'"),
+  schedule: z
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated hours (0-23) to show ads, applied to all days (e.g. '9,10,11,12,13,14,15,16,17' for 9am-5pm)",
+    ),
+  frequencyCapViews: z
+    .number()
+    .optional()
+    .describe(
+      "Creative-level: max times ONE creative is shown to a user within frequencyCapDays (e.g. 3 = user sees this creative at most 3 times)",
+    ),
+  frequencyCapDays: z
+    .number()
+    .optional()
+    .describe(
+      "Creative-level: time window in days for the cap (e.g. 1 = per day, 7 = per week). Used with frequencyCapViews",
+    ),
+  campaignCapViews: z
+    .number()
+    .optional()
+    .describe(
+      "Campaign-level: max times ANY creative from this campaign is shown to a user within campaignCapDays (e.g. 1 = one pop per user)",
+    ),
+  campaignCapDays: z
+    .number()
+    .optional()
+    .describe(
+      "Campaign-level: time window in days (e.g. 1 = per day). Used with campaignCapViews. Example: campaignCapViews=1, campaignCapDays=1 means 'show campaign to each user max once per day'",
+    ),
   impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
-  categories: z.string().optional()
-    .describe("Comma-separated category IDs for content classification (e.g. '1,2,3' or 'mainstream,adult'). Multiple values allowed. Use campaign options to see available IDs."),
-  secondPush: z.boolean().optional().describe("Enable second push notification (push/inpage_push only)"),
-  pauseAfterModeration: z.boolean().optional().describe("Pause campaign after creatives pass moderation"),
-  conversionTemplateId: z.number().optional()
-    .describe("Conversion acceptance template ID from campaign options (conversionTemplates list). Use 0 for custom mapping with conversionApproved/Hold/Reject."),
-  conversionApproved: z.string().optional()
-    .describe("Postback status name for 'Approved' conversions (e.g. 'dep', 'sale'). Used with conversionTemplateId=0 for custom mapping."),
-  conversionHold: z.string().optional()
-    .describe("Postback status name for 'Hold' conversions (e.g. 'reg', 'lead'). Used with conversionTemplateId=0 for custom mapping."),
-  conversionReject: z.string().optional()
-    .describe("Postback status name for 'Rejected' conversions. Used with conversionTemplateId=0 for custom mapping."),
+  categories: z
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated category IDs for content classification (e.g. '1,2,3' or 'mainstream,adult'). Multiple values allowed. Use campaign options to see available IDs.",
+    ),
+  secondPush: z
+    .boolean()
+    .optional()
+    .describe("Enable second push notification (push/inpage_push only)"),
+  pauseAfterModeration: z
+    .boolean()
+    .optional()
+    .describe("Pause campaign after creatives pass moderation"),
+  conversionTemplateId: z
+    .number()
+    .optional()
+    .describe(
+      "Conversion acceptance template ID from campaign options (conversionTemplates list). Use 0 for custom mapping with conversionApproved/Hold/Reject.",
+    ),
+  conversionApproved: z
+    .string()
+    .optional()
+    .describe(
+      "Postback status name for 'Approved' conversions (e.g. 'dep', 'sale'). Used with conversionTemplateId=0 for custom mapping.",
+    ),
+  conversionHold: z
+    .string()
+    .optional()
+    .describe(
+      "Postback status name for 'Hold' conversions (e.g. 'reg', 'lead'). Used with conversionTemplateId=0 for custom mapping.",
+    ),
+  conversionReject: z
+    .string()
+    .optional()
+    .describe(
+      "Postback status name for 'Rejected' conversions. Used with conversionTemplateId=0 for custom mapping.",
+    ),
 };
 
 const postConversionFields = {
-  postViewWindow: z.number().min(1).max(168).optional()
-    .describe("Post-view attribution window in hours (1-168). Time after ad impression to count a conversion"),
-  postClickWindow: z.number().min(1).max(168).optional()
-    .describe("Post-click attribution window in hours (1-168). Time after ad click to count a conversion"),
-  countFirstConversionOnly: z.boolean().optional()
-    .describe("Only count the first conversion per user (default: true). Set false to allow multiple conversions per view/click"),
-  countLastCampaignOnly: z.boolean().optional()
+  postViewWindow: z
+    .number()
+    .min(1)
+    .max(168)
+    .optional()
+    .describe(
+      "Post-view attribution window in hours (1-168). Time after ad impression to count a conversion",
+    ),
+  postClickWindow: z
+    .number()
+    .min(1)
+    .max(168)
+    .optional()
+    .describe(
+      "Post-click attribution window in hours (1-168). Time after ad click to count a conversion",
+    ),
+  countFirstConversionOnly: z
+    .boolean()
+    .optional()
+    .describe(
+      "Only count the first conversion per user (default: true). Set false to allow multiple conversions per view/click",
+    ),
+  countLastCampaignOnly: z
+    .boolean()
+    .optional()
     .describe("Attribute conversion only to the last campaign impression (default: true)"),
-  postClickAttrPriority: z.boolean().optional()
+  postClickAttrPriority: z
+    .boolean()
+    .optional()
     .describe("Post-click attribution takes priority over post-view (default: true)"),
-  postConversionAudienceIds: z.string().optional()
+  postConversionAudienceIds: z
+    .string()
+    .optional()
     .describe("Comma-separated audience IDs for post-conversion retargeting"),
 };
 
@@ -400,12 +515,8 @@ export const campaignsModule: ToolModule = {
         page: z.number().optional().default(1),
         perPage: z.number().optional().default(25),
         folderId: z.number().optional(),
-        status: z
-          .enum(["active", "paused", "archived", "moderation"])
-          .optional(),
-        type: z
-          .enum(["push", "inpage_push", "native", "banner", "video", "popunder"])
-          .optional(),
+        status: z.enum(["active", "paused", "archived", "moderation"]).optional(),
+        type: z.enum(["push", "inpage_push", "native", "banner", "video", "popunder"]).optional(),
         searchQuery: z.string().optional(),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
@@ -430,12 +541,7 @@ export const campaignsModule: ToolModule = {
         };
         const res = await ctx.adv.listCampaigns(params);
         const pagination = extractPagination(res);
-        return formatEntityList(
-          res.rows,
-          formatCampaignRow,
-          "Campaigns",
-          pagination,
-        );
+        return formatEntityList(res.rows, formatCampaignRow, "Campaigns", pagination);
       },
     );
 
@@ -448,17 +554,28 @@ export const campaignsModule: ToolModule = {
         annotations: { title: "Create campaign", readOnlyHint: false },
       },
       {
-        type: z.enum(["push", "inpage_push", "native", "banner", "video", "popunder"]).describe("Ad format"),
+        type: z
+          .enum(["push", "inpage_push", "native", "banner", "video", "popunder"])
+          .describe("Ad format"),
         name: z.string().min(1).describe("Campaign name shown in dashboard"),
         url: z.string().url().describe("Landing page URL"),
         folderId: z.number().describe("Campaign folder ID"),
-        pricingModel: z.enum(["cpc", "cpm", "cpa_target"]).describe("Pricing model: cpc, cpm, or cpa_target"),
-        bid: z.number().positive().describe("Bid amount in USD (e.g. 0.05). For cpa_target this is the target CPA cost"),
+        pricingModel: z
+          .enum(["cpc", "cpm", "cpa_target"])
+          .describe("Pricing model: cpc, cpm, or cpa_target"),
+        bid: z
+          .number()
+          .positive()
+          .describe("Bid amount in USD (e.g. 0.05). For cpa_target this is the target CPA cost"),
         dailyBudget: z.number().positive().describe("Daily spending limit in USD"),
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
-        countries: z.string().describe("Comma-separated ISO country codes for bid targeting (e.g. 'US,DE,BR'). Required."),
+        countries: z
+          .string()
+          .describe(
+            "Comma-separated ISO country codes for bid targeting (e.g. 'US,DE,BR'). Required.",
+          ),
       },
       async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
@@ -489,7 +606,11 @@ export const campaignsModule: ToolModule = {
         url: z.string().url().optional().describe("Landing page URL"),
         folderId: z.number().optional().describe("Campaign folder ID"),
         dailyBudget: z.number().optional().describe("Daily spending limit in USD"),
-        bid: z.number().positive().optional().describe("Bid amount in USD. For cpa_target this is the target CPA cost"),
+        bid: z
+          .number()
+          .positive()
+          .optional()
+          .describe("Bid amount in USD. For cpa_target this is the target CPA cost"),
         disableProxy: z.boolean().optional().describe("Block proxy/VPN traffic"),
         ...campaignTargetingFields,
         ...campaignBudgetFields,
@@ -508,25 +629,33 @@ export const campaignsModule: ToolModule = {
         if (changes.folderId != null) merged.folderId = changes.folderId;
         if (changes.dailyBudget != null) merged.dayMoneyLimit = changes.dailyBudget;
         if (changes.totalBudget != null) merged.commonMoneyLimit = changes.totalBudget;
-        if (changes.evenDistribution != null) merged.isEvenDistribution = changes.evenDistribution ? 1 : 0;
+        if (changes.evenDistribution != null)
+          merged.isEvenDistribution = changes.evenDistribution ? 1 : 0;
         if (changes.disableProxy != null) merged.disableProxy = changes.disableProxy ? 1 : 0;
         if (changes.startDate != null) merged.startDate = changes.startDate;
-        if ((changes as Record<string, unknown>).endDate !== undefined) merged.stopDate = (changes as Record<string, unknown>).endDate;
+        if ((changes as Record<string, unknown>).endDate !== undefined)
+          merged.stopDate = (changes as Record<string, unknown>).endDate;
         if (changes.timezone != null) merged.timezone = changes.timezone;
         if (changes.impTracker !== undefined) merged.impTracker = changes.impTracker;
         if (changes.secondPush != null) merged.isNeedSecondPush = changes.secondPush ? 1 : 0;
-        if (changes.pauseAfterModeration != null) merged.isPauseAfterModerate = changes.pauseAfterModeration ? 1 : 0;
+        if (changes.pauseAfterModeration != null)
+          merged.isPauseAfterModerate = changes.pauseAfterModeration ? 1 : 0;
 
         if (changes.connectionType != null) {
-          merged.connectionType = typeof changes.connectionType === "string"
-            ? (CONNECTION_TYPE_MAP[changes.connectionType] ?? 3)
-            : changes.connectionType;
+          merged.connectionType =
+            typeof changes.connectionType === "string"
+              ? (CONNECTION_TYPE_MAP[changes.connectionType] ?? 3)
+              : changes.connectionType;
         }
 
-        if (changes.devices != null) merged.devices = await registry.resolveIds("device", changes.devices);
-        if (changes.os != null) merged.platformVersions = await registry.resolveIds("platform", changes.os);
-        if (changes.browsers != null) merged.browsers = await registry.resolveIds("browser", changes.browsers);
-        if (changes.languages != null) merged.languages = await registry.resolveIds("language", changes.languages);
+        if (changes.devices != null)
+          merged.devices = await registry.resolveIds("device", changes.devices);
+        if (changes.os != null)
+          merged.platformVersions = await registry.resolveIds("platform", changes.os);
+        if (changes.browsers != null)
+          merged.browsers = await registry.resolveIds("browser", changes.browsers);
+        if (changes.languages != null)
+          merged.languages = await registry.resolveIds("language", changes.languages);
 
         if (changes.categories != null) {
           merged.categories = changes.categories.split(",").map((s: string) => {
@@ -540,24 +669,30 @@ export const campaignsModule: ToolModule = {
           merged.audiences = {
             mode: currentAud.mode ?? 20,
             include: changes.audienceIncludeIds
-              ? changes.audienceIncludeIds.split(",").map(s => parseInt(s.trim(), 10))
+              ? changes.audienceIncludeIds.split(",").map((s) => parseInt(s.trim(), 10))
               : (currentAud.include ?? []),
             exclude: changes.audienceExcludeIds
-              ? changes.audienceExcludeIds.split(",").map(s => parseInt(s.trim(), 10))
+              ? changes.audienceExcludeIds.split(",").map((s) => parseInt(s.trim(), 10))
               : (currentAud.exclude ?? []),
           };
         }
 
         if (changes.siteWhitelist != null) {
-          merged.sites = { mode: 1, list: changes.siteWhitelist.split(",").map(s => parseInt(s.trim(), 10)) };
+          merged.sites = {
+            mode: 1,
+            list: changes.siteWhitelist.split(",").map((s) => parseInt(s.trim(), 10)),
+          };
         } else if (changes.siteBlacklist != null) {
-          merged.sites = { mode: 0, list: changes.siteBlacklist.split(",").map(s => parseInt(s.trim(), 10)) };
+          merged.sites = {
+            mode: 0,
+            list: changes.siteBlacklist.split(",").map((s) => parseInt(s.trim(), 10)),
+          };
         }
 
         if (changes.sspIds != null) {
           merged.ssps = {
             mode: changes.sspMode === "whitelist" || changes.sspMode == null,
-            list: changes.sspIds.split(",").map(s => parseInt(s.trim(), 10)),
+            list: changes.sspIds.split(",").map((s) => parseInt(s.trim(), 10)),
           };
         }
 
@@ -583,15 +718,23 @@ export const campaignsModule: ToolModule = {
 
         const currentPc = (merged.postConversion ?? {}) as Record<string, unknown>;
         const pcOverrides: Record<string, unknown> = {};
-        if (changes.postViewWindow !== undefined) pcOverrides.windowLengthPostView = changes.postViewWindow;
-        if (changes.postClickWindow !== undefined) pcOverrides.windowLengthPostClick = changes.postClickWindow;
-        if (changes.countFirstConversionOnly !== undefined) pcOverrides.countFirstConversionOnly = changes.countFirstConversionOnly;
-        if (changes.countLastCampaignOnly !== undefined) pcOverrides.countLastCampaignOnly = changes.countLastCampaignOnly;
-        if (changes.postClickAttrPriority !== undefined) pcOverrides.postClickAttrPriority = changes.postClickAttrPriority;
+        if (changes.postViewWindow !== undefined)
+          pcOverrides.windowLengthPostView = changes.postViewWindow;
+        if (changes.postClickWindow !== undefined)
+          pcOverrides.windowLengthPostClick = changes.postClickWindow;
+        if (changes.countFirstConversionOnly !== undefined)
+          pcOverrides.countFirstConversionOnly = changes.countFirstConversionOnly;
+        if (changes.countLastCampaignOnly !== undefined)
+          pcOverrides.countLastCampaignOnly = changes.countLastCampaignOnly;
+        if (changes.postClickAttrPriority !== undefined)
+          pcOverrides.postClickAttrPriority = changes.postClickAttrPriority;
         if (changes.postConversionAudienceIds !== undefined) {
           const raw = changes.postConversionAudienceIds;
           pcOverrides.audiences = raw
-            ? raw.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+            ? raw
+                .split(",")
+                .map((s) => parseInt(s.trim(), 10))
+                .filter((n) => !isNaN(n))
             : [];
         }
         if (Object.keys(pcOverrides).length > 0) {
@@ -616,8 +759,12 @@ export const campaignsModule: ToolModule = {
           }
         }
 
-        if (changes.conversionTemplateId != null || changes.conversionApproved != null ||
-            changes.conversionHold != null || changes.conversionReject != null) {
+        if (
+          changes.conversionTemplateId != null ||
+          changes.conversionApproved != null ||
+          changes.conversionHold != null ||
+          changes.conversionReject != null
+        ) {
           const currentConv = (merged.conversion ?? {}) as Record<string, unknown>;
           merged.conversion = {
             id: changes.conversionTemplateId ?? currentConv.id ?? 0,
@@ -676,8 +823,12 @@ export const campaignsModule: ToolModule = {
       {
         id: z.number().describe("Campaign ID"),
         bid: z.number().positive().describe("Bid value in USD (e.g. 0.05)"),
-        countries: z.string().optional()
-          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). If omitted, keeps current countries from campaign settings"),
+        countries: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated ISO country codes (e.g. 'US,DE'). If omitted, keeps current countries from campaign settings",
+          ),
       },
       async (args, ctx) => {
         const registry = ctx.adv.options;
@@ -687,11 +838,12 @@ export const campaignsModule: ToolModule = {
         const currentBids = current.bids as Array<Record<string, unknown>> | undefined;
         const countries = args.countries
           ? await registry.resolveCountryIds(args.countries)
-          : (currentBids?.[0]?.countries as number[] ?? []);
+          : ((currentBids?.[0]?.countries as number[]) ?? []);
 
-        const bidEntry = cpType === 4
-          ? { leadCost: args.bid, countries }
-          : { bid: args.bid, leadCost: 0, countries };
+        const bidEntry =
+          cpType === 4
+            ? { leadCost: args.bid, countries }
+            : { bid: args.bid, leadCost: 0, countries };
 
         await ctx.adv.updateCampaignBid(args.id, [bidEntry]);
         return `Bid for campaign #${args.id} updated to ${args.bid}.`;
@@ -711,12 +863,23 @@ export const campaignsModule: ToolModule = {
         annotations: { title: "Bulk update bids", idempotentHint: true },
       },
       {
-        campaignIds: z.string().min(1).describe("Comma-separated campaign IDs (e.g. '100,200,300')"),
-        bid: z.number().positive().describe("Bid value in USD (for CPA this is the target CPA cost)"),
-        pricingModel: z.enum(["cpc", "cpm", "cpa_target"])
+        campaignIds: z
+          .string()
+          .min(1)
+          .describe("Comma-separated campaign IDs (e.g. '100,200,300')"),
+        bid: z
+          .number()
+          .positive()
+          .describe("Bid value in USD (for CPA this is the target CPA cost)"),
+        pricingModel: z
+          .enum(["cpc", "cpm", "cpa_target"])
           .describe("Pricing model of the campaigns. All campaigns must share this model"),
-        countries: z.string().min(1)
-          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). Required — backend rejects empty list"),
+        countries: z
+          .string()
+          .min(1)
+          .describe(
+            "Comma-separated ISO country codes (e.g. 'US,DE'). Required — backend rejects empty list",
+          ),
       },
       async (args, ctx) => {
         const ids = parseCommaSeparatedIds(args.campaignIds);
@@ -724,9 +887,10 @@ export const campaignsModule: ToolModule = {
         const countries = await registry.resolveCountryIds(args.countries);
         const cpType = PRICING_MODEL_MAP[args.pricingModel];
 
-        const bidEntry = cpType === 4
-          ? { leadCost: args.bid, countries }
-          : { bid: args.bid, leadCost: 0, countries };
+        const bidEntry =
+          cpType === 4
+            ? { leadCost: args.bid, countries }
+            : { bid: args.bid, leadCost: 0, countries };
 
         await ctx.adv.bulkUpdateCampaignBids(ids, [bidEntry]);
         const idList = ids.map((id) => `#${id}`).join(", ");
@@ -747,7 +911,9 @@ export const campaignsModule: ToolModule = {
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),
         zones: z.string().min(1).describe("Comma-separated site (zone) IDs to set bids for"),
-        bid: z.string().describe("Bid value: number ('0.05'), multiplier ('x1.5'), or '0' to remove"),
+        bid: z
+          .string()
+          .describe("Bid value: number ('0.05'), multiplier ('x1.5'), or '0' to remove"),
       },
       async (args, ctx) => {
         const campaignIds = parseCommaSeparatedIds(args.campaignIds);

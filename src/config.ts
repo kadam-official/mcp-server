@@ -18,9 +18,7 @@ const envSchema = z.object({
   KADAM_PUB_API_BASE: z.string().url().default("https://pub.kadam.net/api"),
   KADAM_ADV_DOMAIN: z.string().url().default("https://partners.kadam.net"),
   KADAM_PUB_DOMAIN: z.string().url().default("https://pub.kadam.net"),
-  LOG_LEVEL: z
-    .enum(["trace", "debug", "info", "warn", "error", "fatal"])
-    .default("info"),
+  LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 });
 
 export type Config = z.infer<typeof envSchema>;
@@ -32,9 +30,7 @@ export function getConfig(): Config {
 
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
-    const issues = result.error.issues
-      .map((i) => `  ${i.path.join(".")}: ${i.message}`)
-      .join("\n");
+    const issues = result.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid environment configuration:\n${issues}`);
   }
 

@@ -27,17 +27,17 @@ describe("output-formatter", () => {
     });
 
     it("includes title when provided", () => {
-      const result = formatTable(
-        { headers: ["A"], rows: [["1"]] },
-        "My Table",
-      );
+      const result = formatTable({ headers: ["A"], rows: [["1"]] }, "My Table");
       expect(result).toMatch(/^My Table\n\nA/);
     });
 
     it("includes totals row with extra separator when totals provided", () => {
       const result = formatTable({
         headers: ["Name", "Total"],
-        rows: [["a", "5"], ["b", "3"]],
+        rows: [
+          ["a", "5"],
+          ["b", "3"],
+        ],
         totals: ["Sum", "8"],
       });
       expect(result).toContain("Sum");
@@ -63,33 +63,30 @@ describe("output-formatter", () => {
     });
 
     it("with pagination on last page — no 'Use page=' line", () => {
-      const result = formatEntityList(
-        ["a"],
-        (x) => x,
-        "List",
-        { page: 2, totalPages: 2, totalRows: 2 },
-      );
+      const result = formatEntityList(["a"], (x) => x, "List", {
+        page: 2,
+        totalPages: 2,
+        totalRows: 2,
+      });
       expect(result).toContain("page 2/2");
       expect(result).not.toContain("Use page=");
     });
 
     it("with pagination not last page — includes 'Use page=2'", () => {
-      const result = formatEntityList(
-        ["a"],
-        (x) => x,
-        "List",
-        { page: 1, totalPages: 2, totalRows: 2 },
-      );
+      const result = formatEntityList(["a"], (x) => x, "List", {
+        page: 1,
+        totalPages: 2,
+        totalRows: 2,
+      });
       expect(result).toContain("Use page=2");
     });
 
     it("with empty items — just header + pagination", () => {
-      const result = formatEntityList(
-        [],
-        (_x, i) => `${i}`,
-        "Empty",
-        { page: 1, totalPages: 1, totalRows: 0 },
-      );
+      const result = formatEntityList([], (_x, i) => `${i}`, "Empty", {
+        page: 1,
+        totalPages: 1,
+        totalRows: 0,
+      });
       expect(result).toContain("Empty");
       expect(result).toContain("0");
       expect(result).toContain("page 1/1");
@@ -179,7 +176,9 @@ describe("output-formatter", () => {
         perPage: 1,
       });
       expect(result.length).toBeLessThanOrEqual(50 * 1024 + 200);
-      expect(result).toContain("[Response truncated at 50KB. Narrow your query with filters or reduce perPage.]");
+      expect(result).toContain(
+        "[Response truncated at 50KB. Narrow your query with filters or reduce perPage.]",
+      );
     });
   });
 });

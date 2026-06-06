@@ -3,10 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import {
-  formatEntityList,
-  clampPerPage,
-} from "../../output-formatter.js";
+import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
 import type { CreativeRow } from "../../api/schemas/advertiser.js";
@@ -27,7 +24,10 @@ async function validateSizeId(sizeId: number, registry: OptionsRegistry): Promis
     }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Invalid sizeId")) throw e;
-    logger.warn({ sizeId, err: e }, "Could not validate sizeId against options; falling back to API validation");
+    logger.warn(
+      { sizeId, err: e },
+      "Could not validate sizeId against options; falling back to API validation",
+    );
   }
 }
 
@@ -65,7 +65,10 @@ async function loadFile(source: string): Promise<LoadedFile> {
     const nodeBuffer = await readFile(filePath).catch(() => {
       throw new Error(`File not found or unreadable: ${filePath}`);
     });
-    buffer = nodeBuffer.buffer.slice(nodeBuffer.byteOffset, nodeBuffer.byteOffset + nodeBuffer.byteLength);
+    buffer = nodeBuffer.buffer.slice(
+      nodeBuffer.byteOffset,
+      nodeBuffer.byteOffset + nodeBuffer.byteLength,
+    );
     filename = basename(filePath);
   } else {
     const response = await fetch(source);
@@ -87,12 +90,15 @@ export function parseImageDimensions(data: Uint8Array): { width: number; height:
     const view = new DataView(data.buffer, data.byteOffset);
     return { width: view.getUint32(16), height: view.getUint32(20) };
   }
-  if (data[0] === 0xFF && data[1] === 0xD8) {
+  if (data[0] === 0xff && data[1] === 0xd8) {
     let offset = 2;
     while (offset < data.length - 9) {
-      if (data[offset] !== 0xFF) { offset++; continue; }
+      if (data[offset] !== 0xff) {
+        offset++;
+        continue;
+      }
       const marker = data[offset + 1]!;
-      if (marker === 0xC0 || marker === 0xC2) {
+      if (marker === 0xc0 || marker === 0xc2) {
         const view = new DataView(data.buffer, data.byteOffset);
         return { width: view.getUint16(offset + 7), height: view.getUint16(offset + 5) };
       }
@@ -148,12 +154,7 @@ export const creativesModule: ToolModule = {
         };
         const res = await ctx.adv.listCreatives(params);
         const pagination = extractPagination(res);
-        return formatEntityList(
-          res.rows,
-          formatCreativeRow,
-          "Creatives",
-          pagination,
-        );
+        return formatEntityList(res.rows, formatCreativeRow, "Creatives", pagination);
       },
     );
 
@@ -176,14 +177,47 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
       {
         campaignId: z.number().describe("Campaign ID to add creative to"),
         url: z.string().url().describe("Landing page URL for the creative"),
-        title: z.string().optional().describe("Creative title (required for push/inpage/native/video, max 30 chars for push, 75 for native)"),
-        text: z.string().optional().describe("Creative text/description (required for push/inpage, max 45 chars)"),
-        imageUrl: z.string().optional().describe("Icon/image source: URL or local file path (push: 192x192+, native: 500x500+, banner: exact size)"),
-        mainImageUrl: z.string().optional().describe("Main/rectangle image source: URL or local path (push/inpage: 492x328+, native: 492x328+). Not needed for banner/video."),
-        videoUrl: z.string().optional().describe("Video source: URL or local file path to MP4 (video campaigns only)"),
-        sizeId: z.number().optional().describe("Banner size ID (required for banner). See kadam://reference/creative-formats for valid sizes."),
-        pauseAfterModeration: z.boolean().optional().default(true).describe("Pause creative after it passes moderation (default: true for safety)"),
-        bid: z.number().optional().describe("Custom bid for this creative (overrides campaign bid)"),
+        title: z
+          .string()
+          .optional()
+          .describe(
+            "Creative title (required for push/inpage/native/video, max 30 chars for push, 75 for native)",
+          ),
+        text: z
+          .string()
+          .optional()
+          .describe("Creative text/description (required for push/inpage, max 45 chars)"),
+        imageUrl: z
+          .string()
+          .optional()
+          .describe(
+            "Icon/image source: URL or local file path (push: 192x192+, native: 500x500+, banner: exact size)",
+          ),
+        mainImageUrl: z
+          .string()
+          .optional()
+          .describe(
+            "Main/rectangle image source: URL or local path (push/inpage: 492x328+, native: 492x328+). Not needed for banner/video.",
+          ),
+        videoUrl: z
+          .string()
+          .optional()
+          .describe("Video source: URL or local file path to MP4 (video campaigns only)"),
+        sizeId: z
+          .number()
+          .optional()
+          .describe(
+            "Banner size ID (required for banner). See kadam://reference/creative-formats for valid sizes.",
+          ),
+        pauseAfterModeration: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Pause creative after it passes moderation (default: true for safety)"),
+        bid: z
+          .number()
+          .optional()
+          .describe("Custom bid for this creative (overrides campaign bid)"),
         bidCountries: z.string().optional().describe("Comma-separated country IDs for the bid"),
         startDate: z.string().optional().describe("Creative start date (YYYY-MM-DD HH:MM:SS)"),
         stopDate: z.string().optional().describe("Creative stop date (YYYY-MM-DD HH:MM:SS)"),
@@ -216,7 +250,10 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           const file = await loadFile(args.imageUrl);
           fd.set("image", file.blob, file.filename);
           if (file.width > 0) {
-            fd.set("imageCrop", JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }));
+            fd.set(
+              "imageCrop",
+              JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }),
+            );
           }
         }
 
@@ -224,7 +261,10 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
           const file = await loadFile(args.mainImageUrl);
           fd.set("rectangleImage", file.blob, file.filename);
           if (file.width > 0) {
-            fd.set("rectangleImageCrop", JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }));
+            fd.set(
+              "rectangleImageCrop",
+              JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }),
+            );
           }
         }
 
@@ -255,7 +295,10 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         bid: z.number().optional().describe("Custom bid for this creative"),
         bidCountries: z.string().optional().describe("Comma-separated GEO IDs for the bid"),
         startDate: z.string().optional().describe("Start date (YYYY-MM-DD HH:MM:SS)"),
-        stopDate: z.string().optional().describe("Stop date (YYYY-MM-DD HH:MM:SS or null to clear)"),
+        stopDate: z
+          .string()
+          .optional()
+          .describe("Stop date (YYYY-MM-DD HH:MM:SS or null to clear)"),
         pauseAfterModeration: z.boolean().optional().describe("Pause after moderation"),
       },
       async (args, ctx) => {
@@ -266,9 +309,12 @@ Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Do
         const merged: Record<string, unknown> = {
           adId: creativeId,
           url: changes.url ?? current.url,
-          isPauseAfterModer: changes.pauseAfterModeration != null
-            ? (changes.pauseAfterModeration ? 1 : 0)
-            : current.isPauseAfterModer,
+          isPauseAfterModer:
+            changes.pauseAfterModeration != null
+              ? changes.pauseAfterModeration
+                ? 1
+                : 0
+              : current.isPauseAfterModer,
           startDate: changes.startDate !== undefined ? changes.startDate : current.startDate,
           stopDate: changes.stopDate !== undefined ? changes.stopDate : current.stopDate,
         };

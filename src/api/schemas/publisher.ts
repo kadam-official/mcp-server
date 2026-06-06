@@ -8,7 +8,10 @@ export const sourceDetailSchema = z
   .object({
     id: z.number(),
     userID: z.number().optional(),
-    name: z.string().nullable().transform((v) => v ?? ""),
+    name: z
+      .string()
+      .nullable()
+      .transform((v) => v ?? ""),
     url: z.string(),
     createTime: z.number().optional(),
     state: z.string(),

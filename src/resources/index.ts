@@ -15,17 +15,22 @@ function registerStaticResource(server: McpServer, name: string, content: string
   }));
 }
 
-export function registerResources(server: McpServer, registry: OptionsRegistry | null = null): void {
+export function registerResources(
+  server: McpServer,
+  registry: OptionsRegistry | null = null,
+): void {
   registerCampaignTypesResource(server, registry);
   registerPricingModelsResource(server, registry);
 
   const creativeFormatsUri = "kadam://reference/creative-formats";
   server.resource("creative-formats", creativeFormatsUri, async () => ({
-    contents: [{
-      uri: creativeFormatsUri,
-      mimeType: "text/plain",
-      text: await getCreativeFormatsContent(registry),
-    }],
+    contents: [
+      {
+        uri: creativeFormatsUri,
+        mimeType: "text/plain",
+        text: await getCreativeFormatsContent(registry),
+      },
+    ],
   }));
 
   registerStaticResource(server, "site-states", SITE_STATES_CONTENT);

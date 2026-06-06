@@ -44,7 +44,9 @@ export class ToolWrapper {
         const parsed = inputSchema.parse(args);
         const ctx = resolveCtx();
 
-        const result = await (handler as ToolHandler<z.objectOutputType<TShape, z.ZodTypeAny>, AdvContext | PubContext>)(parsed, ctx);
+        const result = await (
+          handler as ToolHandler<z.objectOutputType<TShape, z.ZodTypeAny>, AdvContext | PubContext>
+        )(parsed, ctx);
 
         const elapsed = Date.now() - startTime;
         log.info({ elapsed, resultSize: result.length }, "Tool completed");

@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPubClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPubClient,
+} from "../../helpers/tool-client.js";
 import { adUnitsModule } from "../../../src/tools/publisher/ad-units.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -40,10 +44,7 @@ describe("publisher ad-units tools", () => {
       arguments: { sourceId: 10, adFormat: "native" },
     });
 
-    expect(api.listAdUnits).toHaveBeenCalledWith(
-      10,
-      expect.objectContaining({ type: 0 }),
-    );
+    expect(api.listAdUnits).toHaveBeenCalledWith(10, expect.objectContaining({ type: 0 }));
   });
 
   it("set_ad_unit_status with status archived passes action delete to API", async () => {

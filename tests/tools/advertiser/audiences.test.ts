@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPartnersClient,
+} from "../../helpers/tool-client.js";
 import { audiencesModule } from "../../../src/tools/advertiser/audiences.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -132,10 +136,12 @@ describe("audiences tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(api.createAudience).toHaveBeenCalledWith(expect.objectContaining({
-      type: "s2s",
-      linkedAudiencesIds: [1, 2],
-    }));
+    expect(api.createAudience).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "s2s",
+        linkedAudiencesIds: [1, 2],
+      }),
+    );
     expect(text).toContain("Audience #42");
     expect(text).toContain("New S2S");
   });
@@ -169,11 +175,13 @@ describe("audiences tools", () => {
       },
     });
 
-    expect(api.createAudience).toHaveBeenCalledWith(expect.objectContaining({
-      type: "audience",
-      campaignsIds: [100, 200],
-      hasClicks: true,
-    }));
+    expect(api.createAudience).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "audience",
+        campaignsIds: [100, 200],
+        hasClicks: true,
+      }),
+    );
   });
 
   it("delete_audience with confirm true works", async () => {
@@ -214,12 +222,15 @@ describe("audiences tools", () => {
     const text = getTextFromResult(result);
 
     expect(api.getAudience).toHaveBeenCalledWith(5);
-    expect(api.updateAudience).toHaveBeenCalledWith(5, expect.objectContaining({
-      type: "s2s",
-      name: "Updated Name",
-      expireDays: 14,
-      linkedAudiencesIds: [1, 3],
-    }));
+    expect(api.updateAudience).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({
+        type: "s2s",
+        name: "Updated Name",
+        expireDays: 14,
+        linkedAudiencesIds: [1, 3],
+      }),
+    );
     expect(text).toContain("updated");
   });
 });

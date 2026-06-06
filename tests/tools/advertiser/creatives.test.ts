@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPartnersClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPartnersClient,
+} from "../../helpers/tool-client.js";
 import { creativesModule } from "../../../src/tools/advertiser/creatives.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -71,10 +75,7 @@ describe("creatives tools", () => {
       },
     });
 
-    expect(api.createCreative).toHaveBeenCalledWith(
-      15,
-      expect.any(FormData),
-    );
+    expect(api.createCreative).toHaveBeenCalledWith(15, expect.any(FormData));
   });
 
   it("set_creative_status with ids 5,6 and status paused calls api with action pause", async () => {

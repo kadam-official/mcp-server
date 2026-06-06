@@ -1,11 +1,7 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import {
-  formatEntityList,
-  clampPerPage,
-  formatSingleEntity,
-} from "../../output-formatter.js";
+import { formatEntityList, clampPerPage, formatSingleEntity } from "../../output-formatter.js";
 import type { AudienceRow, AudienceDetail } from "../../api/schemas/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 
@@ -28,16 +24,22 @@ function formatAudienceDetail(a: AudienceDetail): string {
       a.hasConversions && "conversions",
       a.hasHolds && "holds",
       a.hasRejects && "rejects",
-    ].filter(Boolean).join(", ");
+    ]
+      .filter(Boolean)
+      .join(", ");
     if (flags) pairs.push(["Tracking", flags]);
     if (a.campaigns) {
-      const cmpList = Object.entries(a.campaigns).map(([id, name]) => `${name} (#${id})`).join("; ");
+      const cmpList = Object.entries(a.campaigns)
+        .map(([id, name]) => `${name} (#${id})`)
+        .join("; ");
       pairs.push(["Campaigns", cmpList]);
     }
   }
 
   if (a.type === "s2s" && a.linkedAudiences) {
-    const linked = Object.entries(a.linkedAudiences).map(([id, name]) => `${name} (#${id})`).join("; ");
+    const linked = Object.entries(a.linkedAudiences)
+      .map(([id, name]) => `${name} (#${id})`)
+      .join("; ");
     pairs.push(["Linked Audiences", linked]);
   }
 
@@ -82,19 +84,15 @@ export const audiencesModule: ToolModule = {
         const res = await ctx.adv.listAudiences(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
-        return formatEntityList(
-          items,
-          formatAudienceRow,
-          "Audiences",
-          pagination,
-        );
+        return formatEntityList(items, formatAudienceRow, "Audiences", pagination);
       },
     );
 
     wrapper.register(
       {
         name: "kadam_adv_get_audience",
-        description: "Get a single audience by ID. Returns type-specific details: tracking code for pixel/s2s, campaign links for stat, linked audiences for s2s.",
+        description:
+          "Get a single audience by ID. Returns type-specific details: tracking code for pixel/s2s, campaign links for stat, linked audiences for s2s.",
         product: "advertiser",
         annotations: { title: "Get audience details", readOnlyHint: true },
       },
@@ -124,13 +122,22 @@ export const audiencesModule: ToolModule = {
         type: z.enum(["audience", "audience_code", "s2s"]),
         name: z.string().min(1),
         expireDays: z.number().min(1).max(365),
-        campaignIds: z.string().optional().describe("Comma-separated campaign IDs (required for type=audience)"),
+        campaignIds: z
+          .string()
+          .optional()
+          .describe("Comma-separated campaign IDs (required for type=audience)"),
         hasClicks: z.boolean().optional().describe("Track clicks (type=audience)"),
         hasConversions: z.boolean().optional().describe("Track conversions (type=audience)"),
         hasHolds: z.boolean().optional().describe("Track holds (type=audience)"),
         hasRejects: z.boolean().optional().describe("Track rejects (type=audience)"),
-        linkedAudienceIds: z.string().optional().describe("Comma-separated pixel/fingerprint audience IDs (required for type=s2s)"),
-        createFingerprint: z.boolean().optional().describe("Also create a linked fingerprint audience (type=audience_code or audience)"),
+        linkedAudienceIds: z
+          .string()
+          .optional()
+          .describe("Comma-separated pixel/fingerprint audience IDs (required for type=s2s)"),
+        createFingerprint: z
+          .boolean()
+          .optional()
+          .describe("Also create a linked fingerprint audience (type=audience_code or audience)"),
       },
       async (args, ctx) => {
         const data: Record<string, unknown> = {
@@ -161,7 +168,8 @@ export const audiencesModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_update_audience",
-        description: "Update an existing audience (read-modify-write). Fetches current state, merges your changes, sends full payload. Type cannot be changed. Pass only the fields you want to change.",
+        description:
+          "Update an existing audience (read-modify-write). Fetches current state, merges your changes, sends full payload. Type cannot be changed. Pass only the fields you want to change.",
         product: "advertiser",
         annotations: { title: "Update audience", readOnlyHint: false },
       },
@@ -174,7 +182,10 @@ export const audiencesModule: ToolModule = {
         hasConversions: z.boolean().optional(),
         hasHolds: z.boolean().optional(),
         hasRejects: z.boolean().optional(),
-        linkedAudienceIds: z.string().optional().describe("Comma-separated pixel/fingerprint audience IDs (type=s2s)"),
+        linkedAudienceIds: z
+          .string()
+          .optional()
+          .describe("Comma-separated pixel/fingerprint audience IDs (type=s2s)"),
       },
       async (args, ctx) => {
         const { id, ...rest } = args;
@@ -193,13 +204,13 @@ export const audiencesModule: ToolModule = {
           data.hasRejects = rest.hasRejects ?? current.hasRejects ?? false;
           data.campaignsIds = rest.campaignIds
             ? rest.campaignIds.split(",").map(Number)
-            : current.campaignsIds ?? [];
+            : (current.campaignsIds ?? []);
         }
 
         if (current.type === "s2s") {
           data.linkedAudiencesIds = rest.linkedAudienceIds
             ? rest.linkedAudienceIds.split(",").map(Number)
-            : current.linkedAudiencesIds ?? [];
+            : (current.linkedAudiencesIds ?? []);
         }
 
         await ctx.adv.updateAudience(id, data);
@@ -210,8 +221,7 @@ export const audiencesModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_delete_audience",
-        description:
-          "Permanently delete an audience. Requires confirm=true for safety.",
+        description: "Permanently delete an audience. Requires confirm=true for safety.",
         product: "advertiser",
         annotations: { title: "Delete audience", destructiveHint: true },
       },

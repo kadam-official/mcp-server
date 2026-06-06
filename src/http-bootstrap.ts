@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ClientPool } from "./api/client-pool.js";
 import { getConfig, type Config } from "./config.js";
+import { detectCabinet, isSessionAuthorized, type CabinetType } from "./http-session.js";
 import { ToolWrapper } from "./middleware/tool-wrapper.js";
 import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
@@ -17,8 +18,6 @@ const require = createRequire(import.meta.url);
 const { version: SERVER_VERSION } = require("../package.json") as {
   version: string;
 };
-
-type CabinetType = "adv" | "pub";
 
 interface Session {
   transport: StreamableHTTPServerTransport;
@@ -42,20 +41,7 @@ function touchSession(sessionId: string): void {
   }
 }
 
-function detectCabinet(host: string, config: Config): CabinetType | null {
-  const advHost = new URL(config.KADAM_ADV_DOMAIN).host;
-  const pubHost = new URL(config.KADAM_PUB_DOMAIN).host;
-
-  const requestHost = host.split(":")[0];
-  if (requestHost === advHost.split(":")[0]) return "adv";
-  if (requestHost === pubHost.split(":")[0]) return "pub";
-  return null;
-}
-
-function createSessionServer(
-  clientPool: ClientPool,
-  cabinet: CabinetType,
-): McpServer {
+function createSessionServer(clientPool: ClientPool, cabinet: CabinetType): McpServer {
   const server = new McpServer(
     { name: "@kadam/mcp-server", version: SERVER_VERSION },
     { instructions: `Kadam MCP Server (${cabinet === "adv" ? "advertiser" : "publisher"} mode)` },
@@ -87,8 +73,7 @@ function extractBearer(req: IncomingMessage): string | null {
 }
 
 function buildPrm(config: Config, cabinet: CabinetType): object {
-  const domain =
-    cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
+  const domain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
   return {
     resource: `${domain}/mcp`,
     authorization_servers: [domain],
@@ -130,10 +115,7 @@ export async function bootstrapHttp(): Promise<void> {
         return;
       }
 
-      if (
-        pathname === "/.well-known/oauth-protected-resource" &&
-        method === "GET"
-      ) {
+      if (pathname === "/.well-known/oauth-protected-resource" && method === "GET") {
         const cabinet = detectCabinet(requestHost, config);
         if (!cabinet) {
           sendJson(res, 404, { error: "Unknown host" });
@@ -152,10 +134,7 @@ export async function bootstrapHttp(): Promise<void> {
 
         const bearer = extractBearer(req);
         if (!bearer) {
-          const domain =
-            cabinet === "adv"
-              ? config.KADAM_ADV_DOMAIN
-              : config.KADAM_PUB_DOMAIN;
+          const domain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
           res.writeHead(401, {
             "WWW-Authenticate": `Bearer resource_metadata="${domain}/.well-known/oauth-protected-resource"`,
             "Content-Type": "application/json",
@@ -174,13 +153,11 @@ export async function bootstrapHttp(): Promise<void> {
           const body = await readBody(req);
           const parsed = JSON.parse(body);
 
-          const existingSessionId = req.headers["mcp-session-id"] as
-            | string
-            | undefined;
+          const existingSessionId = req.headers["mcp-session-id"] as string | undefined;
 
           if (existingSessionId && sessions.has(existingSessionId)) {
             const session = sessions.get(existingSessionId)!;
-            if (session.bearer !== bearer || session.cabinet !== cabinet) {
+            if (!isSessionAuthorized(session, bearer, cabinet)) {
               sendJson(res, 403, {
                 jsonrpc: "2.0",
                 error: { code: -32001, message: "Token/cabinet mismatch" },
@@ -214,10 +191,7 @@ export async function bootstrapHttp(): Promise<void> {
                   cabinet,
                   lastActivity: Date.now(),
                 });
-                logger.info(
-                  { sessionId, cabinet },
-                  "New HTTP session created",
-                );
+                logger.info({ sessionId, cabinet }, "New HTTP session created");
               },
             });
 
@@ -246,15 +220,13 @@ export async function bootstrapHttp(): Promise<void> {
         }
 
         if (method === "GET") {
-          const existingSessionId = req.headers["mcp-session-id"] as
-            | string
-            | undefined;
+          const existingSessionId = req.headers["mcp-session-id"] as string | undefined;
           if (!existingSessionId || !sessions.has(existingSessionId)) {
             sendJson(res, 400, { error: "Invalid or missing session ID" });
             return;
           }
           const session = sessions.get(existingSessionId)!;
-          if (session.bearer !== bearer || session.cabinet !== cabinet) {
+          if (!isSessionAuthorized(session, bearer, cabinet)) {
             sendJson(res, 403, { error: "Token/cabinet mismatch" });
             return;
           }
@@ -264,14 +236,16 @@ export async function bootstrapHttp(): Promise<void> {
         }
 
         if (method === "DELETE") {
-          const existingSessionId = req.headers["mcp-session-id"] as
-            | string
-            | undefined;
+          const existingSessionId = req.headers["mcp-session-id"] as string | undefined;
           if (!existingSessionId || !sessions.has(existingSessionId)) {
             sendJson(res, 400, { error: "Invalid or missing session ID" });
             return;
           }
           const session = sessions.get(existingSessionId)!;
+          if (!isSessionAuthorized(session, bearer, cabinet)) {
+            sendJson(res, 403, { error: "Token/cabinet mismatch" });
+            return;
+          }
           await session.transport.handleRequest(req, res);
           return;
         }

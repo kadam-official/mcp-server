@@ -2,10 +2,7 @@ import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import type { FinanceRow } from "../../api/schemas/advertiser.js";
-import {
-  formatEntityList,
-  clampPerPage,
-} from "../../output-formatter.js";
+import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 function formatFinanceRow(op: FinanceRow, index: number): string {

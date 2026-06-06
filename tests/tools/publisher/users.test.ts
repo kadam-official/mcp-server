@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPubClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPubClient,
+} from "../../helpers/tool-client.js";
 import { usersModule } from "../../../src/tools/publisher/users.js";
 import { resetConfig } from "../../../src/config.js";
 
@@ -20,7 +24,7 @@ describe("publisher users tools", () => {
     const { client, mockApi } = await createToolClient(usersModule);
     const api = mockApi as MockPubClient;
     api.getUserInfo.mockResolvedValue({
-      balance: 150.50,
+      balance: 150.5,
       currency: "usd",
       notifications: { items: [], totalItems: 5, unreadItems: 2 },
     });

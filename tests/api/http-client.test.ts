@@ -183,9 +183,7 @@ describe("HttpClient", () => {
     vi.useFakeTimers();
     const client = createClient({ maxRetries: 1 });
     fetchMock
-      .mockResolvedValueOnce(
-        mockResponse(429, {}, { "Retry-After": "1" }),
-      )
+      .mockResolvedValueOnce(mockResponse(429, {}, { "Retry-After": "1" }))
       .mockResolvedValueOnce(mockResponse(200, { ok: true }));
 
     const promise = client.get("/test");

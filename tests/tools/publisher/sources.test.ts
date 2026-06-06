@@ -1,4 +1,8 @@
-import { createToolClient, getTextFromResult, type MockPubClient } from "../../helpers/tool-client.js";
+import {
+  createToolClient,
+  getTextFromResult,
+  type MockPubClient,
+} from "../../helpers/tool-client.js";
 import { sourcesModule } from "../../../src/tools/publisher/sources.js";
 import { resetConfig } from "../../../src/config.js";
 

@@ -43,7 +43,9 @@ export async function getCreativeFormatsContent(registry: OptionsRegistry | null
         }
       }
       sizesSection = lines.join("\n");
-    } catch { /* fallback to no sizes */ }
+    } catch {
+      /* fallback to no sizes */
+    }
   }
 
   return STATIC_CONTENT + sizesSection;
