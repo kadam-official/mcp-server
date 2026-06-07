@@ -45,12 +45,17 @@ export function createMcpServer(clientPool: ClientPool): McpServer {
     },
   );
 
-  const wrapper = new ToolWrapper(server, clientPool);
+  const config = getConfig();
+  // stdio is single-tenant: the env-configured keys are this process's
+  // credentials for every tool call.
+  const wrapper = new ToolWrapper(server, clientPool, {
+    advKey: config.KADAM_ADV_API_KEY,
+    pubKey: config.KADAM_PUB_API_KEY,
+  });
 
   const advEnabled = hasAdvKey();
   let advRegistry = null;
   if (advEnabled) {
-    const config = getConfig();
     const { adv } = clientPool.resolve(config.KADAM_ADV_API_KEY!, undefined);
     advRegistry = adv?.options ?? null;
   }

@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import { ToolWrapper } from "../../src/middleware/tool-wrapper.js";
+import { ToolWrapper, type ToolCredentials } from "../../src/middleware/tool-wrapper.js";
 import { ApiError } from "../../src/api/http-client.js";
 import { resetConfig } from "../../src/config.js";
 import { ClientPool } from "../../src/api/client-pool.js";
@@ -19,9 +19,9 @@ function createPool(): ClientPool {
   });
 }
 
-async function createTestSetup() {
+async function createTestSetup(credentials: ToolCredentials = { advKey: "test-key" }) {
   const server = new McpServer({ name: "test", version: "0.0.1" });
-  const wrapper = new ToolWrapper(server, createPool());
+  const wrapper = new ToolWrapper(server, createPool(), credentials);
 
   wrapper.register(
     { name: "test_tool", description: "A test tool", product: "advertiser" },
@@ -74,8 +74,7 @@ describe("ToolWrapper", () => {
   });
 
   it("missing API key returns isError with message containing KADAM_ADV_API_KEY", async () => {
-    delete process.env.KADAM_ADV_API_KEY;
-    const { client } = await createTestSetup();
+    const { client } = await createTestSetup({});
     const result = await client.callTool({
       name: "test_tool",
       arguments: { input: "hello" },
@@ -90,7 +89,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ApiError(404) returns Resource not found", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "fail_404", description: "Fails with 404", product: "advertiser" },
       { input: z.string() },
@@ -114,7 +113,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ApiError(422, message) returns Validation error", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "fail_422", description: "Fails with 422", product: "advertiser" },
       { input: z.string() },
@@ -138,7 +137,7 @@ describe("ToolWrapper", () => {
   it("handler that throws generic Error returns Error: message", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "fail_generic", description: "Fails with generic error", product: "advertiser" },
       { input: z.string() },
@@ -162,7 +161,7 @@ describe("ToolWrapper", () => {
   it("tool with advertiser product works with ADV key set", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "adv_tool", description: "Adv tool", product: "advertiser" },
       { input: z.string() },
@@ -184,7 +183,7 @@ describe("ToolWrapper", () => {
     process.env.KADAM_ADV_API_KEY = "adv-key";
     delete process.env.KADAM_PUB_API_KEY;
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "pub_tool", description: "Publisher tool", product: "publisher" },
       { input: z.string() },
@@ -206,7 +205,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ZodError returns formatted validation message", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "fail_zod", description: "Fails with ZodError", product: "advertiser" },
       { input: z.string() },
@@ -232,7 +231,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ApiError(401) returns invalid key message", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "fail_401", description: "Fails with 401", product: "advertiser" },
       { input: z.string() },
@@ -258,7 +257,7 @@ describe("ToolWrapper", () => {
   it("handler that throws ApiError(500) returns generic API error", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "fail_500", description: "Fails with 500", product: "advertiser" },
       { input: z.string() },
@@ -282,7 +281,7 @@ describe("ToolWrapper", () => {
   it("invalid input args are rejected by MCP SDK", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });
-    const wrapper = new ToolWrapper(server, createPool());
+    const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" });
     wrapper.register(
       { name: "strict_tool", description: "Strict input", product: "advertiser" },
       { count: z.number().min(1) },

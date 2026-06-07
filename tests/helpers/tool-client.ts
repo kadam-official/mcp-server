@@ -149,7 +149,7 @@ export async function createToolClient(
   });
 
   const server = new McpServer({ name: "test", version: "0.0.1" });
-  const wrapper = new ToolWrapper(server, pool);
+  const wrapper = new ToolWrapper(server, pool, { advKey: "test-key", pubKey: "test-key" });
   module.register(wrapper);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
