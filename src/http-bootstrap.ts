@@ -5,7 +5,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ClientPool } from "./api/client-pool.js";
 import { getConfig, type Config } from "./config.js";
-import { detectCabinet, isSessionAuthorized, type CabinetType } from "./http-session.js";
+import {
+  detectCabinet,
+  isSessionAuthorized,
+  sessionCredentials,
+  type CabinetType,
+} from "./http-session.js";
+import type { ToolCredentials } from "./middleware/tool-wrapper.js";
 import { ToolWrapper } from "./middleware/tool-wrapper.js";
 import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
@@ -41,13 +47,17 @@ function touchSession(sessionId: string): void {
   }
 }
 
-function createSessionServer(clientPool: ClientPool, cabinet: CabinetType): McpServer {
+function createSessionServer(
+  clientPool: ClientPool,
+  cabinet: CabinetType,
+  credentials: ToolCredentials,
+): McpServer {
   const server = new McpServer(
     { name: "@kadam/mcp-server", version: SERVER_VERSION },
     { instructions: `Kadam MCP Server (${cabinet === "adv" ? "advertiser" : "publisher"} mode)` },
   );
 
-  const wrapper = new ToolWrapper(server, clientPool);
+  const wrapper = new ToolWrapper(server, clientPool, credentials);
 
   if (cabinet === "adv") {
     registerResources(server, null);
@@ -171,15 +181,14 @@ export async function bootstrapHttp(): Promise<void> {
           }
 
           if (isInitializeRequest(parsed)) {
-            const advKey = cabinet === "adv" ? bearer : undefined;
-            const pubKey = cabinet === "pub" ? bearer : undefined;
+            const credentials = sessionCredentials(bearer, cabinet);
             const pool = new ClientPool({
               advBaseUrl: config.KADAM_ADV_API_BASE,
               pubBaseUrl: config.KADAM_PUB_API_BASE,
             });
-            pool.resolve(advKey, pubKey);
+            pool.resolve(credentials.advKey, credentials.pubKey);
 
-            const mcpServer = createSessionServer(pool, cabinet);
+            const mcpServer = createSessionServer(pool, cabinet, credentials);
 
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: () => randomUUID(),

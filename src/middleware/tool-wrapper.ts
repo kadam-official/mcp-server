@@ -7,7 +7,6 @@ import { ApiError } from "../api/http-client.js";
 import type { Product } from "../types/tool-module.js";
 import type { AdvContext, PubContext } from "../context.js";
 import type { ClientPool } from "../api/client-pool.js";
-import { getConfig } from "../config.js";
 
 export type ToolHandler<TArgs, TCtx> = (args: TArgs, ctx: TCtx) => Promise<string>;
 
@@ -18,12 +17,24 @@ export interface ToolDefinition {
   annotations?: ToolAnnotations;
 }
 
+/**
+ * Credentials this wrapper resolves tool clients with. The source is decided
+ * by the bootstrap, NOT read from global config here:
+ * - HTTP (multi-tenant): the per-request Bearer for the session's cabinet.
+ * - stdio (single-tenant): the env-configured KADAM_*_API_KEY.
+ */
+export interface ToolCredentials {
+  readonly advKey?: string;
+  readonly pubKey?: string;
+}
+
 type ContextForProduct<P extends Product> = P extends "advertiser" ? AdvContext : PubContext;
 
 export class ToolWrapper {
   constructor(
     private readonly server: McpServer,
     private readonly clientPool: ClientPool,
+    private readonly credentials: ToolCredentials,
   ) {}
 
   register<TShape extends z.ZodRawShape, P extends Product>(
@@ -77,26 +88,26 @@ export class ToolWrapper {
   }
 
   private resolveProductContext(product: Product): AdvContext | PubContext {
-    const config = getConfig();
-
     if (product === "advertiser") {
-      if (!config.KADAM_ADV_API_KEY) {
+      if (!this.credentials.advKey) {
         throw new AuthError(
-          "KADAM_ADV_API_KEY is not configured. " +
-            "Set it to your Kadam advertiser API key from partners.kadam.net -> Profile -> API.",
+          "No advertiser API key for this request. In HTTP mode send " +
+            "Authorization: Bearer <key>; in stdio mode set KADAM_ADV_API_KEY " +
+            "(from partners.kadam.net -> Profile -> API).",
         );
       }
-      const resolved = this.clientPool.resolve(config.KADAM_ADV_API_KEY, undefined);
+      const resolved = this.clientPool.resolve(this.credentials.advKey, undefined);
       return { adv: resolved.adv! } satisfies AdvContext;
     }
 
-    if (!config.KADAM_PUB_API_KEY) {
+    if (!this.credentials.pubKey) {
       throw new AuthError(
-        "KADAM_PUB_API_KEY is not configured. " +
-          "Set it to your Kadam publisher API key from pub.kadam.net -> Profile -> API.",
+        "No publisher API key for this request. In HTTP mode send " +
+          "Authorization: Bearer <key>; in stdio mode set KADAM_PUB_API_KEY " +
+          "(from pub.kadam.net -> Profile -> API).",
       );
     }
-    const resolved = this.clientPool.resolve(undefined, config.KADAM_PUB_API_KEY);
+    const resolved = this.clientPool.resolve(undefined, this.credentials.pubKey);
     return { pub: resolved.pub! } satisfies PubContext;
   }
 

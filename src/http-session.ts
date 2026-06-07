@@ -1,4 +1,5 @@
 import type { Config } from "./config.js";
+import type { ToolCredentials } from "./middleware/tool-wrapper.js";
 
 export type CabinetType = "adv" | "pub";
 
@@ -15,6 +16,16 @@ export function detectCabinet(host: string, config: Config): CabinetType | null 
   if (requestHost === advHost) return "adv";
   if (requestHost === pubHost) return "pub";
   return null;
+}
+
+/**
+ * Map a session's Bearer + cabinet to the tool credentials the ToolWrapper
+ * resolves clients with. The Bearer IS the Kadam API key for its cabinet —
+ * advertiser sessions only carry an advKey, publisher sessions only a pubKey,
+ * so a session can never reach across cabinets.
+ */
+export function sessionCredentials(bearer: string, cabinet: CabinetType): ToolCredentials {
+  return cabinet === "adv" ? { advKey: bearer } : { pubKey: bearer };
 }
 
 export interface SessionIdentity {
