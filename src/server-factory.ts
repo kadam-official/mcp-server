@@ -1,11 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ToolWrapper } from "./middleware/tool-wrapper.js";
 import { hasAdvKey, hasPubKey, getConfig } from "./config.js";
 import { logger } from "./logger.js";
-import { registerResources } from "./resources/index.js";
-import { registerPrompts } from "./prompts/index.js";
-import { advToolModules } from "./tools/advertiser/index.js";
-import { pubToolModules } from "./tools/publisher/index.js";
+import { assembleServer } from "./server-assembly.js";
 import type { ClientPool } from "./api/client-pool.js";
 import { createRequire } from "node:module";
 
@@ -46,36 +42,17 @@ export function createMcpServer(clientPool: ClientPool): McpServer {
   );
 
   const config = getConfig();
-  // stdio is single-tenant: the env-configured keys are this process's
-  // credentials for every tool call.
-  const wrapper = new ToolWrapper(server, clientPool, {
-    advKey: config.KADAM_ADV_API_KEY,
-    pubKey: config.KADAM_PUB_API_KEY,
-  });
-
   const advEnabled = hasAdvKey();
-  let advRegistry = null;
-  if (advEnabled) {
-    const { adv } = clientPool.resolve(config.KADAM_ADV_API_KEY!, undefined);
-    advRegistry = adv?.options ?? null;
-  }
-
-  registerResources(server, advRegistry);
-  registerPrompts(server);
-
   const pubEnabled = hasPubKey();
 
-  if (advEnabled) {
-    for (const mod of advToolModules) {
-      mod.register(wrapper);
-    }
-  }
-
-  if (pubEnabled) {
-    for (const mod of pubToolModules) {
-      mod.register(wrapper);
-    }
-  }
+  // stdio is single-tenant: the env-configured keys are this process's
+  // credentials for every tool call. Same assembler as the HTTP transport.
+  assembleServer(
+    server,
+    clientPool,
+    { advKey: config.KADAM_ADV_API_KEY, pubKey: config.KADAM_PUB_API_KEY },
+    { adv: advEnabled, pub: pubEnabled },
+  );
 
   logger.info(
     {
