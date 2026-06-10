@@ -4,6 +4,7 @@ import {
   campaignRowSchema,
   audienceRowSchema_,
   audienceDetailSchema,
+  financeRowSchema,
 } from "../../src/api/schemas/advertiser.js";
 import {
   sourceDetailSchema,
@@ -237,5 +238,56 @@ describe("reportConfigSchema", () => {
     });
     expect(result.groups.time).toHaveLength(1);
     expect(result.metrics.finance[0]!.id).toBe("finance_moneyOut");
+  });
+});
+
+describe("financeRowSchema", () => {
+  // Regression: the API has returned status as { id, label } since 2023 (KPE-6131);
+  // our old z.number() rejected it. This is the layer where the tool actually broke
+  // (tool tests mock PartnersClient and never hit the schema).
+  it("parses status as an object { id, label } (real shape)", () => {
+    const result = financeRowSchema.parse({
+      date: "2025-01-15",
+      money: "-439.71",
+      type: "charge",
+      extType: "campaign",
+      comment: "spend",
+      status: { id: 1, label: "Approved" },
+    });
+    expect(result.date).toBe("2025-01-15");
+    expect(result.money).toBe("-439.71");
+    expect(result.type).toBe("charge");
+    expect(result.status).toEqual({ id: 1, label: "Approved" });
+  });
+
+  it("still parses a legacy numeric status (back-compat)", () => {
+    const result = financeRowSchema.parse({
+      date: "2025-01-15",
+      money: "100.00",
+      type: "deposit",
+      status: 1,
+    });
+    expect(result.status).toBe(1);
+  });
+
+  it("parses a row with missing status", () => {
+    const result = financeRowSchema.parse({
+      date: "2025-01-15",
+      money: "100.00",
+      type: "deposit",
+    });
+    expect(result.status).toBeUndefined();
+  });
+
+  it("parses a full list response of finance rows", () => {
+    const schema = listResponseSchema(financeRowSchema);
+    const result = schema.parse({
+      rows: [
+        { date: "2025-01-15", money: "100.00", type: "deposit", status: { id: 2, label: "Paid" } },
+        { date: "2025-01-16", money: "-50.00", type: "charge", status: 1 },
+      ],
+      totalRows: 2,
+    });
+    expect(result.rows).toHaveLength(2);
   });
 });

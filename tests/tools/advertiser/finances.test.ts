@@ -31,7 +31,7 @@ describe("finances tools", () => {
           type: "deposit",
           extType: "bank",
           comment: "Top up",
-          status: 1,
+          status: { id: 2, label: "Paid" },
         },
         {
           date: "2025-01-16",
@@ -39,7 +39,7 @@ describe("finances tools", () => {
           type: "charge",
           extType: "campaign",
           comment: "",
-          status: 1,
+          status: { id: 1, label: "Approved" },
         },
       ],
       totalRows: 2,
@@ -57,6 +57,29 @@ describe("finances tools", () => {
     expect(text).toContain("2025-01-15");
     expect(text).toContain("deposit");
     expect(text).toContain("2025-01-01 to 2025-01-31");
+    // status object label surfaced in output
+    expect(text).toContain("Paid");
+    expect(text).toContain("Approved");
+  });
+
+  it("formats rows without status cleanly (no trailing undefined)", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listFinanceOperations.mockResolvedValue({
+      rows: [{ date: "2025-02-01", money: "10.00", type: "deposit", status: 1 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_list_finance_operations",
+      arguments: {},
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("2025-02-01");
+    expect(text).not.toContain("undefined");
   });
 
   it("list_finance_operations with no date shows all time", async () => {

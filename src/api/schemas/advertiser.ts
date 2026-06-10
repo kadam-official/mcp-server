@@ -116,7 +116,12 @@ export const financeRowSchema = z
     type: z.string(),
     extType: z.string().optional().default(""),
     comment: z.string().optional().default(""),
-    status: z.number().optional().default(0),
+    // adv/.../OperationsDataTable.php emits status as { id, label } (since
+    // KPE-6131, 2023-06); keep number for back-compat. passthrough tolerates
+    // extra keys.
+    status: z
+      .union([z.number(), z.object({ id: z.number(), label: z.string() }).passthrough()])
+      .optional(),
   })
   .passthrough();
 
