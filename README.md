@@ -85,13 +85,13 @@ KADAM_ADV_API_KEY=your-key kadam-mcp-server
 
 ## Configuration
 
-| Variable | Required | Description |
-|---|---|---|
-| `KADAM_ADV_API_KEY` | One of two | Advertiser API key from [partners.kadam.net](https://partners.kadam.net) -> Profile -> API |
-| `KADAM_PUB_API_KEY` | One of two | Publisher API key from [pub.kadam.net](https://pub.kadam.net) -> Profile -> API |
-| `KADAM_ADV_API_BASE` | No | Advertiser API URL (default: `https://partners.kadam.net/api/v1`) |
-| `KADAM_PUB_API_BASE` | No | Publisher API URL (default: `https://pub.kadam.net/api`) |
-| `LOG_LEVEL` | No | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `info`) |
+| Variable             | Required   | Description                                                                                |
+| -------------------- | ---------- | ------------------------------------------------------------------------------------------ |
+| `KADAM_ADV_API_KEY`  | One of two | Advertiser API key from [partners.kadam.net](https://partners.kadam.net) -> Profile -> API |
+| `KADAM_PUB_API_KEY`  | One of two | Publisher API key from [pub.kadam.net](https://pub.kadam.net) -> Profile -> API            |
+| `KADAM_ADV_API_BASE` | No         | Advertiser API URL (default: `https://partners.kadam.net/api/v1`)                          |
+| `KADAM_PUB_API_BASE` | No         | Publisher API URL (default: `https://pub.kadam.net/api`)                                   |
+| `LOG_LEVEL`          | No         | Log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `info`)            |
 
 At least one API key must be provided in stdio mode. In HTTP mode, tokens are passed per-request via Bearer authentication.
 
@@ -99,13 +99,13 @@ At least one API key must be provided in stdio mode. In HTTP mode, tokens are pa
 
 For server-side deployment serving multiple users:
 
-| Variable | Required | Description |
-|---|---|---|
-| `MCP_TRANSPORT` | No | `"stdio"` (default) or `"http"` |
-| `MCP_HTTP_PORT` | No | HTTP port (default: `8080`) |
-| `MCP_HTTP_HOST` | No | Bind address (default: `0.0.0.0`) |
-| `KADAM_ADV_DOMAIN` | No | Advertiser domain for PRM (default: `https://partners.kadam.net`) |
-| `KADAM_PUB_DOMAIN` | No | Publisher domain for PRM (default: `https://pub.kadam.net`) |
+| Variable           | Required | Description                                                       |
+| ------------------ | -------- | ----------------------------------------------------------------- |
+| `MCP_TRANSPORT`    | No       | `"stdio"` (default) or `"http"`                                   |
+| `MCP_HTTP_PORT`    | No       | HTTP port (default: `8080`)                                       |
+| `MCP_HTTP_HOST`    | No       | Bind address (default: `0.0.0.0`)                                 |
+| `KADAM_ADV_DOMAIN` | No       | Advertiser domain for PRM (default: `https://partners.kadam.net`) |
+| `KADAM_PUB_DOMAIN` | No       | Publisher domain for PRM (default: `https://pub.kadam.net`)       |
 
 ```bash
 docker run -d --name kadam-mcp \
@@ -133,62 +133,63 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (30)
+## Tools (31)
 
-### Advertiser Tools (21)
+### Advertiser Tools (22)
 
 Requires `KADAM_ADV_API_KEY`.
 
 #### Campaigns
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_adv_list_campaigns` | List campaigns with filters (folder, status, type, date, search) and pagination | readOnly |
-| `kadam_adv_create_campaign` | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences) | — |
-| `kadam_adv_update_campaign` | Update any campaign fields by ID | — |
-| `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived) for comma-separated IDs | idempotent |
+| Tool                            | Description                                                                                                                                  | Annotations |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_list_campaigns`      | List campaigns with filters (folder, status, type, date, search) and pagination                                                              | readOnly    |
+| `kadam_adv_get_campaign`        | Get full campaign configuration by ID: landing page URL, bids per country, budgets, targeting, frequency caps, schedule, conversion settings | readOnly    |
+| `kadam_adv_create_campaign`     | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences)                                               | —           |
+| `kadam_adv_update_campaign`     | Update any campaign fields by ID                                                                                                             | —           |
+| `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived) for comma-separated IDs                                                                          | idempotent  |
 
 #### Bid Management
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_adv_update_campaign_bid` | Update bid for a single campaign (lightweight, no full payload). Falls back to current countries if omitted | idempotent |
-| `kadam_adv_bulk_update_bids` | Update bids for multiple campaigns at once (all must share the same pricing model) | idempotent |
-| `kadam_adv_update_site_bids` | Set per-site (zone) bids: static (`0.05`), multiplier (`x1.5`), or remove (`0`) | idempotent |
+| Tool                            | Description                                                                                                 | Annotations |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_update_campaign_bid` | Update bid for a single campaign (lightweight, no full payload). Falls back to current countries if omitted | idempotent  |
+| `kadam_adv_bulk_update_bids`    | Update bids for multiple campaigns at once (all must share the same pricing model)                          | idempotent  |
+| `kadam_adv_update_site_bids`    | Set per-site (zone) bids: static (`0.05`), multiplier (`x1.5`), or remove (`0`)                             | idempotent  |
 
 #### Campaign Folders
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_adv_list_campaign_folders` | List folders with campaign counts and budgets | readOnly |
-| `kadam_adv_create_campaign_folder` | Create a new folder (name min 4 chars) | — |
-| `kadam_adv_update_campaign_folder` | Update folder budgets and distribution | — |
+| Tool                               | Description                                   | Annotations |
+| ---------------------------------- | --------------------------------------------- | ----------- |
+| `kadam_adv_list_campaign_folders`  | List folders with campaign counts and budgets | readOnly    |
+| `kadam_adv_create_campaign_folder` | Create a new folder (name min 4 chars)        | —           |
+| `kadam_adv_update_campaign_folder` | Update folder budgets and distribution        | —           |
 
 #### Creatives
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_adv_list_creatives` | List creatives by campaign, status, or search query | readOnly |
-| `kadam_adv_create_creative` | Create creative for a campaign (goes through moderation) | — |
-| `kadam_adv_update_creative` | Update creative fields | — |
-| `kadam_adv_set_creative_status` | Bulk status change for creatives | idempotent |
+| Tool                            | Description                                              | Annotations |
+| ------------------------------- | -------------------------------------------------------- | ----------- |
+| `kadam_adv_list_creatives`      | List creatives by campaign, status, or search query      | readOnly    |
+| `kadam_adv_create_creative`     | Create creative for a campaign (goes through moderation) | —           |
+| `kadam_adv_update_creative`     | Update creative fields                                   | —           |
+| `kadam_adv_set_creative_status` | Bulk status change for creatives                         | idempotent  |
 
 #### Audiences
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_adv_list_audiences` | List audiences with search and sorting | readOnly |
-| `kadam_adv_get_audience` | Get detailed audience info by ID | readOnly |
-| `kadam_adv_create_audience` | Create audience (pixel, code, fingerprint, or S2S) | — |
-| `kadam_adv_update_audience` | Update audience settings | — |
+| Tool                        | Description                                            | Annotations |
+| --------------------------- | ------------------------------------------------------ | ----------- |
+| `kadam_adv_list_audiences`  | List audiences with search and sorting                 | readOnly    |
+| `kadam_adv_get_audience`    | Get detailed audience info by ID                       | readOnly    |
+| `kadam_adv_create_audience` | Create audience (pixel, code, fingerprint, or S2S)     | —           |
+| `kadam_adv_update_audience` | Update audience settings                               | —           |
 | `kadam_adv_delete_audience` | Delete audience permanently (requires `confirm: true`) | destructive |
 
 #### Finance & Statistics
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_adv_list_finance_operations` | Transaction history (deposits, charges, refunds) | readOnly |
-| `kadam_adv_get_stats` | Unified statistics — 3 report types via `reportType` param: `custom` (report builder with dimension/metric mapping), `sites` (per-site breakdown), `postbacks` (conversion logs) | readOnly |
+| Tool                                | Description                                                                                                                                                                      | Annotations |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_list_finance_operations` | Transaction history (deposits, charges, refunds)                                                                                                                                 | readOnly    |
+| `kadam_adv_get_stats`               | Unified statistics — 3 report types via `reportType` param: `custom` (report builder with dimension/metric mapping), `sites` (per-site breakdown), `postbacks` (conversion logs) | readOnly    |
 
 ### Publisher Tools (9)
 
@@ -196,52 +197,52 @@ Requires `KADAM_PUB_API_KEY`.
 
 #### Sites (Sources)
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_pub_list_sources` | List publisher sites with stats | readOnly |
-| `kadam_pub_create_source` | Add a new site (starts verification flow) | — |
-| `kadam_pub_get_source` | Get detailed site info | readOnly |
-| `kadam_pub_update_source` | Update site name | — |
-| `kadam_pub_set_source_status` | Change site status (active/paused/archived/unarchived) | idempotent |
+| Tool                          | Description                                            | Annotations |
+| ----------------------------- | ------------------------------------------------------ | ----------- |
+| `kadam_pub_list_sources`      | List publisher sites with stats                        | readOnly    |
+| `kadam_pub_create_source`     | Add a new site (starts verification flow)              | —           |
+| `kadam_pub_get_source`        | Get detailed site info                                 | readOnly    |
+| `kadam_pub_update_source`     | Update site name                                       | —           |
+| `kadam_pub_set_source_status` | Change site status (active/paused/archived/unarchived) | idempotent  |
 
 #### Ad Units
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_pub_list_ad_units` | List ad units for a site, filter by format (native/banner/push/popunder/inpagepush) | readOnly |
-| `kadam_pub_set_ad_unit_status` | Change ad unit status (active/paused/archived/restored) | idempotent |
+| Tool                           | Description                                                                         | Annotations |
+| ------------------------------ | ----------------------------------------------------------------------------------- | ----------- |
+| `kadam_pub_list_ad_units`      | List ad units for a site, filter by format (native/banner/push/popunder/inpagepush) | readOnly    |
+| `kadam_pub_set_ad_unit_status` | Change ad unit status (active/paused/archived/restored)                             | idempotent  |
 
 #### User & Statistics
 
-| Tool | Description | Annotations |
-|---|---|---|
-| `kadam_pub_get_user_info` | Get publisher account info and balance | readOnly |
-| `kadam_pub_get_stats` | Publisher statistics with human-readable dimension/metric mapping | readOnly |
+| Tool                      | Description                                                       | Annotations |
+| ------------------------- | ----------------------------------------------------------------- | ----------- |
+| `kadam_pub_get_user_info` | Get publisher account info and balance                            | readOnly    |
+| `kadam_pub_get_stats`     | Publisher statistics with human-readable dimension/metric mapping | readOnly    |
 
 ## Resources (7)
 
 Static reference data the agent can read before calling tools:
 
-| URI | Description |
-|---|---|
-| `kadam://reference/campaign-types` | All ad format types with IDs, features, pricing, and creative specs |
-| `kadam://reference/pricing-models` | CPC, CPM, CPV, CPA Target with IDs and descriptions |
-| `kadam://reference/creative-formats` | Creative requirements per campaign type |
-| `kadam://reference/ad-unit-types` | Publisher ad unit formats with IDs |
-| `kadam://reference/site-states` | Publisher site lifecycle states |
-| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools |
-| `kadam://reference/api-overview` | General Kadam API capabilities overview |
+| URI                                   | Description                                                         |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| `kadam://reference/campaign-types`    | All ad format types with IDs, features, pricing, and creative specs |
+| `kadam://reference/pricing-models`    | CPC, CPM, CPV, CPA Target with IDs and descriptions                 |
+| `kadam://reference/creative-formats`  | Creative requirements per campaign type                             |
+| `kadam://reference/ad-unit-types`     | Publisher ad unit formats with IDs                                  |
+| `kadam://reference/site-states`       | Publisher site lifecycle states                                     |
+| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools               |
+| `kadam://reference/api-overview`      | General Kadam API capabilities overview                             |
 
 ## Prompts (4)
 
 Pre-built workflow templates that guide the agent through multi-step operations:
 
-| Prompt | Description | Arguments |
-|---|---|---|
-| `kadam_launch_campaign` | Step-by-step campaign creation (check types -> create folder -> create campaign -> add creatives) | `type`, `name`, `url`, `budget` |
-| `kadam_campaign_performance` | Campaign performance analysis with optimization recommendations | `campaignId`, `period` |
-| `kadam_optimize_sites` | Analyze site performance and suggest blacklist/whitelist changes | `campaignId`, `minClicks`, `maxCPA` |
-| `kadam_account_overview` | Full account overview — campaigns, spend, top performers | — |
+| Prompt                       | Description                                                                                       | Arguments                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `kadam_launch_campaign`      | Step-by-step campaign creation (check types -> create folder -> create campaign -> add creatives) | `type`, `name`, `url`, `budget`     |
+| `kadam_campaign_performance` | Campaign performance analysis with optimization recommendations                                   | `campaignId`, `period`              |
+| `kadam_optimize_sites`       | Analyze site performance and suggest blacklist/whitelist changes                                  | `campaignId`, `minClicks`, `maxCPA` |
+| `kadam_account_overview`     | Full account overview — campaigns, spend, top performers                                          | —                                   |
 
 ## Architecture
 
@@ -350,6 +351,7 @@ docker run -i --rm -e KADAM_ADV_API_KEY=... kadam-mcp-server
 ### CI/CD
 
 The `.gitlab-ci.yml` pipeline includes:
+
 - **lint** — ESLint + TypeScript check
 - **test** — Vitest with coverage
 - **build** — Vite production build
