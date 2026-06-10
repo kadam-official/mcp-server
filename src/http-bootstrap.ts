@@ -12,11 +12,7 @@ import {
   type CabinetType,
 } from "./http-session.js";
 import type { ToolCredentials } from "./middleware/tool-wrapper.js";
-import { ToolWrapper } from "./middleware/tool-wrapper.js";
-import { registerResources } from "./resources/index.js";
-import { registerPrompts } from "./prompts/index.js";
-import { advToolModules } from "./tools/advertiser/index.js";
-import { pubToolModules } from "./tools/publisher/index.js";
+import { assembleServer } from "./server-assembly.js";
 import { logger } from "./logger.js";
 import { createRequire } from "node:module";
 
@@ -47,7 +43,7 @@ function touchSession(sessionId: string): void {
   }
 }
 
-function createSessionServer(
+export function createSessionServer(
   clientPool: ClientPool,
   cabinet: CabinetType,
   credentials: ToolCredentials,
@@ -57,21 +53,13 @@ function createSessionServer(
     { instructions: `Kadam MCP Server (${cabinet === "adv" ? "advertiser" : "publisher"} mode)` },
   );
 
-  const wrapper = new ToolWrapper(server, clientPool, credentials);
-
-  if (cabinet === "adv") {
-    registerResources(server, null);
-    registerPrompts(server);
-    for (const mod of advToolModules) {
-      mod.register(wrapper);
-    }
-  } else {
-    registerResources(server, null);
-    registerPrompts(server);
-    for (const mod of pubToolModules) {
-      mod.register(wrapper);
-    }
-  }
+  // Shared assembler (same as stdio). The advertiser OptionsRegistry is derived
+  // from the session Bearer inside assembleServer, so the creative-formats
+  // resource includes Banner Sizes; pub sessions have no advKey -> null.
+  assembleServer(server, clientPool, credentials, {
+    adv: cabinet === "adv",
+    pub: cabinet === "pub",
+  });
 
   return server;
 }
