@@ -7,7 +7,8 @@ import { extractPagination } from "../../utils/pagination.js";
 
 function formatFinanceRow(op: FinanceRow, index: number): string {
   const comment = op.comment ? ` | ${op.comment}` : "";
-  return `${index + 1}. ${op.date} | ${op.type} | ${op.money}${comment}`;
+  const status = op.status && typeof op.status === "object" ? ` | ${op.status.label}` : "";
+  return `${index + 1}. ${op.date} | ${op.type} | ${op.money}${status}${comment}`;
 }
 
 export const financesModule: ToolModule = {
