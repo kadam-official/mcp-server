@@ -15,8 +15,8 @@ function formatCampaignRow(row: CampaignRow, index: number): string {
 }
 
 const CONNECTION_TYPE_MAP: Record<string, number> = {
-  cellular: 1,
-  wifi: 2,
+  wifi: 1,
+  cellular: 2,
   unknown: 3,
   all: 3,
 };

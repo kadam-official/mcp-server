@@ -11,8 +11,8 @@ const PRICING_MODEL_NAME: Record<number, string> = {
 };
 
 const CONNECTION_TYPE_NAME: Record<number, string> = {
-  1: "Cellular",
-  2: "WiFi",
+  1: "WiFi",
+  2: "Cellular",
   3: "All",
 };
 

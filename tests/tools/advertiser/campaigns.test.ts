@@ -206,7 +206,33 @@ describe("campaigns tools", () => {
     });
 
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
-    expect(payload.connectionType).toBe(2);
+    expect(payload.connectionType).toBe(1); // backend: 1 = Wi-Fi
+  });
+
+  it("update_campaign maps connectionType cellular to 2 (3G/LTE)", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 31,
+      type: 30,
+      cpType: 0,
+      name: "Conn cellular test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      connectionType: 3,
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 31, connectionType: "cellular" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.connectionType).toBe(2); // backend: 2 = 3G/LTE
   });
 
   it("update_campaign filters NaN from postConversionAudienceIds", async () => {
