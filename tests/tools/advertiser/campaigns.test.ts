@@ -278,13 +278,13 @@ describe("campaigns tools", () => {
     expect(text).toContain("0");
   });
 
-  it("update_campaign_bid sends CPC bid with explicit countries", async () => {
+  it("update_campaign_bid sends CPC bid with explicit (already-targeted) countries", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
     api.getCampaign.mockResolvedValue({
       id: 50,
       cpType: 0,
-      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34, 24] }],
     });
     api.updateCampaignBid.mockResolvedValue({} as never);
 
@@ -299,6 +299,28 @@ describe("campaigns tools", () => {
       { bid: 0.08, leadCost: 0, countries: [34, 24] },
     ]);
     expect(text).toContain("campaign #50");
+  });
+
+  it("update_campaign_bid errors (no silent success) when a country is not targeted", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 51,
+      cpType: 0,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }], // US only
+    });
+    api.updateCampaignBid.mockResolvedValue({} as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_campaign_bid",
+      arguments: { id: 51, bid: 0.08, countries: "BR" },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    const text = getTextFromResult(result);
+    expect(text).toContain("BR");
+    expect(text).toContain("does not target");
+    expect(api.updateCampaignBid).not.toHaveBeenCalled();
   });
 
   it("update_campaign_bid without countries falls back to campaign's current countries", async () => {
@@ -511,6 +533,66 @@ describe("campaigns tools", () => {
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
     const conv = payload.conversion as Record<string, unknown>;
     expect(conv.id).toBe(5);
+  });
+
+  it("update_campaign sets subAges from subscriptionAges", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 90,
+      type: 30,
+      pushType: 2,
+      cpType: 0,
+      name: "Sub-age test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      subAges: [1, 2, 3, 4],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 90, subscriptionAges: "1" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.subAges).toEqual([1]);
+  });
+
+  it("update_campaign preserves subAges and drops read-only keys on unrelated edits", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 91,
+      status: 10,
+      state: { id: "active", label: "Active" },
+      type: 30,
+      pushType: 2,
+      cpType: 0,
+      name: "Old",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      subAges: [1, 2, 3],
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 91, name: "New" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.subAges).toEqual([1, 2, 3]); // preserved untouched
+    expect(payload.pushType).toBe(2); // writable field, preserved
+    expect(payload.name).toBe("New");
+    expect(payload.id).toBeUndefined(); // read-only, dropped
+    expect(payload.status).toBeUndefined(); // read-only, dropped
+    expect(payload.state).toBeUndefined(); // read-only, dropped
   });
 
   it("update_site_bids sends PUT /stats/sites/bids with zones and bid", async () => {
