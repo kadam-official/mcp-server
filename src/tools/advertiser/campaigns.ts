@@ -21,6 +21,83 @@ const CONNECTION_TYPE_MAP: Record<string, number> = {
   all: 3,
 };
 
+/**
+ * Writable campaign fields, mirroring the backend create/update form
+ * (adv/modules/campaigns/forms/campaigns/CampaignCreateForm.php — CampaignUpdateForm
+ * extends the same base form). The update endpoint is a full replace, so the
+ * read-modify-write payload must carry every writable field and NOTHING else:
+ * read-only view keys (id, status, state, ...) must be dropped, or they pollute
+ * the form. subAges is part of this set, so it round-trips on unrelated edits.
+ */
+const CAMPAIGN_WRITABLE_FIELDS = new Set<string>([
+  "type",
+  "pushType",
+  "isNeedSecondPush",
+  "allowMultiAds",
+  "folderId",
+  "name",
+  "cpType",
+  "maxCpm",
+  "isEasyStart",
+  "url",
+  "clickPostback",
+  "hasCorrectPostback",
+  "impTracker",
+  "conversion",
+  "bids",
+  "cities",
+  "isps",
+  "platformVersions",
+  "devices",
+  "browsers",
+  "languages",
+  "connectionType",
+  "categories",
+  "gender",
+  "age",
+  "newAudiences",
+  "audiences",
+  "sites",
+  "ips",
+  "disableProxy",
+  "proxies",
+  "subAges",
+  "macrosGroups",
+  "videoFormats",
+  "ssps",
+  "commonMoneyLimit",
+  "dayMoneyLimit",
+  "isDirectTrafficPriority",
+  "isEvenDistribution",
+  "totalLossLimit",
+  "materialViews",
+  "campaignView",
+  "minBlockViews",
+  "maxBlockViews",
+  "dayClickLimit",
+  "dayConversionsLimit",
+  "startDate",
+  "stopDate",
+  "timezone",
+  "isPauseAfterModerate",
+  "time",
+  "isConversionFromPostback",
+  "isApplyNewDomainToAds",
+  "forecastMaxBid",
+  "forecastMinBid",
+  "autorules",
+  "postConversion",
+]);
+
+/** Keep only writable fields from a GET campaign detail; drops read-only keys (id, status, state, ...). */
+function pickWritable(current: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of CAMPAIGN_WRITABLE_FIELDS) {
+    if (current[key] !== undefined) out[key] = current[key];
+  }
+  return out;
+}
+
 async function mapField(
   key: string,
   value: unknown,
@@ -596,7 +673,9 @@ export const campaignsModule: ToolModule = {
         name: "kadam_adv_update_campaign",
         description:
           "Update an existing campaign (read-modify-write). Fetches current state, merges your changes, sends full payload. " +
-          "Pass only the fields you want to change. Uses same field names as create. For status changes use set_campaign_status instead.",
+          "Pass only the fields you want to change; uses the same field names as create. " +
+          "This is the tool for ALL targeting changes: geo (countries), devices/OS/browsers, sub-age (subscriptionAges), " +
+          "budgets, bid, schedule, and conversion settings. For status changes use set_campaign_status instead.",
         product: "advertiser",
         annotations: { title: "Update campaign", readOnlyHint: false },
       },
@@ -612,6 +691,13 @@ export const campaignsModule: ToolModule = {
           .optional()
           .describe("Bid amount in USD. For cpa_target this is the target CPA cost"),
         disableProxy: z.boolean().optional().describe("Block proxy/VPN traffic"),
+        subscriptionAges: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated subscription-age IDs (push / in-page push only; see campaign options 'subAges'). " +
+              "Replaces the current set. Example: '1' = newest only.",
+          ),
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
@@ -619,7 +705,7 @@ export const campaignsModule: ToolModule = {
       async (args, ctx) => {
         const { id, ...changes } = args;
         const current = await ctx.adv.getCampaign(id);
-        const merged = { ...current };
+        const merged = pickWritable(current);
 
         const cpType = merged.cpType as number | undefined;
         const registry = ctx.adv.options;
@@ -632,6 +718,12 @@ export const campaignsModule: ToolModule = {
         if (changes.evenDistribution != null)
           merged.isEvenDistribution = changes.evenDistribution ? 1 : 0;
         if (changes.disableProxy != null) merged.disableProxy = changes.disableProxy ? 1 : 0;
+        if (changes.subscriptionAges != null) {
+          merged.subAges = changes.subscriptionAges
+            .split(",")
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => !isNaN(n));
+        }
         if (changes.startDate != null) merged.startDate = changes.startDate;
         if ((changes as Record<string, unknown>).endDate !== undefined)
           merged.stopDate = (changes as Record<string, unknown>).endDate;
@@ -774,9 +866,7 @@ export const campaignsModule: ToolModule = {
           };
         }
 
-        delete merged.id;
-        delete merged.status;
-
+        // id/status are read-only view keys; pickWritable already excludes them.
         merged.newAudiences ??= [];
 
         if (Array.isArray(merged.categories) && (merged.categories as unknown[]).length === 0) {
@@ -813,10 +903,10 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_update_campaign_bid",
         description:
-          "Update bid for a single campaign without sending the full campaign payload. " +
-          "Faster and safer than kadam_adv_update_campaign when only the bid needs changing. " +
-          "If countries omitted, keeps the campaign's current country targeting. " +
-          "Note: this endpoint only updates bids for countries already configured on the campaign; it does not add new countries.",
+          "Change ONLY the bid amount for countries the campaign ALREADY targets. " +
+          "Does NOT change geo/country targeting — to add or change countries (or any other field) use kadam_adv_update_campaign. " +
+          "Passing a country the campaign does not target returns an error. " +
+          "If countries is omitted, re-bids all of the campaign's current countries.",
         product: "advertiser",
         annotations: { title: "Update campaign bid", idempotentHint: true },
       },
@@ -827,7 +917,8 @@ export const campaignsModule: ToolModule = {
           .string()
           .optional()
           .describe(
-            "Comma-separated ISO country codes (e.g. 'US,DE'). If omitted, keeps current countries from campaign settings",
+            "Which of the campaign's EXISTING countries to re-bid (e.g. 'US,DE') — not for adding countries. " +
+              "If omitted, re-bids all current countries.",
           ),
       },
       async (args, ctx) => {
@@ -836,6 +927,29 @@ export const campaignsModule: ToolModule = {
         const cpType = current.cpType as number | undefined;
 
         const currentBids = current.bids as Array<Record<string, unknown>> | undefined;
+
+        if (args.countries) {
+          const configured = new Set<number>(
+            (currentBids ?? []).flatMap((b) => (b.countries as number[] | undefined) ?? []),
+          );
+          const countryMap = await registry.getCountryMap();
+          const notTargeted = args.countries
+            .split(",")
+            .map((s) => s.trim().toUpperCase())
+            .filter(Boolean)
+            .filter((code) => {
+              const geoId = countryMap.get(code);
+              return geoId == null || !configured.has(geoId);
+            });
+          if (notTargeted.length > 0) {
+            throw new Error(
+              `Campaign #${args.id} does not target: ${notTargeted.join(", ")}. ` +
+                `update_campaign_bid only adjusts bids for countries already on the campaign — ` +
+                `use kadam_adv_update_campaign (countries=...) to change geo targeting.`,
+            );
+          }
+        }
+
         const countries = args.countries
           ? await registry.resolveCountryIds(args.countries)
           : ((currentBids?.[0]?.countries as number[]) ?? []);
