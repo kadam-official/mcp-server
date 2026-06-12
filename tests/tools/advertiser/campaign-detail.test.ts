@@ -76,7 +76,7 @@ describe("kadam_adv_get_campaign", () => {
     expect(text).toContain('[ID: 906074] "Retarget DE"');
     expect(text).toContain("Type: Push");
     expect(text).toContain("Pricing model: CPC");
-    expect(text).toContain("Folder: #178937");
+    expect(text).toContain("Campaign group: #178937");
     expect(text).toContain("Daily budget: 150");
     expect(text).toContain("Total budget: 5000");
   });

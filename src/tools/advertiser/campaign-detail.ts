@@ -201,7 +201,7 @@ export async function formatCampaignDetail(
   push(c.url != null ? `URL: ${c.url}` : null);
   push(typeName ? `Type: ${typeName}` : null);
   push(pricing ? `Pricing model: ${pricing}` : null);
-  push(c.folderId != null ? `Folder: #${c.folderId}` : null);
+  push(c.folderId != null ? `Campaign group: #${c.folderId}` : null);
   push(c.status != null ? `Status: ${jsonCompact(c.status)}` : null);
   push(c.state != null ? `State: ${jsonCompact(c.state)}` : null);
 

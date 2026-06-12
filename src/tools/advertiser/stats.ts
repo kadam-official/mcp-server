@@ -9,9 +9,11 @@ import {
 } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 import {
-  resolveMetricIds,
-  resolveGroupIds,
+  resolveMetrics,
+  resolveGroups,
   resolveAlias,
+  describeMetrics,
+  describeGroups,
   METRIC_ALIASES,
 } from "../../utils/dimension-mapper.js";
 import { resolvePeriodToDates } from "../../utils/date-helpers.js";
@@ -39,8 +41,22 @@ export const statsModule: ToolModule = {
         perPage: z.number().optional().default(25),
         sortBy: z.string().optional(),
         sortOrder: z.enum(["asc", "desc"]).optional(),
-        groupBy: z.string().optional(),
-        metrics: z.string().optional().default("spend,clicks,impressions,ctr"),
+        groupBy: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated groupings, e.g. 'day,campaign,country'. Includes campaign_group (a.k.a. folder). " +
+              "Unknown names are reported back, not silently ignored.",
+          ),
+        metrics: z
+          .string()
+          .optional()
+          .default("spend,clicks,impressions,ctr")
+          .describe(
+            "Comma-separated metric names, e.g. 'spend,clicks,impressions,ctr,cpa,conversions,income,roi'. " +
+              "income = earned/profit. Unknown names are reported back, not silently ignored. " +
+              "See the report-dimensions resource for the full list.",
+          ),
         campaignIds: z.string().optional(),
         countries: z.string().optional(),
         creativeIds: z.string().optional(),
@@ -53,7 +69,7 @@ export const statsModule: ToolModule = {
         folderIds: z
           .string()
           .optional()
-          .describe("Comma-separated folder IDs (for reportType=conversions)"),
+          .describe("Comma-separated campaign group (folder) IDs (for reportType=conversions)"),
         audienceIds: z
           .string()
           .optional()
@@ -72,11 +88,11 @@ export const statsModule: ToolModule = {
 
         if (args.reportType === "custom") {
           const config = await ctx.adv.getReportConfig();
-          const groupIds = resolveGroupIds(args.groupBy, config);
-          const metricIds = resolveMetricIds(args.metrics, config);
+          const { ids: groupIds, unknown: unknownGroups } = resolveGroups(args.groupBy, config);
+          const { ids: metricIds, unknown: unknownMetrics } = resolveMetrics(args.metrics, config);
 
           if (metricIds.length === 0) {
-            return "No valid metrics found. Available: spend, clicks, views/impressions, ctr, cpc, cpm, cpa, conversions, holds, rejects, cr, roi, income";
+            return `No valid metrics found. Valid metrics: ${describeMetrics(config)}`;
           }
 
           const customFilters: unknown[] = [];
@@ -102,8 +118,15 @@ export const statsModule: ToolModule = {
             });
           }
 
-          const resolvedSort =
-            args.sortBy != null ? resolveAlias(args.sortBy, METRIC_ALIASES) : undefined;
+          // sortBy may be a metric OR a group; resolve through both, warn if neither.
+          let resolvedSort: string | undefined;
+          let unknownSort: string | undefined;
+          if (args.sortBy != null) {
+            const sortMetric = resolveMetrics(args.sortBy, config).ids[0];
+            const sortGroup = sortMetric ? undefined : resolveGroups(args.sortBy, config).ids[0];
+            resolvedSort = sortMetric ?? sortGroup;
+            if (resolvedSort == null) unknownSort = args.sortBy;
+          }
 
           const params: Record<string, unknown> = {
             groups: groupIds.length > 0 ? groupIds : ["time_day"],
@@ -119,8 +142,22 @@ export const statsModule: ToolModule = {
           };
           const res = await ctx.adv.getReportData(params);
           const rows = res.rows ?? [];
+
+          const warnings: string[] = [];
+          if (unknownMetrics.length > 0)
+            warnings.push(
+              `ignored unknown metric(s): ${unknownMetrics.join(", ")}. Valid metrics: ${describeMetrics(config)}.`,
+            );
+          if (unknownGroups.length > 0)
+            warnings.push(
+              `ignored unknown groupBy: ${unknownGroups.join(", ")}. Valid groups: ${describeGroups(config)}.`,
+            );
+          if (unknownSort != null)
+            warnings.push(`ignored unknown sortBy: ${unknownSort} (not a valid metric or group).`);
+          const notice = warnings.length > 0 ? `Note: ${warnings.join(" ")}\n\n` : "";
+
           if (rows.length === 0) {
-            return `No data for ${df} to ${dt}.`;
+            return `${notice}No data for ${df} to ${dt}.`;
           }
           const allKeys = new Set<string>();
           for (const row of rows) {
@@ -130,7 +167,7 @@ export const statsModule: ToolModule = {
           const tableRows = rows.map((row) => headers.map((h) => extractCellValue(row[h])));
           const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
           const title = `Stats (${df} to ${dt}, page ${res.page ?? 1}/${totalPages})`;
-          return formatTable({ headers, rows: tableRows }, title);
+          return notice + formatTable({ headers, rows: tableRows }, title);
         }
 
         if (args.reportType === "sites") {

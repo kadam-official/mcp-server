@@ -51,7 +51,7 @@ describe("campaign-folders tools", () => {
 
     expect(text).toContain("[ID: 1]");
     expect(text).toContain("My Folder");
-    expect(text).toContain("Campaign Folders");
+    expect(text).toContain("Campaign groups");
   });
 
   it("create_campaign_folder calls api and returns ID", async () => {
@@ -66,7 +66,7 @@ describe("campaign-folders tools", () => {
     const text = getTextFromResult(result);
 
     expect(api.createCampaignFolder).toHaveBeenCalledWith("Test Folder");
-    expect(text).toContain("Folder created: [ID: 42]");
+    expect(text).toContain("Campaign group created: [ID: 42]");
   });
 
   it("update_campaign_folder auto-sets limitsEnabled when budget is provided", async () => {

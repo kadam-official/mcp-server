@@ -66,6 +66,106 @@ describe("advertiser stats tools", () => {
     expect(params.sort).toEqual({ finance_moneyOut: "desc" });
   });
 
+  it("custom report warns about unknown metrics and still resolves valid ones", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }], advertiser: [{ id: "advertiser_income" }] },
+    });
+    api.getReportData.mockResolvedValue({
+      rows: [{ time_day: "2025-03-01", finance_moneyOut: 100, advertiser_income: 451 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: { reportType: "custom", period: "7days", metrics: "spend,earned,foo" },
+    });
+    const text = getTextFromResult(result);
+
+    const params = api.getReportData.mock.calls[0][0] as Record<string, unknown>;
+    expect(params.metrics).toEqual(["finance_moneyOut", "advertiser_income"]); // earned -> income
+    expect(text).toContain("ignored unknown metric(s): foo");
+    expect(text).toContain("Valid metrics:");
+  });
+
+  it("custom report returns a config-derived hint when no metrics resolve", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }] },
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: { reportType: "custom", period: "7days", metrics: "foo,bar" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("No valid metrics found");
+    expect(text).toContain("spend"); // finance_moneyOut -> friendly alias "spend"
+    expect(api.getReportData).not.toHaveBeenCalled();
+  });
+
+  it("custom report resolves a GROUP sortBy to its id (not just metrics)", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { advertiser: [{ id: "advertiser_campaign" }], time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }] },
+    });
+    api.getReportData.mockResolvedValue({
+      rows: [{ advertiser_campaign: "X", finance_moneyOut: 1 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
+    });
+
+    await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: {
+        reportType: "custom",
+        period: "7days",
+        metrics: "spend",
+        groupBy: "campaign",
+        sortBy: "campaign",
+        sortOrder: "asc",
+      },
+    });
+
+    const params = api.getReportData.mock.calls[0][0] as Record<string, unknown>;
+    expect(params.sort).toEqual({ advertiser_campaign: "asc" });
+  });
+
+  it("custom report warns and omits an unknown sortBy", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getReportConfig.mockResolvedValue({
+      groups: { time: [{ id: "time_day" }] },
+      metrics: { finance: [{ id: "finance_moneyOut" }] },
+    });
+    api.getReportData.mockResolvedValue({
+      rows: [{ time_day: "2025-03-01", finance_moneyOut: 100 }],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_stats",
+      arguments: { reportType: "custom", period: "7days", metrics: "spend", sortBy: "bogus" },
+    });
+    const text = getTextFromResult(result);
+
+    const params = api.getReportData.mock.calls[0][0] as Record<string, unknown>;
+    expect(params.sort).toBeUndefined();
+    expect(text).toContain("ignored unknown sortBy: bogus");
+  });
+
   it("custom report wires countries and creativeIds into filters", async () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
