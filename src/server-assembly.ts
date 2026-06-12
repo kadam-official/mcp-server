@@ -5,10 +5,12 @@ import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
 import { advToolModules } from "./tools/advertiser/index.js";
 import { pubToolModules } from "./tools/publisher/index.js";
-import { getConfig } from "./config.js";
-import type { ServerProducts } from "./types/products.js";
 
-export type { ServerProducts } from "./types/products.js";
+/** Which cabinets' tool modules to register on this server. */
+export interface ServerProducts {
+  readonly adv: boolean;
+  readonly pub: boolean;
+}
 
 /**
  * Single source of truth for wiring an McpServer's contents — resources,
@@ -31,15 +33,11 @@ export function assembleServer(
 ): void {
   const wrapper = new ToolWrapper(server, pool, credentials);
 
-  // Static-only mode: skip live API enrichment so reference resources are served
-  // from the static reference text (fast, no upstream calls).
-  const staticOnly = getConfig().KADAM_STATIC_RESOURCES_ONLY;
-  const advRegistry =
-    !staticOnly && credentials.advKey
-      ? (pool.resolve(credentials.advKey, undefined).adv?.options ?? null)
-      : null;
+  const advRegistry = credentials.advKey
+    ? (pool.resolve(credentials.advKey, undefined).adv?.options ?? null)
+    : null;
 
-  registerResources(server, advRegistry, products);
+  registerResources(server, advRegistry);
   registerPrompts(server);
 
   if (products.adv) {

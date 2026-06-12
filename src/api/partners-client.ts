@@ -54,11 +54,8 @@ export class PartnersClient {
   readonly options: OptionsRegistry;
   private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
 
-  constructor(
-    private readonly http: HttpClient,
-    optionsTtlMs?: number,
-  ) {
-    this.options = new OptionsRegistry(http, optionsTtlMs);
+  constructor(private readonly http: HttpClient) {
+    this.options = new OptionsRegistry(http);
   }
 
   async listCampaigns(params: Record<string, unknown>): Promise<ListResponse<CampaignRow>> {

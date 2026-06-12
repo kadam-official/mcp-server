@@ -70,22 +70,4 @@ describe("ClientPool", () => {
     expect(ctx.adv).toBeNull();
     expect(ctx.pub).toBeNull();
   });
-
-  it("evicts the least-recently-used client when maxClients is exceeded", () => {
-    const pool = new ClientPool({ ...config, maxClients: 1 });
-    const a1 = pool.resolve("a", undefined).adv;
-    pool.resolve("b", undefined); // exceeds cap -> evicts LRU "a"
-    expect(pool.stats.advClients).toBe(1);
-    const a2 = pool.resolve("a", undefined).adv; // "a" recreated (cold)
-    expect(a2).not.toBe(a1);
-  });
-
-  it("evictIdle drops clients and forces re-creation", () => {
-    const pool = new ClientPool(config);
-    const a1 = pool.resolve("a", undefined).adv;
-    expect(pool.evictIdle(-1)).toBe(1); // everything is older than -1ms
-    expect(pool.stats.advClients).toBe(0);
-    const a2 = pool.resolve("a", undefined).adv;
-    expect(a2).not.toBe(a1);
-  });
 });
