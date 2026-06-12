@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../types/advertiser.js";
 import type { OptionsRegistry } from "../api/options-registry.js";
+import { compareId } from "../utils/stable-sort.js";
 
 const PRICING_DESCRIPTIONS: Record<number, string> = {
   0: "Cost Per Click. You pay for each click.",
@@ -17,7 +18,7 @@ function staticFallback(): string {
   return lines.join("\n");
 }
 
-async function generateContent(registry: OptionsRegistry | null): Promise<string> {
+export async function buildPricingModelsContent(registry: OptionsRegistry | null): Promise<string> {
   if (!registry) return staticFallback();
 
   const allCpTypes = new Map<number, { label: string; types: string[] }>();
@@ -42,7 +43,8 @@ async function generateContent(registry: OptionsRegistry | null): Promise<string
   if (allCpTypes.size === 0) return staticFallback();
 
   const lines = ["Pricing Models (cpType):"];
-  for (const [id, { label, types }] of allCpTypes) {
+  const sorted = [...allCpTypes.entries()].sort(([a], [b]) => compareId(a, b));
+  for (const [id, { label, types }] of sorted) {
     const desc = PRICING_DESCRIPTIONS[id] ?? "";
     lines.push(`- ${label} (id: ${id}): ${desc}`);
     lines.push(`  Available for: ${types.join(", ")}`);
@@ -59,7 +61,7 @@ export function registerPricingModelsResource(
       {
         uri: "kadam://reference/pricing-models",
         mimeType: "text/plain",
-        text: await generateContent(registry),
+        text: await buildPricingModelsContent(registry),
       },
     ],
   }));
