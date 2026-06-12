@@ -151,8 +151,9 @@ export function resolveGroupIds(names: string | undefined, config: ReportConfig)
 
 /**
  * Human-readable list of valid dimension names for THIS config, derived live from
- * the API (not a hardcoded string -> never drifts). Friendly aliases whose target
- * exists in the config come first, then any available ids that have no alias.
+ * the API (not a hardcoded string -> never drifts). One canonical friendly name
+ * per target id (the first alias defined wins, so synonyms like spend/spending/cost
+ * collapse to "spend"), followed by any available ids that have no alias.
  */
 function describeDimensions(
   config: Record<string, (ReportConfigGroup | ReportConfigMetric)[]>,
@@ -160,11 +161,15 @@ function describeDimensions(
 ): string {
   const available = flattenConfig(config);
   const aliasTargets = new Set(Object.values(aliases));
-  const friendly = Object.entries(aliases)
-    .filter(([, id]) => available.has(id))
-    .map(([name]) => name);
+  const seenTargets = new Set<string>();
+  const friendly: string[] = [];
+  for (const [name, id] of Object.entries(aliases)) {
+    if (!available.has(id) || seenTargets.has(id)) continue;
+    seenTargets.add(id);
+    friendly.push(name);
+  }
   const rawUncovered = [...available].filter((id) => !aliasTargets.has(id));
-  return [...new Set([...friendly, ...rawUncovered])].join(", ");
+  return [...friendly, ...rawUncovered].join(", ");
 }
 
 export function describeMetrics(config: ReportConfig): string {

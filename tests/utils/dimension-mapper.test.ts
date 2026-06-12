@@ -176,6 +176,14 @@ describe("describeMetrics / describeGroups (config-derived)", () => {
     expect(describeMetrics(mockConfig)).toContain("advertiser_unaliased");
   });
 
+  it("collapses synonyms to one canonical name per target id", () => {
+    const s = describeMetrics(mockConfig);
+    expect(s).toContain("spend"); // canonical for finance_moneyOut
+    expect(s).not.toContain("spending"); // synonym deduped
+    expect(s).not.toContain("earned"); // synonym of income deduped
+    expect(s).not.toContain("profit");
+  });
+
   it("describeGroups lists campaign_group and excludes absent-target aliases", () => {
     const s = describeGroups(mockConfig);
     expect(s).toContain("campaign_group");

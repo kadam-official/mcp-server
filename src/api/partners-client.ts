@@ -47,8 +47,12 @@ export interface ReportDataParams {
   [key: string]: unknown;
 }
 
+/** Report config (groups/metrics) rarely changes; cache per client instance (== per tenant). */
+const REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
+
 export class PartnersClient {
   readonly options: OptionsRegistry;
+  private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
 
   constructor(private readonly http: HttpClient) {
     this.options = new OptionsRegistry(http);
@@ -161,8 +165,13 @@ export class PartnersClient {
   }
 
   async getReportConfig(): Promise<ReportConfig> {
+    if (this.reportConfigCache && this.reportConfigCache.expiresAt > Date.now()) {
+      return this.reportConfigCache.data;
+    }
     const raw = await this.http.options("/custom-reports");
-    return reportConfigSchema.parse(raw);
+    const data = reportConfigSchema.parse(raw);
+    this.reportConfigCache = { data, expiresAt: Date.now() + REPORT_CONFIG_TTL_MS };
+    return data;
   }
 
   async getReportData(params: ReportDataParams): Promise<ReportDataResponse> {
