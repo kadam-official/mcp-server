@@ -1,5 +1,4 @@
 import type { OptionsRegistry } from "../api/options-registry.js";
-import { sortById } from "../utils/stable-sort.js";
 
 const STATIC_CONTENT = `Creative Format Requirements by Campaign Type:
 
@@ -36,7 +35,7 @@ export async function getCreativeFormatsContent(registry: OptionsRegistry | null
     try {
       const opts = await registry.getMaterialOptions();
       const lines = ["\nBanner Sizes (sizeId values):"];
-      for (const s of sortById(opts.sizes)) {
+      for (const s of opts.sizes) {
         if (s.width > 0 && s.height > 0) {
           lines.push(`  ${s.id} = ${s.label} (${s.width}x${s.height})`);
         } else {

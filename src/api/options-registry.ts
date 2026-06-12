@@ -79,7 +79,7 @@ export interface MaterialOptions {
 }
 
 const CAMPAIGN_TYPES = [10, 20, 30, 40, 70, 100] as const;
-const DEFAULT_CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
 interface CacheEntry<T> {
   data: T;
@@ -100,14 +100,7 @@ export class OptionsRegistry {
     language: Map<string, number>;
   } | null = null;
 
-  private readonly ttlMs: number;
-
-  constructor(
-    private readonly http: HttpClient,
-    ttlMs?: number,
-  ) {
-    this.ttlMs = ttlMs && ttlMs > 0 ? ttlMs : DEFAULT_CACHE_TTL_MS;
-  }
+  constructor(private readonly http: HttpClient) {}
 
   async getCampaignOptions(type: number): Promise<CampaignOptions> {
     const cached = this.campaignCache.get(type);
@@ -122,7 +115,7 @@ export class OptionsRegistry {
 
     try {
       const data = await promise;
-      this.campaignCache.set(type, { data, expiresAt: Date.now() + this.ttlMs });
+      this.campaignCache.set(type, { data, expiresAt: Date.now() + CACHE_TTL_MS });
       if (type === 10) {
         this.isoToGeoId = null;
         this.nameResolvers = null;
@@ -146,7 +139,7 @@ export class OptionsRegistry {
 
     try {
       const data = await promise;
-      this.materialCache = { data, expiresAt: Date.now() + this.ttlMs };
+      this.materialCache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
       return data;
     } finally {
       this.inflight.delete("materials");
