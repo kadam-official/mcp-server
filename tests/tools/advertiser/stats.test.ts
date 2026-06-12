@@ -274,7 +274,7 @@ describe("advertiser stats tools", () => {
     expect(text).toContain("Conversion Details");
   });
 
-  it("conversions report resolves sortBy alias in sort key", async () => {
+  it("conversions report passes sortBy as a raw column key (not via metric aliases)", async () => {
     const { client, mockApi } = await createToolClient(statsModule);
     const api = mockApi as MockPartnersClient;
     api.getConversionDetails.mockResolvedValue({
@@ -288,10 +288,15 @@ describe("advertiser stats tools", () => {
 
     await client.callTool({
       name: "kadam_adv_get_stats",
-      arguments: { reportType: "conversions", period: "7days", sortBy: "spend", sortOrder: "asc" },
+      arguments: {
+        reportType: "conversions",
+        period: "7days",
+        sortBy: "conversionTime",
+        sortOrder: "asc",
+      },
     });
 
     const params = api.getConversionDetails.mock.calls[0][0];
-    expect(params.sort).toEqual({ finance_moneyOut: "asc" });
+    expect(params.sort).toEqual({ conversionTime: "asc" });
   });
 });

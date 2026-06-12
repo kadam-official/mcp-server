@@ -3,10 +3,10 @@ import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatTable, extractCellValue, clampPerPage } from "../../output-formatter.js";
 import {
-  resolveMetricIds,
-  resolveGroupIds,
-  resolveAlias,
-  METRIC_ALIASES,
+  resolveMetrics,
+  resolveGroups,
+  describeMetrics,
+  describeGroups,
 } from "../../utils/dimension-mapper.js";
 
 function resolveDateRange(
@@ -50,8 +50,7 @@ export const pubStatsModule: ToolModule = {
         name: "kadam_pub_get_stats",
         description:
           "Fetches publisher statistics. Use human-readable names like 'revenue,impressions,clicks' for metrics and 'day,site,country' for groupBy. " +
-          "Available metrics: revenue, clicks, views, impressions, pub_cpm, pub_cpc, block_ctr, block_cpm, subscriptions, unsubscriptions, block_views, viewrate. " +
-          "Available groups: day, hour, week, month, source, block, country, browser, os, device, devicetype, domain, subid, pid, category, sub_age, block_format, block_size.",
+          "Unknown names are reported back (not silently ignored); see the report-dimensions resource for the full list.",
         product: "publisher",
         annotations: { title: "Get publisher statistics", readOnlyHint: true },
       },
@@ -69,14 +68,24 @@ export const pubStatsModule: ToolModule = {
       },
       async (args, ctx) => {
         const config = await ctx.pub.getReportConfig();
-        const groupIds = resolveGroupIds(args.groupBy, config);
+        const { ids: groupIds, unknown: unknownGroups } = resolveGroups(args.groupBy, config);
         if (groupIds.length === 0) {
-          return `Unknown groupBy "${args.groupBy}". Try: day, week, month, source, block, country, browser, os, device, domain, subid`;
+          return `No valid groupBy found. Valid groups: ${describeGroups(config)}`;
         }
 
-        const metricIds = resolveMetricIds(args.metrics, config);
+        const { ids: metricIds, unknown: unknownMetrics } = resolveMetrics(args.metrics, config);
         if (metricIds.length === 0) {
-          return "No valid metrics. Try: revenue, clicks, views, impressions, pub_cpm, pub_cpc, block_ctr, subscriptions, viewrate";
+          return `No valid metrics found. Valid metrics: ${describeMetrics(config)}`;
+        }
+
+        // sortBy may be a metric OR a group; resolve through both, warn if neither.
+        let resolvedSort: string | undefined;
+        let unknownSort: string | undefined;
+        if (args.sortBy != null) {
+          const sortMetric = resolveMetrics(args.sortBy, config).ids[0];
+          const sortGroup = sortMetric ? undefined : resolveGroups(args.sortBy, config).ids[0];
+          resolvedSort = sortMetric ?? sortGroup;
+          if (resolvedSort == null) unknownSort = args.sortBy;
         }
 
         const perPage = clampPerPage(args.perPage);
@@ -93,16 +102,27 @@ export const pubStatsModule: ToolModule = {
           },
           page: args.page,
           perPage,
-          ...(args.sortBy != null && {
-            sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" },
-          }),
+          ...(resolvedSort != null && { sort: { [resolvedSort]: args.sortOrder ?? "desc" } }),
         };
 
         const res = await ctx.pub.getReportData(params);
         const rows = res.rows ?? [];
 
+        const warnings: string[] = [];
+        if (unknownMetrics.length > 0)
+          warnings.push(
+            `ignored unknown metric(s): ${unknownMetrics.join(", ")}. Valid metrics: ${describeMetrics(config)}.`,
+          );
+        if (unknownGroups.length > 0)
+          warnings.push(
+            `ignored unknown groupBy: ${unknownGroups.join(", ")}. Valid groups: ${describeGroups(config)}.`,
+          );
+        if (unknownSort != null)
+          warnings.push(`ignored unknown sortBy: ${unknownSort} (not a valid metric or group).`);
+        const notice = warnings.length > 0 ? `Note: ${warnings.join(" ")}\n\n` : "";
+
         if (rows.length === 0) {
-          return `No data found for ${dateFrom} to ${dateTo}.`;
+          return `${notice}No data found for ${dateFrom} to ${dateTo}.`;
         }
 
         const allKeys = new Set<string>();
@@ -113,9 +133,12 @@ export const pubStatsModule: ToolModule = {
         const tableRows = rows.map((r) => headers.map((h) => extractCellValue(r[h])));
 
         const totalPages = res.perPage ? Math.ceil(res.totalRows / res.perPage) : 1;
-        return formatTable(
-          { headers, rows: tableRows },
-          `Publisher Stats (${args.groupBy}, ${dateFrom}–${dateTo}, page ${res.page ?? 1}/${totalPages})`,
+        return (
+          notice +
+          formatTable(
+            { headers, rows: tableRows },
+            `Publisher Stats (${args.groupBy}, ${dateFrom}–${dateTo}, page ${res.page ?? 1}/${totalPages})`,
+          )
         );
       },
     );

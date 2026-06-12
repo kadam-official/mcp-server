@@ -11,10 +11,8 @@ import { extractPagination } from "../../utils/pagination.js";
 import {
   resolveMetrics,
   resolveGroups,
-  resolveAlias,
   describeMetrics,
   describeGroups,
-  METRIC_ALIASES,
 } from "../../utils/dimension-mapper.js";
 import { resolvePeriodToDates } from "../../utils/date-helpers.js";
 
@@ -224,7 +222,8 @@ export const statsModule: ToolModule = {
             perPage,
             filters,
             ...(args.sortBy != null && {
-              sort: { [resolveAlias(args.sortBy, METRIC_ALIASES)]: args.sortOrder ?? "desc" },
+              // Conversion-detail columns are not report metrics; pass the key as-is.
+              sort: { [args.sortBy]: args.sortOrder ?? "desc" },
             }),
           };
           const res = await ctx.adv.getConversionDetails(params);
