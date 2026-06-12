@@ -38,12 +38,19 @@ export interface PubReportDataParams {
 }
 
 /** Report config (groups/metrics) rarely changes; cache per client instance (== per tenant). */
-const REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
 
 export class PubClient {
   private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
+  private readonly reportConfigTtlMs: number;
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    optionsTtlMs?: number,
+  ) {
+    this.reportConfigTtlMs =
+      optionsTtlMs && optionsTtlMs > 0 ? optionsTtlMs : DEFAULT_REPORT_CONFIG_TTL_MS;
+  }
 
   async listSources(params: Record<string, unknown>): Promise<TableListResponse<SourceRow>> {
     const raw = await this.http.post("/sources/sources-table", params);
@@ -156,7 +163,7 @@ export class PubClient {
     }
     const raw = await this.http.options("/custom-reports");
     const data = reportConfigSchema.parse(raw);
-    this.reportConfigCache = { data, expiresAt: Date.now() + REPORT_CONFIG_TTL_MS };
+    this.reportConfigCache = { data, expiresAt: Date.now() + this.reportConfigTtlMs };
     return data;
   }
 

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CAMPAIGN_TYPE_MAP, CAMPAIGN_TYPE_NAME } from "../types/advertiser.js";
 import type { OptionsRegistry, CampaignOptions, CategoryItem } from "../api/options-registry.js";
+import { sortById } from "../utils/stable-sort.js";
 
 const CREATIVE_INFO: Record<string, string> = {
   push: "title + text + icon + main image",
@@ -13,7 +14,7 @@ const CREATIVE_INFO: Record<string, string> = {
 
 function formatCategoryTree(cats: CategoryItem[], indent: string): string[] {
   const lines: string[] = [];
-  for (const cat of cats) {
+  for (const cat of sortById(cats)) {
     lines.push(`${indent}${cat.id}: ${cat.label}`);
     if (cat.children && cat.children.length > 0) {
       lines.push(...formatCategoryTree(cat.children, indent + "  "));
@@ -24,22 +25,26 @@ function formatCategoryTree(cats: CategoryItem[], indent: string): string[] {
 
 function formatOptions(opts: CampaignOptions): string {
   const parts: string[] = [];
-  const pricing = opts.cpTypes.map((c) => c.label).join(", ");
+  const pricing = sortById(opts.cpTypes)
+    .map((c) => c.label)
+    .join(", ");
   parts.push(`Pricing: ${pricing}`);
 
   if (opts.options.allowAgeSelection) parts.push("age targeting");
   if (opts.options.allowGenderSelection) parts.push("gender targeting");
   if (opts.subAges.length > 0) parts.push("subAge targeting");
   if (opts.categories.length > 0) {
-    const topLabels = opts.categories.map((c) => c.label).join(", ");
+    const topLabels = sortById(opts.categories)
+      .map((c) => c.label)
+      .join(", ");
     parts.push(`categories: ${topLabels}`);
   }
   return parts.join(" | ");
 }
 
-async function generateContent(registry: OptionsRegistry | null): Promise<string> {
+export async function buildCampaignTypesContent(registry: OptionsRegistry | null): Promise<string> {
   const lines = ["Campaign Types:"];
-  for (const [key, id] of Object.entries(CAMPAIGN_TYPE_MAP)) {
+  for (const [key, id] of Object.entries(CAMPAIGN_TYPE_MAP).sort((a, b) => a[1] - b[1])) {
     const name = CAMPAIGN_TYPE_NAME[id] ?? key;
     lines.push(`- ${name} (id: ${id}): ${key} format`);
 
@@ -72,7 +77,7 @@ export function registerCampaignTypesResource(
       {
         uri: "kadam://reference/campaign-types",
         mimeType: "text/plain",
-        text: await generateContent(registry),
+        text: await buildCampaignTypesContent(registry),
       },
     ],
   }));

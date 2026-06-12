@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ClientPool } from "./api/client-pool.js";
+import { BearerValidator } from "./bearer-validation.js";
 import { getConfig, type Config } from "./config.js";
 import {
   detectCabinet,
@@ -31,10 +32,27 @@ interface Session {
 
 const sessions = new Map<string, Session>();
 
-// Evict sessions with no activity for this long to bound memory when clients
-// disconnect without sending DELETE.
-const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
-const SESSION_SWEEP_MS = 5 * 60 * 1000; // sweep every 5 minutes
+// Sweep cadence for idle session/client eviction (idle TTLs are env-configurable).
+const SESSION_SWEEP_MS = 5 * 60 * 1000;
+
+/** Evict least-recently-active sessions until there is room for one more. */
+function evictExcessSessions(max: number): void {
+  while (sessions.size >= max) {
+    let oldestId: string | null = null;
+    let oldest = Infinity;
+    for (const [sid, s] of sessions) {
+      if (s.lastActivity < oldest) {
+        oldest = s.lastActivity;
+        oldestId = sid;
+      }
+    }
+    if (!oldestId) break;
+    const victim = sessions.get(oldestId)!;
+    sessions.delete(oldestId);
+    void victim.transport.close().catch(() => {});
+    logger.info({ sessionId: oldestId }, "Evicted LRU HTTP session (cap reached)");
+  }
+}
 
 function touchSession(sessionId: string): void {
   const session = sessions.get(sessionId);
@@ -101,6 +119,22 @@ export async function bootstrapHttp(): Promise<void> {
   const config = getConfig();
   const { MCP_HTTP_PORT: port, MCP_HTTP_HOST: host } = config;
 
+  // One shared pool for the whole process: per-bearer clients (and their options
+  // cache) persist across sessions. Interactive HTTP mode lowers the retry/timeout
+  // budget unless overridden by env.
+  const pool = new ClientPool({
+    advBaseUrl: config.KADAM_ADV_API_BASE,
+    pubBaseUrl: config.KADAM_PUB_API_BASE,
+    maxRetries: config.KADAM_HTTP_MAX_RETRIES ?? 1,
+    timeout: config.KADAM_HTTP_TIMEOUT_MS ?? 15_000,
+    maxClients: config.KADAM_MAX_CLIENTS,
+    optionsTtlMs: config.KADAM_OPTIONS_TTL_MS,
+  });
+  const bearerValidator = new BearerValidator(pool);
+  const sessionIdleMs = config.KADAM_SESSION_IDLE_MS;
+  const maxSessions = config.KADAM_MAX_SESSIONS;
+  const clientIdleMs = config.KADAM_CLIENT_IDLE_MS;
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     const pathname = url.pathname;
@@ -147,9 +181,38 @@ export async function bootstrapHttp(): Promise<void> {
           return;
         }
 
+        if (method !== "DELETE") {
+          const valid = await bearerValidator.validate(bearer, cabinet);
+          if (!valid) {
+            const domain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
+            res.writeHead(401, {
+              "WWW-Authenticate": `Bearer resource_metadata="${domain}/.well-known/oauth-protected-resource"`,
+              "Content-Type": "application/json",
+            });
+            res.end(
+              JSON.stringify({
+                jsonrpc: "2.0",
+                error: { code: -32001, message: "Unauthorized: upstream API key rejected" },
+                id: null,
+              }),
+            );
+            return;
+          }
+        }
+
         if (method === "POST") {
           const body = await readBody(req);
-          const parsed = JSON.parse(body);
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(body);
+          } catch {
+            sendJson(res, 400, {
+              jsonrpc: "2.0",
+              error: { code: -32700, message: "Parse error" },
+              id: null,
+            });
+            return;
+          }
 
           const existingSessionId = req.headers["mcp-session-id"] as string | undefined;
 
@@ -170,10 +233,6 @@ export async function bootstrapHttp(): Promise<void> {
 
           if (isInitializeRequest(parsed)) {
             const credentials = sessionCredentials(bearer, cabinet);
-            const pool = new ClientPool({
-              advBaseUrl: config.KADAM_ADV_API_BASE,
-              pubBaseUrl: config.KADAM_PUB_API_BASE,
-            });
             pool.resolve(credentials.advKey, credentials.pubKey);
 
             const mcpServer = createSessionServer(pool, cabinet, credentials);
@@ -181,6 +240,7 @@ export async function bootstrapHttp(): Promise<void> {
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: () => randomUUID(),
               onsessioninitialized: (sessionId) => {
+                evictExcessSessions(maxSessions);
                 sessions.set(sessionId, {
                   transport,
                   server: mcpServer,
@@ -274,7 +334,7 @@ export async function bootstrapHttp(): Promise<void> {
   const sweeper = setInterval(() => {
     const now = Date.now();
     for (const [sid, session] of sessions.entries()) {
-      if (now - session.lastActivity > SESSION_IDLE_MS) {
+      if (now - session.lastActivity > sessionIdleMs) {
         sessions.delete(sid);
         void session.transport.close().catch((e) => {
           logger.error({ sessionId: sid, error: e }, "Error closing idle session");
@@ -282,6 +342,8 @@ export async function bootstrapHttp(): Promise<void> {
         logger.info({ sessionId: sid }, "Evicted idle HTTP session");
       }
     }
+    pool.evictIdle(clientIdleMs);
+    bearerValidator.prune(now);
   }, SESSION_SWEEP_MS);
   sweeper.unref();
 

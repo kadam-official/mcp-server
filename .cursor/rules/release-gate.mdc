@@ -1,0 +1,33 @@
+---
+description: Release & deploy gate for @kadam-net/mcp-server — what the agent may do autonomously vs. what requires explicit human approval. Applies to all branch/MR/release/deploy work in this repo.
+globs:
+alwaysApply: true
+---
+
+# Release & Deploy Gate (human-approved)
+
+Merging to `main`, tagging releases, deploying, and publishing are **shared-state,
+hard-to-reverse actions**. They require an explicit, per-action human "go" — even
+when a plan's to-do list names them and even when the agent was told to
+"implement the plan / don't stop until all to-dos are done". That instruction
+does **not** override this gate.
+
+## The agent MAY do autonomously
+- Create branches, commit, push the feature branch.
+- Open a GitLab MR (and update its description).
+- Run/await CI; run the full local quality gate.
+- Report status (e.g. "MR open, pipeline green") and **stop**.
+
+## The agent MUST STOP and get explicit per-action approval before
+- **Merging** an MR into `main` (never self-merge; green CI ≠ approval to merge).
+- **Tagging / pushing a release tag** (`vX.Y.Z`).
+- **Approving the npm-publish gate** (this is always a human action).
+- **Deploying / redeploying** any environment — e.g. `rnd.sdev.pw:/root/mcp-kadam`,
+  `docker compose up`, editing a host `docker-compose.yml`.
+- **Force-pushing** anything (and never force-push `main`/`master`).
+- Reverting `main` or deleting release tags (these are also human-gated changes).
+
+## Default end state of an autonomous task
+"Branch pushed + MR open + CI green", then await the human's instruction for each
+of the gated steps above. Present the MR link and ask how to proceed; do not
+chain merge → tag → deploy → publish on your own.
