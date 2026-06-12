@@ -108,7 +108,7 @@ describe("Tool listing integration", () => {
     const textContent = result.contents!.find((c) => "text" in c) as { text: string } | undefined;
     expect(textContent).toBeDefined();
     expect(textContent!.text).toContain("Push (id: 30)");
-  });
+  }, 20000); // real-network read: up to 6 sequential upstream option fetches
 
   it("resource kadam://reference/pricing-models content contains CPC", async () => {
     const { client } = await createFullServer();
@@ -118,7 +118,7 @@ describe("Tool listing integration", () => {
     const textContent = result.contents!.find((c) => "text" in c) as { text: string } | undefined;
     expect(textContent).toBeDefined();
     expect(textContent!.text).toContain("CPC");
-  });
+  }, 20000); // real-network read: up to 6 sequential upstream option fetches
 
   it("4 prompts listed", async () => {
     const { client } = await createFullServer();

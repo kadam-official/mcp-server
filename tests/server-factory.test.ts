@@ -99,17 +99,29 @@ describe("createMcpServer", () => {
     }
   });
 
-  it("registers resources and prompts regardless of keys", async () => {
+  it("registers prompts regardless of keys", async () => {
     const { client, cleanup } = await connectServer({
       KADAM_ADV_API_KEY: undefined,
       KADAM_PUB_API_KEY: undefined,
-      MCP_TRANSPORT: "http",
+    });
+    try {
+      const prompts = await client.listPrompts();
+      expect(prompts.prompts!.length).toBeGreaterThan(0);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("scopes resources to the active cabinet (advertiser key -> advertiser resources)", async () => {
+    const { client, cleanup } = await connectServer({
+      KADAM_ADV_API_KEY: "test-adv",
+      KADAM_PUB_API_KEY: undefined,
     });
     try {
       const resources = await client.listResources();
-      const prompts = await client.listPrompts();
-      expect(resources.resources!.length).toBeGreaterThan(0);
-      expect(prompts.prompts!.length).toBeGreaterThan(0);
+      const uris = (resources.resources ?? []).map((r) => r.uri);
+      expect(uris).toContain("kadam://reference/campaign-types");
+      expect(uris).not.toContain("kadam://reference/site-states");
     } finally {
       cleanup();
     }
