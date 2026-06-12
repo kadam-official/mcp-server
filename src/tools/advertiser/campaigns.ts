@@ -584,7 +584,7 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_list_campaigns",
         description:
-          "List advertiser campaigns with pagination. Filter by folder, status, type, date range, or search query.",
+          "List advertiser campaigns with pagination. Filter by campaign group (folderId), status, type, date range, or search query.",
         product: "advertiser",
         annotations: { title: "List campaigns", readOnlyHint: true },
       },
@@ -626,7 +626,7 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_create_campaign",
         description:
-          "Create a new advertiser campaign. Required: type, name, url, folderId, pricingModel, bid, dailyBudget.",
+          "Create a new advertiser campaign. Required: type, name, url, folderId (campaign group ID), pricingModel, bid, dailyBudget.",
         product: "advertiser",
         annotations: { title: "Create campaign", readOnlyHint: false },
       },
@@ -636,7 +636,11 @@ export const campaignsModule: ToolModule = {
           .describe("Ad format"),
         name: z.string().min(1).describe("Campaign name shown in dashboard"),
         url: z.string().url().describe("Landing page URL"),
-        folderId: z.number().describe("Campaign folder ID"),
+        folderId: z
+          .number()
+          .describe(
+            "Campaign group ID (the Kadam UI calls this a 'campaign group' / 'Группа кампаний'; the API field name is folderId)",
+          ),
         pricingModel: z
           .enum(["cpc", "cpm", "cpa_target"])
           .describe("Pricing model: cpc, cpm, or cpa_target"),
@@ -664,7 +668,7 @@ export const campaignsModule: ToolModule = {
         }
         const mappedData = await mapCampaignFields(mappedArgs, ctx.adv.options);
         const result = await ctx.adv.createCampaign(mappedData);
-        return `Campaign created: [ID: ${result.id}] "${args.name}" in folder #${args.folderId}`;
+        return `Campaign created: [ID: ${result.id}] "${args.name}" in campaign group #${args.folderId}`;
       },
     );
 
@@ -683,7 +687,12 @@ export const campaignsModule: ToolModule = {
         id: z.number().describe("Campaign ID to update"),
         name: z.string().min(1).optional().describe("Campaign name shown in dashboard"),
         url: z.string().url().optional().describe("Landing page URL"),
-        folderId: z.number().optional().describe("Campaign folder ID"),
+        folderId: z
+          .number()
+          .optional()
+          .describe(
+            "Campaign group ID (the Kadam UI calls this a 'campaign group' / 'Группа кампаний'; the API field name is folderId)",
+          ),
         dailyBudget: z.number().optional().describe("Daily spending limit in USD"),
         bid: z
           .number()

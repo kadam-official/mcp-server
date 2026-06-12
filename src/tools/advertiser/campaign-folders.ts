@@ -16,9 +16,11 @@ export const campaignFoldersModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_list_campaign_folders",
-        description: "List advertiser campaign folders with pagination. Optional search by name.",
+        description:
+          "List advertiser campaign groups with pagination. Optional search by name. " +
+          "A campaign group (called 'campaign group' / 'Группа кампаний' in the Kadam UI) is the same entity the API/tool calls a folder.",
         product: "advertiser",
-        annotations: { title: "List campaign folders", readOnlyHint: true },
+        annotations: { title: "List campaign groups", readOnlyHint: true },
       },
       {
         page: z.number().optional().default(1),
@@ -35,36 +37,38 @@ export const campaignFoldersModule: ToolModule = {
         const res = await ctx.adv.listCampaignFolders(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
-        return formatEntityList(items, formatFolderRow, "Campaign Folders", pagination);
+        return formatEntityList(items, formatFolderRow, "Campaign groups", pagination);
       },
     );
 
     wrapper.register(
       {
         name: "kadam_adv_create_campaign_folder",
-        description: "Create a new campaign folder.",
+        description:
+          "Create a new campaign group (called 'campaign group' / 'Группа кампаний' in the Kadam UI; API term: folder).",
         product: "advertiser",
-        annotations: { title: "Create campaign folder", readOnlyHint: false },
+        annotations: { title: "Create campaign group", readOnlyHint: false },
       },
       {
         name: z
           .string()
           .min(1)
           .max(50)
-          .describe("Folder name (1-50 characters, e.g. 'SA', 'US campaigns')"),
+          .describe("Campaign group name (1-50 characters, e.g. 'SA', 'US campaigns')"),
       },
       async (args, ctx) => {
         const result = await ctx.adv.createCampaignFolder(args.name);
-        return `Folder created: [ID: ${result.id}] "${args.name}"`;
+        return `Campaign group created: [ID: ${result.id}] "${args.name}"`;
       },
     );
 
     wrapper.register(
       {
         name: "kadam_adv_update_campaign_folder",
-        description: "Update campaign folder settings: budgets and distribution.",
+        description:
+          "Update campaign group settings: budgets and distribution (campaign group = the UI term for a folder).",
         product: "advertiser",
-        annotations: { title: "Update campaign folder", readOnlyHint: false },
+        annotations: { title: "Update campaign group", readOnlyHint: false },
       },
       {
         id: z.number(),
@@ -83,7 +87,7 @@ export const campaignFoldersModule: ToolModule = {
           rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
 
         await ctx.adv.updateCampaignFolder(id, data);
-        return `Folder #${id} updated successfully.`;
+        return `Campaign group #${id} updated successfully.`;
       },
     );
   },

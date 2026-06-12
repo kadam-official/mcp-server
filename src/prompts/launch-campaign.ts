@@ -22,8 +22,8 @@ export function registerLaunchCampaignPrompt(server: McpServer): void {
 
 Follow these steps in order:
 
-1. Check available campaign folders:
-   Call kadam_adv_list_campaign_folders to see existing folders, or create one with kadam_adv_create_campaign_folder if needed.
+1. Check available campaign groups:
+   Call kadam_adv_list_campaign_folders to see existing campaign groups, or create one with kadam_adv_create_campaign_folder if needed.
 
 2. Create the campaign:
    Call kadam_adv_create_campaign with:
