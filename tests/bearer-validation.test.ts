@@ -33,7 +33,18 @@ describe("BearerValidator", () => {
     expect(v.size).toBe(0);
   });
 
-  it("fails open on transient (non-401/403) errors", async () => {
+  it("rejects Kadam's HTTP-200 invalid-credentials signal (ApiError status 0)", async () => {
+    // Kadam returns 200 + {success:false, code:0, msg.exception:"...invalid credentials..."}
+    // which http-client surfaces as ApiError(message, status=0).
+    const probe = vi
+      .fn()
+      .mockRejectedValue(new ApiError("Your request was made with invalid credentials.", 0));
+    const v = new BearerValidator(fakePool(probe));
+    expect(await v.validate("k", "adv")).toBe(false);
+    expect(v.size).toBe(0);
+  });
+
+  it("fails open on transient (non-auth) errors", async () => {
     expect(
       await new BearerValidator(
         fakePool(vi.fn().mockRejectedValue(new ApiError("oops", 500))),

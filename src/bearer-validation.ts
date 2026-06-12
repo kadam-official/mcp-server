@@ -7,12 +7,25 @@ const DEFAULT_TTL_MS = 60 * 1000;
 const DEFAULT_MAX_ENTRIES = 5000;
 
 /**
+ * Whether an upstream error means "the bearer is rejected".
+ * Kadam does NOT return HTTP 401/403 for a bad key — it returns HTTP 200 with
+ * `{success:false, code:0, msg.exception:"...invalid credentials..."}`, which
+ * http-client surfaces as an ApiError with status 0 and that message. So match
+ * the credentials message as well as the conventional 401/403 statuses.
+ */
+function isUpstreamAuthFailure(error: ApiError): boolean {
+  if (error.status === 401 || error.status === 403) return true;
+  return /invalid credentials/i.test(error.message);
+}
+
+/**
  * Validates a per-request bearer against the upstream API so a rejected key can
  * surface as an HTTP 401 (spec re-auth) instead of a 200 tool error. Results are
  * cached per tenant for a short TTL; the cache is bounded (prune-expired + FIFO
- * cap) so a flood of distinct bearers can't grow it unbounded. Only an explicit
- * upstream 401/403 fails — transient errors (network/5xx/timeout) pass, so a
- * valid key is never bounced on an upstream blip.
+ * cap) so a flood of distinct bearers can't grow it unbounded. Only an upstream
+ * auth rejection fails (HTTP 401/403, or Kadam's HTTP-200 "invalid credentials"
+ * body) — transient errors (network/5xx/timeout) pass, so a valid key is never
+ * bounced on an upstream blip.
  */
 export class BearerValidator {
   private readonly cache = new Map<string, number>(); // sha256(cabinet:bearer) -> expiresAt
@@ -36,7 +49,7 @@ export class BearerValidator {
       this.remember(key);
       return true;
     } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      if (error instanceof ApiError && isUpstreamAuthFailure(error)) {
         return false;
       }
       return true;
