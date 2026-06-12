@@ -48,14 +48,20 @@ export interface ReportDataParams {
 }
 
 /** Report config (groups/metrics) rarely changes; cache per client instance (== per tenant). */
-const REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
 
 export class PartnersClient {
   readonly options: OptionsRegistry;
   private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
+  private readonly reportConfigTtlMs: number;
 
-  constructor(private readonly http: HttpClient) {
-    this.options = new OptionsRegistry(http);
+  constructor(
+    private readonly http: HttpClient,
+    optionsTtlMs?: number,
+  ) {
+    this.options = new OptionsRegistry(http, optionsTtlMs);
+    this.reportConfigTtlMs =
+      optionsTtlMs && optionsTtlMs > 0 ? optionsTtlMs : DEFAULT_REPORT_CONFIG_TTL_MS;
   }
 
   async listCampaigns(params: Record<string, unknown>): Promise<ListResponse<CampaignRow>> {
@@ -170,7 +176,7 @@ export class PartnersClient {
     }
     const raw = await this.http.options("/custom-reports");
     const data = reportConfigSchema.parse(raw);
-    this.reportConfigCache = { data, expiresAt: Date.now() + REPORT_CONFIG_TTL_MS };
+    this.reportConfigCache = { data, expiresAt: Date.now() + this.reportConfigTtlMs };
     return data;
   }
 

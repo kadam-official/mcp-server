@@ -2,6 +2,12 @@ import { z } from "zod";
 
 const transportSchema = z.enum(["stdio", "http"]).default("stdio");
 
+// Env booleans: only "true"/"1" enable; everything else (incl. "false") is off.
+const boolEnv = z
+  .string()
+  .optional()
+  .transform((v) => v === "true" || v === "1");
+
 // Both API keys are optional in every mode:
 // - http: tokens arrive per-request via Bearer auth.
 // - stdio: the server still starts with no keys so the client can connect,
@@ -19,6 +25,25 @@ const envSchema = z.object({
   KADAM_ADV_DOMAIN: z.string().url().default("https://partners.kadam.net"),
   KADAM_PUB_DOMAIN: z.string().url().default("https://pub.kadam.net"),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
+  // Upstream HTTP budget (interactive HTTP mode lowers the defaults at bootstrap).
+  KADAM_HTTP_MAX_RETRIES: z.coerce.number().int().min(0).max(10).optional(),
+  KADAM_HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).optional(),
+  // HTTP session / client pool bounds.
+  KADAM_MAX_SESSIONS: z.coerce.number().int().min(1).default(500),
+  KADAM_SESSION_IDLE_MS: z.coerce
+    .number()
+    .int()
+    .min(60000)
+    .default(30 * 60 * 1000),
+  KADAM_MAX_CLIENTS: z.coerce.number().int().min(1).default(1000),
+  KADAM_CLIENT_IDLE_MS: z.coerce
+    .number()
+    .int()
+    .min(60000)
+    .default(30 * 60 * 1000),
+  // Reference-resource behaviour.
+  KADAM_STATIC_RESOURCES_ONLY: boolEnv,
+  KADAM_OPTIONS_TTL_MS: z.coerce.number().int().min(1000).optional(),
 });
 
 export type Config = z.infer<typeof envSchema>;
