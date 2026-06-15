@@ -452,15 +452,8 @@ const campaignTargetingFields = {
   sspMode: z
     .enum(["whitelist", "blacklist"])
     .optional()
-    .describe(
-      "SSP source list mode: 'whitelist' = only allow listed SSPs, 'blacklist' = block listed SSPs",
-    ),
-  sspIds: z
-    .string()
-    .optional()
-    .describe(
-      "Comma-separated SSP IDs for the source whitelist/blacklist (see ssps in campaign options)",
-    ),
+    .describe("SSP list mode: whitelist (allow listed) or blacklist (block listed)"),
+  sspIds: z.string().optional().describe("Comma-separated SSP IDs for the whitelist/blacklist"),
 };
 
 const campaignBudgetFields = {
@@ -472,40 +465,24 @@ const campaignBudgetFields = {
   schedule: z
     .string()
     .optional()
-    .describe(
-      "Comma-separated hours (0-23) to show ads, applied to all days (e.g. '9,10,11,12,13,14,15,16,17' for 9am-5pm)",
-    ),
+    .describe("Comma-separated hours (0-23) to show ads, applied to all days (e.g. '9,10,11,17')"),
   frequencyCapViews: z
     .number()
     .optional()
-    .describe(
-      "Creative-level: max times ONE creative is shown to a user within frequencyCapDays (e.g. 3 = user sees this creative at most 3 times)",
-    ),
-  frequencyCapDays: z
-    .number()
-    .optional()
-    .describe(
-      "Creative-level: time window in days for the cap (e.g. 1 = per day, 7 = per week). Used with frequencyCapViews",
-    ),
+    .describe("Creative-level cap: max views of ONE creative per user within frequencyCapDays"),
+  frequencyCapDays: z.number().optional().describe("Window in days for frequencyCapViews"),
   campaignCapViews: z
     .number()
     .optional()
     .describe(
-      "Campaign-level: max times ANY creative from this campaign is shown to a user within campaignCapDays (e.g. 1 = one pop per user)",
+      "Campaign-level cap: max views of ANY creative from this campaign per user within campaignCapDays",
     ),
-  campaignCapDays: z
-    .number()
-    .optional()
-    .describe(
-      "Campaign-level: time window in days (e.g. 1 = per day). Used with campaignCapViews. Example: campaignCapViews=1, campaignCapDays=1 means 'show campaign to each user max once per day'",
-    ),
+  campaignCapDays: z.number().optional().describe("Window in days for campaignCapViews"),
   impTracker: z.string().optional().describe("Third-party impression tracking pixel URL"),
   categories: z
     .string()
     .optional()
-    .describe(
-      "Comma-separated category IDs for content classification (e.g. '1,2,3' or 'mainstream,adult'). Multiple values allowed. Use campaign options to see available IDs.",
-    ),
+    .describe("Comma-separated category IDs or names (see kadam://reference/categories)"),
   secondPush: z
     .boolean()
     .optional()
@@ -518,26 +495,22 @@ const campaignBudgetFields = {
     .number()
     .optional()
     .describe(
-      "Conversion acceptance template ID from campaign options (conversionTemplates list). Use 0 for custom mapping with conversionApproved/Hold/Reject.",
+      "Conversion template ID (from campaign options). Use 0 for custom mapping via conversionApproved/Hold/Reject",
     ),
   conversionApproved: z
     .string()
     .optional()
     .describe(
-      "Postback status name for 'Approved' conversions (e.g. 'dep', 'sale'). Used with conversionTemplateId=0 for custom mapping.",
+      "Postback status name for 'Approved' conversions (e.g. 'dep'); used with conversionTemplateId=0",
     ),
   conversionHold: z
     .string()
     .optional()
-    .describe(
-      "Postback status name for 'Hold' conversions (e.g. 'reg', 'lead'). Used with conversionTemplateId=0 for custom mapping.",
-    ),
+    .describe("Postback status name for 'Hold' conversions (e.g. 'reg')"),
   conversionReject: z
     .string()
     .optional()
-    .describe(
-      "Postback status name for 'Rejected' conversions. Used with conversionTemplateId=0 for custom mapping.",
-    ),
+    .describe("Postback status name for 'Rejected' conversions"),
 };
 
 const postConversionFields = {
@@ -546,23 +519,17 @@ const postConversionFields = {
     .min(1)
     .max(168)
     .optional()
-    .describe(
-      "Post-view attribution window in hours (1-168). Time after ad impression to count a conversion",
-    ),
+    .describe("Post-view attribution window in hours (1-168)"),
   postClickWindow: z
     .number()
     .min(1)
     .max(168)
     .optional()
-    .describe(
-      "Post-click attribution window in hours (1-168). Time after ad click to count a conversion",
-    ),
+    .describe("Post-click attribution window in hours (1-168)"),
   countFirstConversionOnly: z
     .boolean()
     .optional()
-    .describe(
-      "Only count the first conversion per user (default: true). Set false to allow multiple conversions per view/click",
-    ),
+    .describe("Count only the first conversion per user (default: true)"),
   countLastCampaignOnly: z
     .boolean()
     .optional()
@@ -636,11 +603,7 @@ export const campaignsModule: ToolModule = {
           .describe("Ad format"),
         name: z.string().min(1).describe("Campaign name shown in dashboard"),
         url: z.string().url().describe("Landing page URL"),
-        folderId: z
-          .number()
-          .describe(
-            "Campaign group ID (the Kadam UI calls this a 'campaign group' / 'Группа кампаний'; the API field name is folderId)",
-          ),
+        folderId: z.number().describe("Campaign group ID (API field: folderId)"),
         pricingModel: z
           .enum(["cpc", "cpm", "cpa_target"])
           .describe("Pricing model: cpc, cpm, or cpa_target"),
@@ -676,10 +639,8 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_update_campaign",
         description:
-          "Update an existing campaign (read-modify-write). Fetches current state, merges your changes, sends full payload. " +
-          "Pass only the fields you want to change; uses the same field names as create. " +
-          "This is the tool for ALL targeting changes: geo (countries), devices/OS/browsers, sub-age (subscriptionAges), " +
-          "budgets, bid, schedule, and conversion settings. For status changes use set_campaign_status instead.",
+          "Update a campaign (read-modify-write): pass only the fields to change, same names as create. " +
+          "Handles all targeting/budget/bid/schedule/conversion edits. For status changes use set_campaign_status.",
         product: "advertiser",
         annotations: { title: "Update campaign", readOnlyHint: false },
       },
@@ -687,12 +648,7 @@ export const campaignsModule: ToolModule = {
         id: z.number().describe("Campaign ID to update"),
         name: z.string().min(1).optional().describe("Campaign name shown in dashboard"),
         url: z.string().url().optional().describe("Landing page URL"),
-        folderId: z
-          .number()
-          .optional()
-          .describe(
-            "Campaign group ID (the Kadam UI calls this a 'campaign group' / 'Группа кампаний'; the API field name is folderId)",
-          ),
+        folderId: z.number().optional().describe("Campaign group ID (API field: folderId)"),
         dailyBudget: z.number().optional().describe("Daily spending limit in USD"),
         bid: z
           .number()
@@ -912,10 +868,9 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_update_campaign_bid",
         description:
-          "Change ONLY the bid amount for countries the campaign ALREADY targets. " +
-          "Does NOT change geo/country targeting — to add or change countries (or any other field) use kadam_adv_update_campaign. " +
-          "Passing a country the campaign does not target returns an error. " +
-          "If countries is omitted, re-bids all of the campaign's current countries.",
+          "Change ONLY the bid for countries the campaign ALREADY targets (does NOT change geo). " +
+          "To add or change countries use kadam_adv_update_campaign. " +
+          "Unknown countries error out; omit countries to re-bid all current ones.",
         product: "advertiser",
         annotations: { title: "Update campaign bid", idempotentHint: true },
       },
@@ -977,11 +932,9 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_bulk_update_bids",
         description:
-          "Update bids for multiple campaigns at once. All specified campaigns receive the same bid. " +
-          "Much faster than updating campaigns one by one. " +
-          "IMPORTANT: all campaigns in the batch must share the same pricing model (all CPC/CPM or all CPA). " +
-          "Mixing CPC and CPA campaigns will cause a validation error. " +
-          "Countries are required — the backend rejects empty country lists.",
+          "Set the same bid on multiple campaigns at once. " +
+          "All campaigns in the batch must share one pricing model (mixing CPC/CPA errors out). " +
+          "Countries are required (backend rejects an empty list).",
         product: "advertiser",
         annotations: { title: "Bulk update bids", idempotentHint: true },
       },
@@ -1025,9 +978,7 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_update_site_bids",
         description:
-          "Set per-site (zone) bids for campaigns. Allows bid adjustments on individual publisher sites. " +
-          "Bid can be a number ('0.05'), a multiplier ('x1.5' to multiply base bid), or '0' to remove the site bid. " +
-          "This is idempotent — calling with the same values has no additional effect.",
+          "Set per-site (zone) bids for campaigns. Bid is a number ('0.05'), a multiplier ('x1.5'), or '0' to remove.",
         product: "advertiser",
         annotations: { title: "Update site bids", idempotentHint: true },
       },

@@ -93,11 +93,11 @@ describe("Tool listing integration", () => {
     });
   });
 
-  it("7 resources listed", async () => {
+  it("8 resources listed", async () => {
     const { client } = await createFullServer();
     const result = await client.listResources();
     expect(result.resources).toBeDefined();
-    expect(result.resources!.length).toBe(7);
+    expect(result.resources!.length).toBe(8);
   });
 
   it("resource kadam://reference/campaign-types content contains Push (id: 30)", async () => {

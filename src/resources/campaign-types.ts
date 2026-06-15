@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CAMPAIGN_TYPE_MAP, CAMPAIGN_TYPE_NAME } from "../types/advertiser.js";
-import type { OptionsRegistry, CampaignOptions, CategoryItem } from "../api/options-registry.js";
+import type { OptionsRegistry, CampaignOptions } from "../api/options-registry.js";
 import { sortById } from "../utils/stable-sort.js";
 
 const CREATIVE_INFO: Record<string, string> = {
@@ -11,17 +11,6 @@ const CREATIVE_INFO: Record<string, string> = {
   video: "MP4 video file",
   popunder: "URL only (no image/text needed)",
 };
-
-function formatCategoryTree(cats: CategoryItem[], indent: string): string[] {
-  const lines: string[] = [];
-  for (const cat of sortById(cats)) {
-    lines.push(`${indent}${cat.id}: ${cat.label}`);
-    if (cat.children && cat.children.length > 0) {
-      lines.push(...formatCategoryTree(cat.children, indent + "  "));
-    }
-  }
-  return lines;
-}
 
 function formatOptions(opts: CampaignOptions): string {
   const parts: string[] = [];
@@ -44,6 +33,9 @@ function formatOptions(opts: CampaignOptions): string {
 
 export async function buildCampaignTypesContent(registry: OptionsRegistry | null): Promise<string> {
   const lines = ["Campaign Types:"];
+  if (registry) {
+    lines.push("(Full category ID tree: kadam://reference/categories)");
+  }
   for (const [key, id] of Object.entries(CAMPAIGN_TYPE_MAP).sort((a, b) => a[1] - b[1])) {
     const name = CAMPAIGN_TYPE_NAME[id] ?? key;
     lines.push(`- ${name} (id: ${id}): ${key} format`);
@@ -52,10 +44,6 @@ export async function buildCampaignTypesContent(registry: OptionsRegistry | null
       try {
         const opts = await registry.getCampaignOptions(id);
         lines.push(`  ${formatOptions(opts)}`);
-        if (opts.categories.length > 0) {
-          lines.push("  Categories:");
-          lines.push(...formatCategoryTree(opts.categories, "    "));
-        }
       } catch {
         /* options unavailable — skip dynamic info */
       }

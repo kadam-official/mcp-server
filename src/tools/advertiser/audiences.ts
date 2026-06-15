@@ -109,11 +109,11 @@ export const audiencesModule: ToolModule = {
       {
         name: "kadam_adv_create_audience",
         description: [
-          "Create a new audience. Types and required fields:",
-          "• audience_code (pixel) — name, expireDays. Optional: createFingerprint (creates linked FP audience).",
-          "• audience (stat/campaign data) — name, expireDays, campaignIds (comma-separated), plus at least one of: hasClicks, hasConversions, hasHolds, hasRejects.",
-          "• s2s — name, expireDays, linkedAudienceIds (comma-separated IDs of pixel/fingerprint audiences).",
-          "• fingerprint — cannot be created directly; set createFingerprint=true on pixel or stat audience.",
+          "Create an audience. Required fields by type:",
+          "• audience_code (pixel) — name, expireDays; optional createFingerprint.",
+          "• audience (stat) — name, expireDays, campaignIds, plus >=1 of hasClicks/hasConversions/hasHolds/hasRejects.",
+          "• s2s — name, expireDays, linkedAudienceIds (pixel/fingerprint IDs).",
+          "• fingerprint — not created directly; set createFingerprint=true on a pixel/stat audience.",
         ].join("\n"),
         product: "advertiser",
         annotations: { title: "Create audience", readOnlyHint: false },

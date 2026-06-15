@@ -77,14 +77,26 @@ describe("HTTP session resources", () => {
     expect(text).toContain("Banner Sizes (sizeId values)");
     expect(text).toContain("5 = 300x250 (300x250)");
   });
+
+  it("campaign-types points to the on-demand categories resource and omits the full tree", async () => {
+    const text = await readText("adv", { advKey: "b" }, "kadam://reference/campaign-types");
+    expect(text).toContain("kadam://reference/categories");
+    expect(text).not.toContain("Categories:");
+  });
+
+  it("categories resource is served on demand", async () => {
+    const text = await readText("adv", { advKey: "b" }, "kadam://reference/categories");
+    expect(text).toContain("Category IDs per campaign type");
+  });
 });
 
 describe("resource cabinet scoping", () => {
-  it("adv session lists exactly the 5 advertiser resources", async () => {
+  it("adv session lists exactly the 6 advertiser resources", async () => {
     const uris = await listUris("adv", { advKey: "b" });
     expect(uris).toEqual([
       "kadam://reference/api-overview",
       "kadam://reference/campaign-types",
+      "kadam://reference/categories",
       "kadam://reference/creative-formats",
       "kadam://reference/pricing-models",
       "kadam://reference/report-dimensions",
@@ -100,6 +112,7 @@ describe("resource cabinet scoping", () => {
       "kadam://reference/site-states",
     ]);
     expect(uris).not.toContain("kadam://reference/campaign-types");
+    expect(uris).not.toContain("kadam://reference/categories");
     expect(uris).not.toContain("kadam://reference/pricing-models");
     expect(uris).not.toContain("kadam://reference/creative-formats");
   });

@@ -161,16 +161,13 @@ export const creativesModule: ToolModule = {
     wrapper.register(
       {
         name: "kadam_adv_create_creative",
-        description: `Create a new creative for a campaign. Accepts both URLs (http/https) and local file paths for images/video.
-
-Campaign type determines required fields:
-- Push / In-Page Push: title, text, url, imageUrl (icon 192x192+), mainImageUrl (492x328+)
-- Native: title, url, imageUrl (icon 500x500+), mainImageUrl (492x328+)
-- Banner: url, imageUrl (exact banner size), sizeId (use kadam://reference/creative-formats for valid sizes)
-- Video: title, url, videoUrl (MP4 file)
-- Popunder: does NOT support separate creatives (campaign URL = ad)
-
-Image/video sources: URL (https://...) or local path (/Users/.../image.png, ~/Downloads/banner.jpg).`,
+        description: `Create a creative. Accepts image/video as a URL or local file path. Required fields by type:
+- Push / In-Page Push: title, text, url, imageUrl (icon), mainImageUrl
+- Native: title, url, imageUrl (icon), mainImageUrl
+- Banner: url, imageUrl, sizeId
+- Video: title, url, videoUrl (MP4)
+- Popunder: none (campaign URL is the ad)
+See kadam://reference/creative-formats for sizes and exact dimensions.`,
         product: "advertiser",
         annotations: { title: "Create creative", readOnlyHint: false },
       },
