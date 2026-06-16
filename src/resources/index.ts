@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerCampaignTypesResource } from "./campaign-types.js";
+import { registerCategoriesResource } from "./categories.js";
 import { registerPricingModelsResource } from "./pricing-models.js";
 import { getCreativeFormatsContent } from "./creative-formats.js";
 import { SITE_STATES_CONTENT } from "./site-states.js";
@@ -29,6 +30,7 @@ export function registerResources(
 ): void {
   if (products.adv) {
     registerCampaignTypesResource(server, registry);
+    registerCategoriesResource(server, registry);
     registerPricingModelsResource(server, registry);
 
     const creativeFormatsUri = "kadam://reference/creative-formats";

@@ -23,7 +23,7 @@ export const statsModule: ToolModule = {
       {
         name: "kadam_adv_get_stats",
         description:
-          "Unified advertiser statistics. Use reportType to select: 'custom' (default) for full report builder, 'sites' for per-site breakdown, 'conversions' for individual conversion event log. For custom reports use human-readable names like 'spend,clicks,impressions,ctr' for metrics and 'day,campaign,country' for groupBy.",
+          "Advertiser statistics. reportType: 'custom' (default, report builder), 'sites' (per-site), or 'conversions' (event log). For custom reports use names like 'spend,clicks,ctr' (metrics) and 'day,campaign,country' (groupBy).",
         product: "advertiser",
         annotations: { title: "Get advertiser statistics", readOnlyHint: true },
       },
@@ -43,17 +43,15 @@ export const statsModule: ToolModule = {
           .string()
           .optional()
           .describe(
-            "Comma-separated groupings, e.g. 'day,campaign,country'. Includes campaign_group (a.k.a. folder). " +
-              "Unknown names are reported back, not silently ignored.",
+            "Comma-separated groupings, e.g. 'day,campaign,country' (incl. campaign_group). Unknown names are reported back.",
           ),
         metrics: z
           .string()
           .optional()
           .default("spend,clicks,impressions,ctr")
           .describe(
-            "Comma-separated metric names, e.g. 'spend,clicks,impressions,ctr,cpa,conversions,income,roi'. " +
-              "income = earned/profit. Unknown names are reported back, not silently ignored. " +
-              "See the report-dimensions resource for the full list.",
+            "Comma-separated metric names, e.g. 'spend,clicks,ctr,cpa,conversions,income,roi' (income = profit). " +
+              "Unknown names are reported back; see report-dimensions for the full list.",
           ),
         campaignIds: z.string().optional(),
         countries: z.string().optional(),

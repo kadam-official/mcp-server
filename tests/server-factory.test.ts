@@ -121,13 +121,14 @@ describe("createMcpServer", () => {
       const resources = await client.listResources();
       const uris = (resources.resources ?? []).map((r) => r.uri);
       expect(uris).toContain("kadam://reference/campaign-types");
+      expect(uris).toContain("kadam://reference/categories");
       expect(uris).not.toContain("kadam://reference/site-states");
     } finally {
       cleanup();
     }
   });
 
-  it("dual-key stdio registers all 7 resources with no duplicate URIs", async () => {
+  it("dual-key stdio registers all 8 resources with no duplicate URIs", async () => {
     const { client, cleanup } = await connectServer({
       KADAM_ADV_API_KEY: "test-adv",
       KADAM_PUB_API_KEY: "test-pub",
@@ -136,8 +137,9 @@ describe("createMcpServer", () => {
       const resources = await client.listResources();
       const uris = (resources.resources ?? []).map((r) => r.uri);
       expect(new Set(uris).size).toBe(uris.length); // no duplicate URIs (mixed registered once)
-      expect(uris.length).toBe(7);
+      expect(uris.length).toBe(8);
       expect(uris).toContain("kadam://reference/campaign-types"); // adv
+      expect(uris).toContain("kadam://reference/categories"); // adv
       expect(uris).toContain("kadam://reference/site-states"); // pub
       expect(uris).toContain("kadam://reference/report-dimensions"); // mixed, once
     } finally {

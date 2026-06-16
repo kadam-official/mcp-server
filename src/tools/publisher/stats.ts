@@ -49,8 +49,8 @@ export const pubStatsModule: ToolModule = {
       {
         name: "kadam_pub_get_stats",
         description:
-          "Fetches publisher statistics. Use human-readable names like 'revenue,impressions,clicks' for metrics and 'day,site,country' for groupBy. " +
-          "Unknown names are reported back (not silently ignored); see the report-dimensions resource for the full list.",
+          "Publisher statistics. Use names like 'revenue,impressions,clicks' (metrics) and 'day,site,country' (groupBy). " +
+          "Unknown names are reported back; see report-dimensions for the full list.",
         product: "publisher",
         annotations: { title: "Get publisher statistics", readOnlyHint: true },
       },

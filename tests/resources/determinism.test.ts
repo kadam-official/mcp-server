@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildCampaignTypesContent } from "../../src/resources/campaign-types.js";
+import { buildCategoriesContent } from "../../src/resources/categories.js";
 import { buildPricingModelsContent } from "../../src/resources/pricing-models.js";
 import { getCreativeFormatsContent } from "../../src/resources/creative-formats.js";
 import type { OptionsRegistry } from "../../src/api/options-registry.js";
@@ -73,6 +74,14 @@ describe("reference resource determinism (shuffle-independent)", () => {
     expect(a).toBe(b);
   });
 
+  it("categories tree content is identical regardless of category/children order", async () => {
+    const a = await buildCategoriesContent(campaignRegistry(CP_ORDER_A, CATS_A));
+    const b = await buildCategoriesContent(campaignRegistry(CP_ORDER_B, CATS_B));
+    expect(a).toBe(b);
+    // the full nested tree lives here, not in campaign-types
+    expect(a).toContain("Sports");
+  });
+
   it("pricing-models content is identical regardless of cpTypes order", async () => {
     const a = await buildPricingModelsContent(campaignRegistry(CP_ORDER_A, []));
     const b = await buildPricingModelsContent(campaignRegistry(CP_ORDER_B, []));
@@ -83,5 +92,14 @@ describe("reference resource determinism (shuffle-independent)", () => {
     const a = await getCreativeFormatsContent(materialRegistry(SIZES_A));
     const b = await getCreativeFormatsContent(materialRegistry(SIZES_B));
     expect(a).toBe(b);
+  });
+});
+
+describe("categories resource static-mode fallback", () => {
+  it("returns an ID-focused hint when no registry is available", async () => {
+    const text = await buildCategoriesContent(null);
+    expect(text).toContain("static mode");
+    expect(text).toContain("numeric category IDs");
+    expect(text).not.toContain("resolve server-side");
   });
 });
