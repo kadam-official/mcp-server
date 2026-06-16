@@ -19,13 +19,14 @@ vi.mock("../src/logger.js", () => ({
 }));
 
 const SIZES = { sizes: [{ id: 5, label: "300x250", width: 300, height: 250 }] };
+const CATS = [{ id: 7, label: "Finance", children: [{ id: 70, label: "Crypto" }] }];
 
 function mockRegistry() {
   return {
     getMaterialOptions: vi.fn().mockResolvedValue(SIZES),
     getCampaignOptions: vi.fn().mockResolvedValue({
       cpTypes: [],
-      categories: [],
+      categories: CATS,
       subAges: [],
       options: { allowAgeSelection: false, allowGenderSelection: false },
     }),
@@ -80,13 +81,17 @@ describe("HTTP session resources", () => {
 
   it("campaign-types points to the on-demand categories resource and omits the full tree", async () => {
     const text = await readText("adv", { advKey: "b" }, "kadam://reference/campaign-types");
-    expect(text).toContain("kadam://reference/categories");
-    expect(text).not.toContain("Categories:");
+    expect(text).toContain("kadam://reference/categories"); // pointer to the on-demand resource
+    expect(text).toContain("Finance"); // top-level label still summarized inline
+    expect(text).not.toContain("Categories:"); // no full tree block header
+    expect(text).not.toContain("Crypto"); // nested child is NOT in the always-loaded prefix
   });
 
-  it("categories resource is served on demand", async () => {
+  it("categories resource carries the full nested tree on demand", async () => {
     const text = await readText("adv", { advKey: "b" }, "kadam://reference/categories");
     expect(text).toContain("Category IDs per campaign type");
+    expect(text).toContain("7: Finance");
+    expect(text).toContain("70: Crypto"); // the nested child lives here, not in campaign-types
   });
 });
 

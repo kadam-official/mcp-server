@@ -21,7 +21,7 @@ function formatCategoryTree(cats: CategoryItem[], indent: string): string[] {
  */
 export async function buildCategoriesContent(registry: OptionsRegistry | null): Promise<string> {
   if (!registry) {
-    return "Category tree unavailable (static mode). Pass category names to create/update_campaign; they resolve server-side.";
+    return "Category tree unavailable (static mode). Pass numeric category IDs to create/update_campaign (or the 'mainstream'/'adult' keyword).";
   }
   const lines = [
     "Category IDs per campaign type (for the `categories` parameter of create/update_campaign).",

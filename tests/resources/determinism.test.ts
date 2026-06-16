@@ -94,3 +94,12 @@ describe("reference resource determinism (shuffle-independent)", () => {
     expect(a).toBe(b);
   });
 });
+
+describe("categories resource static-mode fallback", () => {
+  it("returns an ID-focused hint when no registry is available", async () => {
+    const text = await buildCategoriesContent(null);
+    expect(text).toContain("static mode");
+    expect(text).toContain("numeric category IDs");
+    expect(text).not.toContain("resolve server-side");
+  });
+});

@@ -482,7 +482,9 @@ const campaignBudgetFields = {
   categories: z
     .string()
     .optional()
-    .describe("Comma-separated category IDs or names (see kadam://reference/categories)"),
+    .describe(
+      "Comma-separated category IDs from kadam://reference/categories (or the 'mainstream'/'adult' keyword)",
+    ),
   secondPush: z
     .boolean()
     .optional()
