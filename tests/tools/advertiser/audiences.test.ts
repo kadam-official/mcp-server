@@ -54,6 +54,24 @@ describe("audiences tools", () => {
     expect(text).toContain("Audiences");
   });
 
+  it("list_audiences nests searchQuery under filters and sort as an object (KTS-1590)", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listAudiences.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    await client.callTool({
+      name: "kadam_adv_list_audiences",
+      arguments: { page: 1, searchQuery: "retarget", sortField: "reachToday", sortOrder: "desc" },
+    });
+
+    expect(api.listAudiences).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 25,
+      filters: { searchQuery: "retarget" },
+      sort: { reachToday: "desc" },
+    });
+  });
+
   it("get_audience returns type-specific detail for s2s", async () => {
     const { client, mockApi } = await createToolClient(audiencesModule);
     const api = mockApi as MockPartnersClient;

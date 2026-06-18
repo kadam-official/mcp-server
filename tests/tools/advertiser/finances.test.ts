@@ -101,7 +101,7 @@ describe("finances tools", () => {
     expect(text).toContain("all time");
   });
 
-  it("passes activityType filter to API", async () => {
+  it("nests dates under filters and maps activityType to filters.type int (KTS-1590)", async () => {
     const { client, mockApi } = await createToolClient(financesModule);
     const api = mockApi as MockPartnersClient;
     api.listFinanceOperations.mockResolvedValue({
@@ -113,11 +113,13 @@ describe("finances tools", () => {
 
     await client.callTool({
       name: "kadam_adv_list_finance_operations",
-      arguments: { activityType: "deposit" },
+      arguments: { dateFrom: "2025-01-01", dateTo: "2025-01-31", activityType: "deposit" },
     });
 
-    expect(api.listFinanceOperations).toHaveBeenCalledWith(
-      expect.objectContaining({ activityType: "deposit" }),
-    );
+    expect(api.listFinanceOperations).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 25,
+      filters: { dateFrom: "2025-01-01", dateTo: "2025-01-31", type: 2 },
+    });
   });
 });

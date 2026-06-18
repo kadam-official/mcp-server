@@ -4,7 +4,11 @@ import type { ToolModule } from "../../types/tool-module.js";
 import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
-import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
+import {
+  ADV_STATUS_ACTION_MAP,
+  CAMPAIGN_LIST_STATUS_FILTER,
+  parseCommaSeparatedIds,
+} from "../../utils/status-actions.js";
 import type { CampaignRow } from "../../api/schemas/advertiser.js";
 import { flattenCategoryIds } from "../../api/options-registry.js";
 import type { OptionsRegistry, CampaignOptions } from "../../api/options-registry.js";
@@ -571,20 +575,25 @@ export const campaignsModule: ToolModule = {
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
-        const params: Record<string, unknown> = {
-          page: args.page,
-          perPage,
-          ...(args.folderId != null && { folderId: args.folderId }),
-          ...(args.status != null && { status: args.status }),
-          ...(args.type != null && {
-            type: CAMPAIGN_TYPE_MAP[args.type] ?? args.type,
-          }),
-          ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
-          ...(args.dateFrom != null && { dateFrom: args.dateFrom }),
-          ...(args.dateTo != null && { dateTo: args.dateTo }),
-          ...(args.sortField != null && { sortField: args.sortField }),
-          ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
-        };
+
+        // The API reads filters/sort only from nested `filters` and `sort` objects;
+        // anything sent flat at the top level is silently ignored.
+        const filters: Record<string, unknown> = {};
+        if (args.folderId != null) filters.folderId = args.folderId;
+        if (args.status != null) Object.assign(filters, CAMPAIGN_LIST_STATUS_FILTER[args.status]);
+        if (args.type != null) filters.types = [CAMPAIGN_TYPE_MAP[args.type]];
+        if (args.searchQuery != null) filters.searchQuery = args.searchQuery;
+        if (args.dateFrom != null && args.dateTo != null) {
+          filters.dateFrom = args.dateFrom;
+          filters.dateTo = args.dateTo;
+        }
+
+        const params: Record<string, unknown> = { page: args.page, perPage };
+        if (args.sortField != null) {
+          params.sort = { [args.sortField]: args.sortOrder ?? "desc" };
+        }
+        if (Object.keys(filters).length > 0) params.filters = filters;
+
         const res = await ctx.adv.listCampaigns(params);
         const pagination = extractPagination(res);
         return formatEntityList(res.rows, formatCampaignRow, "Campaigns", pagination);

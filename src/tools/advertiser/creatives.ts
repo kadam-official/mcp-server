@@ -5,7 +5,11 @@ import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
-import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../utils/status-actions.js";
+import {
+  ADV_STATUS_ACTION_MAP,
+  MATERIAL_LIST_STATUS_FILTER,
+  parseCommaSeparatedIds,
+} from "../../utils/status-actions.js";
 import type { CreativeRow } from "../../api/schemas/advertiser.js";
 import type { OptionsRegistry } from "../../api/options-registry.js";
 import { logger } from "../../logger.js";
@@ -140,18 +144,21 @@ export const creativesModule: ToolModule = {
         page: z.number().optional().default(1),
         perPage: z.number().optional().default(25),
         campaignId: z.number().optional(),
-        status: z.string().optional(),
+        status: z.enum(["active", "paused", "moderation", "blocked", "archived"]).optional(),
         searchQuery: z.string().optional(),
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
-        const params: Record<string, unknown> = {
-          page: args.page,
-          perPage,
-          ...(args.campaignId != null && { filters: { campaignId: args.campaignId } }),
-          ...(args.status != null && { status: args.status }),
-          ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
-        };
+
+        // Filters must be nested under `filters`; flat top-level keys are ignored by the API.
+        const filters: Record<string, unknown> = {};
+        if (args.campaignId != null) filters.campaignId = args.campaignId;
+        if (args.status != null) Object.assign(filters, MATERIAL_LIST_STATUS_FILTER[args.status]);
+        if (args.searchQuery != null) filters.searchQuery = args.searchQuery;
+
+        const params: Record<string, unknown> = { page: args.page, perPage };
+        if (Object.keys(filters).length > 0) params.filters = filters;
+
         const res = await ctx.adv.listCreatives(params);
         const pagination = extractPagination(res);
         return formatEntityList(res.rows, formatCreativeRow, "Creatives", pagination);

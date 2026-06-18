@@ -74,13 +74,14 @@ export const audiencesModule: ToolModule = {
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);
-        const params: Record<string, unknown> = {
-          page: args.page,
-          perPage,
-          ...(args.searchQuery != null && { searchQuery: args.searchQuery }),
-          ...(args.sortField != null && { sortField: args.sortField }),
-          ...(args.sortOrder != null && { sortOrder: args.sortOrder }),
-        };
+
+        // searchQuery/sort must be nested; flat top-level keys are ignored by the API.
+        const params: Record<string, unknown> = { page: args.page, perPage };
+        if (args.searchQuery != null) params.filters = { searchQuery: args.searchQuery };
+        if (args.sortField != null) {
+          params.sort = { [args.sortField]: args.sortOrder ?? "desc" };
+        }
+
         const res = await ctx.adv.listAudiences(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);

@@ -58,6 +58,69 @@ describe("campaigns tools", () => {
     expect(text).toContain("Test");
   });
 
+  it("list_campaigns nests every filter under `filters` and sort as an object (KTS-1590)", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCampaigns.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    await client.callTool({
+      name: "kadam_adv_list_campaigns",
+      arguments: {
+        page: 1,
+        perPage: 5,
+        folderId: 180180,
+        status: "active",
+        type: "push",
+        searchQuery: "promo",
+        dateFrom: "2026-06-01",
+        dateTo: "2026-06-18",
+        sortField: "moneyOut",
+        sortOrder: "desc",
+      },
+    });
+
+    expect(api.listCampaigns).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 5,
+      sort: { moneyOut: "desc" },
+      filters: {
+        folderId: 180180,
+        statuses: [10],
+        types: [30],
+        searchQuery: "promo",
+        dateFrom: "2026-06-01",
+        dateTo: "2026-06-18",
+      },
+    });
+  });
+
+  it("list_campaigns maps status=archived to filters.archive (not statuses)", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCampaigns.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    await client.callTool({
+      name: "kadam_adv_list_campaigns",
+      arguments: { page: 2, status: "archived" },
+    });
+
+    expect(api.listCampaigns).toHaveBeenCalledWith({
+      page: 2,
+      perPage: 25,
+      filters: { archive: 1 },
+    });
+  });
+
+  it("list_campaigns sends only pagination when no filters/sort are given", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCampaigns.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    await client.callTool({ name: "kadam_adv_list_campaigns", arguments: { page: 1 } });
+
+    expect(api.listCampaigns).toHaveBeenCalledWith({ page: 1, perPage: 25 });
+  });
+
   it("create_campaign calls api with type 30 (push) and cpType 0 (cpc)", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
