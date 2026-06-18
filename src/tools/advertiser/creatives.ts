@@ -145,7 +145,7 @@ export const creativesModule: ToolModule = {
         perPage: z.number().optional().default(25),
         campaignId: z.number().optional(),
         status: z.enum(["active", "paused", "moderation", "blocked", "archived"]).optional(),
-        searchQuery: z.string().optional(),
+        searchQuery: z.string().min(2).optional().describe("Creative title/name or creative ID"),
       },
       async (args, ctx) => {
         const perPage = clampPerPage(args.perPage);

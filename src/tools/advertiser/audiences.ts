@@ -69,7 +69,12 @@ export const audiencesModule: ToolModule = {
         page: z.number().optional().default(1),
         perPage: z.number().optional().default(25),
         searchQuery: z.string().min(2).optional(),
-        sortField: z.string().optional(),
+        sortField: z
+          .string()
+          .optional()
+          .describe(
+            "Sort column: audienceId, audienceName, dateCreated, expireDays, reachToday, newToday, reach7d, new7d, reach30d, new30d",
+          ),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
       async (args, ctx) => {

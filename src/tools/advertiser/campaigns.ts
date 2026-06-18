@@ -567,10 +567,18 @@ export const campaignsModule: ToolModule = {
         folderId: z.number().optional(),
         status: z.enum(["active", "paused", "archived", "moderation"]).optional(),
         type: z.enum(["push", "inpage_push", "native", "banner", "video", "popunder"]).optional(),
-        searchQuery: z.string().optional(),
-        dateFrom: z.string().optional(),
-        dateTo: z.string().optional(),
-        sortField: z.string().optional(),
+        searchQuery: z.string().min(2).optional().describe("Campaign name/domain or campaign ID"),
+        dateFrom: z
+          .string()
+          .optional()
+          .describe("Stats range start (YYYY-MM-DD); pass with dateTo"),
+        dateTo: z.string().optional().describe("Stats range end (YYYY-MM-DD); pass with dateFrom"),
+        sortField: z
+          .string()
+          .optional()
+          .describe(
+            "Sort column: campaign, dateCreation, views, clicks, moneyOut, CPC, CPM, CPA, CTR, CR, ROI, conversions, holds, rejects, profit",
+          ),
         sortOrder: z.enum(["asc", "desc"]).optional(),
       },
       async (args, ctx) => {

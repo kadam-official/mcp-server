@@ -34,8 +34,14 @@ export const financesModule: ToolModule = {
       {
         page: z.number().optional().default(1),
         perPage: z.number().optional().default(25),
-        dateFrom: z.string().optional(),
-        dateTo: z.string().optional(),
+        dateFrom: z
+          .string()
+          .optional()
+          .describe("Range start (YYYY-MM-DD); must be paired with dateTo"),
+        dateTo: z
+          .string()
+          .optional()
+          .describe("Range end (YYYY-MM-DD); must be paired with dateFrom"),
         activityType: z
           .enum(["impression", "deposit", "admin_deposit", "withdrawal", "admin_withdrawal"])
           .optional()
@@ -45,9 +51,13 @@ export const financesModule: ToolModule = {
         const perPage = clampPerPage(args.perPage);
 
         // Filters must be nested under `filters`; flat top-level keys are ignored by the API.
+        // The API rejects a half-open range, so only send dates when BOTH are present.
+        const hasRange = args.dateFrom != null && args.dateTo != null;
         const filters: Record<string, unknown> = {};
-        if (args.dateFrom != null) filters.dateFrom = args.dateFrom;
-        if (args.dateTo != null) filters.dateTo = args.dateTo;
+        if (hasRange) {
+          filters.dateFrom = args.dateFrom;
+          filters.dateTo = args.dateTo;
+        }
         if (args.activityType != null) filters.type = FINANCE_OPERATION_TYPE[args.activityType];
 
         const params: Record<string, unknown> = { page: args.page, perPage };
@@ -56,14 +66,7 @@ export const financesModule: ToolModule = {
         const res = await ctx.adv.listFinanceOperations(params);
         const items = res.rows ?? [];
         const pagination = extractPagination(res);
-        const dateRange =
-          args.dateFrom && args.dateTo
-            ? `${args.dateFrom} to ${args.dateTo}`
-            : args.dateFrom
-              ? `from ${args.dateFrom}`
-              : args.dateTo
-                ? `to ${args.dateTo}`
-                : "all time";
+        const dateRange = hasRange ? `${args.dateFrom} to ${args.dateTo}` : "all time";
         const header = `Finance operations (${dateRange}, page ${pagination.page}/${pagination.totalPages})`;
         return formatEntityList(items, formatFinanceRow, header, pagination);
       },
