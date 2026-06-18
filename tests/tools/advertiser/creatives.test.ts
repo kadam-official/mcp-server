@@ -48,6 +48,40 @@ describe("creatives tools", () => {
     expect(text).toContain("Creatives");
   });
 
+  it("list_creatives nests campaignId/searchQuery into filters and maps status to statuses (KTS-1590)", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCreatives.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    await client.callTool({
+      name: "kadam_adv_list_creatives",
+      arguments: { page: 1, campaignId: 10, status: "paused", searchQuery: "banner" },
+    });
+
+    expect(api.listCreatives).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 25,
+      filters: { campaignId: 10, statuses: [80], searchQuery: "banner" },
+    });
+  });
+
+  it("list_creatives maps status=moderation to statuses [0,5]", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listCreatives.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    await client.callTool({
+      name: "kadam_adv_list_creatives",
+      arguments: { page: 1, status: "moderation" },
+    });
+
+    expect(api.listCreatives).toHaveBeenCalledWith({
+      page: 1,
+      perPage: 25,
+      filters: { statuses: [0, 5] },
+    });
+  });
+
   it("create_creative calls api.createCreative with campaignId and FormData", async () => {
     const { client, mockApi } = await createToolClient(creativesModule);
     const api = mockApi as MockPartnersClient;
