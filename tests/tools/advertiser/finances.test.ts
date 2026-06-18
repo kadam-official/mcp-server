@@ -101,6 +101,21 @@ describe("finances tools", () => {
     expect(text).toContain("all time");
   });
 
+  it("drops a half-open date range (only one date) instead of sending an invalid pair", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listFinanceOperations.mockResolvedValue({ rows: [], totalRows: 0, page: 1, perPage: 25 });
+
+    const result = await client.callTool({
+      name: "kadam_adv_list_finance_operations",
+      arguments: { dateFrom: "2025-01-01" },
+    });
+
+    // The API rejects a half-open range, so a lone date must not be sent at all.
+    expect(api.listFinanceOperations).toHaveBeenCalledWith({ page: 1, perPage: 25 });
+    expect(getTextFromResult(result)).toContain("all time");
+  });
+
   it("nests dates under filters and maps activityType to filters.type int (KTS-1590)", async () => {
     const { client, mockApi } = await createToolClient(financesModule);
     const api = mockApi as MockPartnersClient;
