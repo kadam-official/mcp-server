@@ -20,13 +20,31 @@ afterEach(() => {
 });
 
 describe("bid-optimization tools", () => {
-  it("get_extended_stats nests filters/sort, echoes per-row pathIds, and labels countries", async () => {
+  it("get_extended_stats nests filters/sort and echoes per-row pathIds with title labels", async () => {
     const { client, mockApi } = await createToolClient(bidOptimizationModule);
     const api = mockApi as MockPartnersClient;
     api.getExtendedStats.mockResolvedValue({
       rows: [
-        { id: 34, name: 34, views: "1000", clicks: "50", cpc: "0.02", cr: "4", bid: "0.05" },
-        { id: 24, name: 24, views: "500", clicks: "10", cpc: "0.03", cr: "2", bid: null },
+        {
+          name: { id: 34, title: "United States", type: "slice_value" },
+          views: "1000",
+          clicks: "50",
+          CPC: "0.02",
+          CR: "4",
+          bid: "0.05",
+          hasBids: true,
+          isExcludedFromAutorules: false,
+        },
+        {
+          name: { id: 24, title: "Germany", type: "slice_value" },
+          views: "500",
+          clicks: "10",
+          CPC: "0.03",
+          CR: "2",
+          bid: "",
+          hasBids: false,
+          isExcludedFromAutorules: true,
+        },
       ],
       totalRows: 2,
       page: 1,
@@ -35,7 +53,7 @@ describe("bid-optimization tools", () => {
 
     const result = await client.callTool({
       name: "kadam_adv_get_extended_stats",
-      arguments: { campaignIds: "100", pathIds: "130", metrics: "views,clicks,cpc,cr" },
+      arguments: { campaignIds: "100", pathIds: "130", metrics: "views,clicks,CPC,CR" },
     });
     const text = getTextFromResult(result);
 
@@ -46,12 +64,45 @@ describe("bid-optimization tools", () => {
       sort: { views: "desc" },
     });
     expect((params as { filters: { dateFrom: string } }).filters.dateFrom).toBeTruthy();
-    // per-row pathIds echoed (base path + value id) and country labeled
-    expect(text).toContain('pathIds=130,34 "US"');
-    expect(text).toContain("pathIds=130,24");
+    // per-row pathIds echoed (base path + name.id) and labeled with name.title
+    expect(text).toContain('pathIds=130,34 "United States"');
+    expect(text).toContain('pathIds=130,24 "Germany"');
     expect(text).toContain("views=1000");
+    expect(text).toContain("CPC=0.02");
     expect(text).toContain("bid=0.05");
+    // empty bid is skipped; an autorule-excluded slice is flagged
+    expect(text).toContain("[autorule-excluded]");
+    // the available-columns hint omits structural keys
     expect(text).toContain("Available metric columns");
+    expect(text).not.toContain("isExcludedFromAutorules");
+  });
+
+  it("get_extended_stats renders scalar pathIds + title at deeper levels (no [object Object])", async () => {
+    const { client, mockApi } = await createToolClient(bidOptimizationModule);
+    const api = mockApi as MockPartnersClient;
+    api.getExtendedStats.mockResolvedValue({
+      rows: [
+        {
+          name: { id: 1, title: "Linux", type: "slice_value" },
+          views: "10",
+          clicks: "2",
+          CPC: "0.01",
+          CR: "1",
+        },
+      ],
+      totalRows: 1,
+      page: 1,
+      perPage: 25,
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_extended_stats",
+      arguments: { campaignIds: "100", pathIds: "130,34,140" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain('pathIds=130,34,140,1 "Linux"');
+    expect(text).not.toContain("[object Object]");
   });
 
   it("get_extended_stats respects explicit sort and metric subset", async () => {

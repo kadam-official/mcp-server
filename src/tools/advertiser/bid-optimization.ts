@@ -5,29 +5,25 @@ import { formatEntityList, extractCellValue, clampPerPage } from "../../output-f
 import { extractPagination } from "../../utils/pagination.js";
 import { resolvePeriodToDates } from "../../utils/date-helpers.js";
 import { parseCommaSeparatedIds } from "../../utils/status-actions.js";
-import type { OptionsRegistry } from "../../api/options-registry.js";
 
 const SLICE_LEGEND =
   "Slice IDs: 130 country, 140 platform, 150 browser, 180 source, 190 site, " +
   "200 platform version, 300 subscription age, 320 browser language, 380 CR-target.";
 
-const DEFAULT_METRICS = ["views", "clicks", "cpc", "cr"];
-// Keys that are not user-facing metrics (excluded from the "available columns" hint).
-const NON_METRIC_KEYS = new Set(["id", "name", "bid", "bidMode", "hasBids", "checkbox"]);
-
-const SLICE_COUNTRY = 130;
-
-/** geoId -> ISO code, for labeling country-slice rows (reuse the cached country map). */
-async function buildCountryLabels(options: OptionsRegistry): Promise<Map<number, string>> {
-  const rev = new Map<number, string>();
-  try {
-    const map = await options.getCountryMap();
-    for (const [code, geoId] of map) rev.set(geoId, code);
-  } catch {
-    /* labels are best-effort */
-  }
-  return rev;
-}
+// Metric column keys are display-cased and identical to the sortField keys.
+const DEFAULT_METRICS = ["views", "clicks", "CPC", "CR"];
+// Structural / non-metric keys excluded from the "available columns" hint.
+const NON_METRIC_KEYS = new Set([
+  "id",
+  "name",
+  "bid",
+  "bidMode",
+  "hasBids",
+  "isExcludedFromAutorules",
+  "checkbox",
+  "WR",
+  "auction",
+]);
 
 export const bidOptimizationModule: ToolModule = {
   product: "advertiser",
@@ -55,7 +51,7 @@ export const bidOptimizationModule: ToolModule = {
           .string()
           .optional()
           .describe(
-            "Comma-separated metric column keys to show, lowercase: views,clicks,cpc,cpm,cpa,cr,ctr,roi,epc,conversions,holds,rejections,profit (default views,clicks,cpc,cr). The output's 'Available metric columns' line lists the exact keys. NOTE: these are NOT the sortField keys.",
+            "Comma-separated metric column keys (display-cased, the SAME keys as sortField and the output's 'Available metric columns' line): views,clicks,CTR,conversions,holds,rejections,spending,earning,profit,ROI,CR,CPM,EPL,EPC,CPC,CPA,CPL (default views,clicks,CPC,CR).",
           ),
         period: z
           .enum(["today", "yesterday", "7days", "week", "month"])
@@ -68,7 +64,7 @@ export const bidOptimizationModule: ToolModule = {
           .string()
           .optional()
           .describe(
-            "Sort column key (display-cased, distinct from metric keys): views, clicks, CTR, conversions, holds, rejections, spending, profit, ROI, CR, CPC, CPM, CPA, EPC. Default: views desc (high-traffic first).",
+            "Sort column key (same display-cased keys as metrics): views, clicks, CTR, conversions, holds, rejections, spending, earning, profit, ROI, CR, CPC, CPM, CPA, EPC, EPL, CPL. Default: views desc (high-traffic first).",
           ),
         sortOrder: z.enum(["asc", "desc"]).optional(),
         page: z.number().optional().default(1),
@@ -103,11 +99,6 @@ export const bidOptimizationModule: ToolModule = {
         const rows = res.rows ?? [];
         const pagination = extractPagination(res);
 
-        // The slice being broken down by = last sliceId when the path is odd-length.
-        const brokenSlice = basePath.length % 2 === 1 ? basePath[basePath.length - 1] : undefined;
-        const countryLabels =
-          brokenSlice === SLICE_COUNTRY ? await buildCountryLabels(ctx.adv.options) : null;
-
         const wanted = args.metrics
           ? args.metrics
               .split(",")
@@ -119,17 +110,29 @@ export const bidOptimizationModule: ToolModule = {
           rows.length > 0 ? Object.keys(rows[0]!).filter((k) => !NON_METRIC_KEYS.has(k)) : [];
 
         const formatRow = (row: Record<string, unknown>, index: number): string => {
-          const valId = (row.id ?? row.name) as number | string | undefined;
+          // Every grid row carries its value in `name`: live data uses an object
+          // {id,title,...} (scalar only on legacy/empty rows). `id` is the slice value
+          // id that goes into pathIds; `title` is the human label (country, source, ...).
+          const nameVal = row.name;
+          let valId: number | string | undefined;
+          let label: string | undefined;
+          if (nameVal != null && typeof nameVal === "object") {
+            const n = nameVal as { id?: number | string; title?: string };
+            valId = n.id;
+            label = n.title;
+          } else {
+            valId = nameVal as number | string | undefined;
+          }
+
           const path = [...basePath, valId].filter((v) => v != null).join(",");
-          const label =
-            countryLabels && valId != null ? countryLabels.get(Number(valId)) : undefined;
           const metricsStr = wanted
             .filter((m) => m in row)
             .map((m) => `${m}=${extractCellValue(row[m])}`)
             .join(" ");
           const bid =
             row.bid != null && row.bid !== "" ? ` | bid=${extractCellValue(row.bid)}` : "";
-          return `${index + 1}. pathIds=${path}${label ? ` "${label}"` : ""} | ${metricsStr}${bid}`;
+          const excluded = row.isExcludedFromAutorules === true ? " [autorule-excluded]" : "";
+          return `${index + 1}. pathIds=${path}${label ? ` "${label}"` : ""} | ${metricsStr}${bid}${excluded}`;
         };
 
         const header =

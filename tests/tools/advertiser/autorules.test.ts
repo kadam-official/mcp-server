@@ -95,8 +95,76 @@ describe("autorules tools", () => {
       slices: [180, 190],
       bidRate: 0.9,
       bidMax: 0.007,
+      isActive: true, // defaulted (the form requires it)
     });
     expect(getTextFromResult(result)).toContain("[ID: 999]");
+  });
+
+  it("create_autorule rejects a bidChange rule missing bidMax (precise client-side error)", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_autorule",
+      arguments: {
+        campaignId: 100,
+        type: "bid",
+        period: 7,
+        conditions: [{ metric: "spend", match: "more", value: 1 }],
+        action: "bidChange",
+        slices: [180, 190],
+        bidRate: 0.9,
+        // bidMax omitted on purpose
+      },
+    });
+
+    expect(api.createAutorule).not.toHaveBeenCalled();
+    const text = getTextFromResult(result);
+    expect(text).toContain("bidChange autorule requires");
+    expect(text).toContain("bidMax");
+  });
+
+  it("create_autorule rejects a bidChange rule without a spend/clicks condition", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_autorule",
+      arguments: {
+        campaignId: 100,
+        type: "bid",
+        period: 7,
+        conditions: [{ metric: "ROI", match: "less", value: 50 }],
+        action: "bidChange",
+        slices: [180],
+        bidRate: 1,
+        bidMax: 0.01,
+      },
+    });
+
+    expect(api.createAutorule).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("spend' or 'clicks'");
+  });
+
+  it("create_autorule rejects a dayLimitIncrease rule missing dayLimit fields", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_autorule",
+      arguments: {
+        campaignId: 100,
+        type: "bid",
+        period: 7,
+        conditions: [{ metric: "spend", match: "more", value: 1 }],
+        action: "dayLimitIncrease",
+      },
+    });
+
+    expect(api.createAutorule).not.toHaveBeenCalled();
+    const text = getTextFromResult(result);
+    expect(text).toContain("dayLimitIncrease autorule requires");
+    expect(text).toContain("dayLimitValue");
   });
 
   it("update_autorule does read-modify-write (fetch, merge, full PUT)", async () => {

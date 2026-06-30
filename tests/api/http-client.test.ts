@@ -163,6 +163,43 @@ describe("HttpClient", () => {
     await expect(client.get("/test")).rejects.toThrow(/Validation failed/);
   });
 
+  it("422 validation envelope: flattens the msg field map into the message", async () => {
+    const client = createClient();
+    fetchMock.mockResolvedValue(
+      mockResponse(422, {
+        success: false,
+        code: 422,
+        msg: { autorules: ["Available only for CPC campaigns"] },
+      }),
+    );
+
+    await expect(client.get("/test")).rejects.toThrow(
+      /autorules: Available only for CPC campaigns/,
+    );
+  });
+
+  it("422 with a JSON-encoded errors string in message: parses and flattens it", async () => {
+    const client = createClient();
+    fetchMock.mockResolvedValue(
+      mockResponse(422, { message: JSON.stringify({ bidMax: ["maxbid is required"] }) }),
+    );
+
+    await expect(client.get("/test")).rejects.toThrow(/bidMax: maxbid is required/);
+  });
+
+  it("HTTP-200 success:false envelope: throws ApiError with the flattened msg", async () => {
+    const client = createClient();
+    fetchMock.mockResolvedValue(
+      mockResponse(200, {
+        success: false,
+        code: 0,
+        msg: { exception: "Your request was made with invalid credentials." },
+      }),
+    );
+
+    await expect(client.get("/test")).rejects.toThrow(/invalid credentials/);
+  });
+
   it("500 error with retries: retried up to maxRetries", async () => {
     vi.useFakeTimers();
     const client = createClient({ maxRetries: 1 });
