@@ -36,7 +36,7 @@ export const bidOptimizationModule: ToolModule = {
       {
         name: "kadam_adv_get_extended_stats",
         description:
-          "Bid Optimization: per-slice stats grid for drilling down and setting bids. Drill by appending a sliceId to pathIds; reuse each row's pathIds to set bids via kadam_adv_update_extended_bids. Use ONE campaign to see per-row bids.",
+          "Bid Optimization: per-slice stats grid for drilling down and setting bids (requires Bid Optimization access on the account). Drill by appending a sliceId to pathIds; reuse each row's pathIds to set bids via kadam_adv_update_extended_bids. Use ONE campaign to see per-row bids.",
         product: "advertiser",
         annotations: { title: "Get extended (bid-optimization) stats", readOnlyHint: true },
       },
@@ -55,7 +55,7 @@ export const bidOptimizationModule: ToolModule = {
           .string()
           .optional()
           .describe(
-            "Comma-separated metric columns to show (default views,clicks,cpc,cr). The output lists all available columns.",
+            "Comma-separated metric column keys to show, lowercase: views,clicks,cpc,cpm,cpa,cr,ctr,roi,epc,conversions,holds,rejections,profit (default views,clicks,cpc,cr). The output's 'Available metric columns' line lists the exact keys. NOTE: these are NOT the sortField keys.",
           ),
         period: z
           .enum(["today", "yesterday", "7days", "week", "month"])
@@ -68,7 +68,7 @@ export const bidOptimizationModule: ToolModule = {
           .string()
           .optional()
           .describe(
-            "Sort column (e.g. views, clicks, cpc, cr); default views desc to surface high-traffic rows",
+            "Sort column key (display-cased, distinct from metric keys): views, clicks, CTR, conversions, holds, rejections, spending, profit, ROI, CR, CPC, CPM, CPA, EPC. Default: views desc (high-traffic first).",
           ),
         sortOrder: z.enum(["asc", "desc"]).optional(),
         page: z.number().optional().default(1),
@@ -196,7 +196,12 @@ export const bidOptimizationModule: ToolModule = {
         bids: z
           .array(
             z.object({
-              pathIds: z.array(z.number()).min(2).describe("Alternating [sliceId, valueId, ...]"),
+              pathIds: z
+                .array(z.number())
+                .min(2)
+                .describe(
+                  "Alternating [sliceId, valueId, ...] as shown in a get_extended_stats row's pathIds",
+                ),
               action: z.enum(["set", "off", "on", "remove"]),
               mode: z.enum(["fixed", "multiplier"]).optional().describe("Required for action=set"),
               bid: z.string().optional().describe("Required for action=set"),
