@@ -39,12 +39,14 @@ const ruleFields = {
   conditions: z
     .array(conditionSchema)
     .min(1)
-    .describe("Conditions ANDed together; each {metric, match, value}"),
+    .describe(
+      "Conditions ANDed together; each {metric, match, value}. Note: bidChange (bid) rules don't allow the ROI metric, and spend/clicks conditions can't use value 0.",
+    ),
   statBy: z.enum(["campaign", "account"]).optional(),
   action: z
     .enum(RULE_ACTION)
     .describe(
-      "Action: areaBlPut/areaBlRemove (type area), campaignStop (campaign), creoStop/creoActivate (creo), bidChange/dayLimitIncrease (bid)",
+      "Action (must match type): areaBlPut/areaBlRemove (area), campaignStop/dayLimitIncrease (campaign), creoStop/creoActivate (creo), bidChange (bid)",
     ),
   slices: z
     .array(z.number())

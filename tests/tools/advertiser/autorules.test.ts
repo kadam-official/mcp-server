@@ -154,7 +154,7 @@ describe("autorules tools", () => {
       name: "kadam_adv_create_autorule",
       arguments: {
         campaignId: 100,
-        type: "bid",
+        type: "campaign",
         period: 7,
         conditions: [{ metric: "spend", match: "more", value: 1 }],
         action: "dayLimitIncrease",
@@ -165,6 +165,85 @@ describe("autorules tools", () => {
     const text = getTextFromResult(result);
     expect(text).toContain("dayLimitIncrease autorule requires");
     expect(text).toContain("dayLimitValue");
+  });
+
+  it("create_autorule rejects a bidChange rule with out-of-range bidRate", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_autorule",
+      arguments: {
+        campaignId: 100,
+        type: "bid",
+        period: 7,
+        conditions: [{ metric: "clicks", match: "more", value: 100 }],
+        action: "bidChange",
+        slices: [180],
+        bidRate: 5, // > 2
+        bidMax: 0.01,
+      },
+    });
+
+    expect(api.createAutorule).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("bidRate must be between 0.1 and 2");
+  });
+
+  it("create_autorule rejects a bidChange rule with bidMax below the floor", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_autorule",
+      arguments: {
+        campaignId: 100,
+        type: "bid",
+        period: 7,
+        conditions: [{ metric: "clicks", match: "more", value: 100 }],
+        action: "bidChange",
+        slices: [180],
+        bidRate: 1,
+        bidMax: 0.0001, // < 0.001
+      },
+    });
+
+    expect(api.createAutorule).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("bidMax must be >= 0.001");
+  });
+
+  it("create_autorule rejects a dayLimitIncrease rule with dayLimitValue below the floor", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_autorule",
+      arguments: {
+        campaignId: 100,
+        type: "campaign",
+        period: 7,
+        conditions: [{ metric: "spend", match: "more", value: 1 }],
+        action: "dayLimitIncrease",
+        dayLimitValue: 0.001, // < 0.01
+        dayLimitType: "strict",
+      },
+    });
+
+    expect(api.createAutorule).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("dayLimitValue must be >= 0.01");
+  });
+
+  it("update_autorule re-validates the merged rule and rejects an invalid change", async () => {
+    const { client, mockApi } = await createToolClient(autorulesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getAutorule.mockResolvedValue(SAMPLE_RULE); // bidChange rule
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_autorule",
+      arguments: { id: 16637, bidRate: 5 }, // pushes the merged rule out of range
+    });
+
+    expect(api.updateAutorule).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("bidRate must be between 0.1 and 2");
   });
 
   it("update_autorule does read-modify-write (fetch, merge, full PUT)", async () => {
