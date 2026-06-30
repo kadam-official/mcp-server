@@ -109,6 +109,16 @@ export function createMockPartnersClient() {
     getReportData: vi.fn(),
     getSiteStats: vi.fn(),
     getConversionDetails: vi.fn(),
+    listAutorules: vi.fn(),
+    listCampaignAutorules: vi.fn(),
+    getAutorule: vi.fn(),
+    createAutorule: vi.fn(),
+    updateAutorule: vi.fn(),
+    setAutoruleStatus: vi.fn(),
+    deleteAutorule: vi.fn(),
+    getExtendedStats: vi.fn(),
+    listExtendedBids: vi.fn(),
+    updateExtendedBids: vi.fn(),
   };
 }
 

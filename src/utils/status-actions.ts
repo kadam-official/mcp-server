@@ -29,6 +29,15 @@ export const MATERIAL_LIST_STATUS_FILTER: Record<string, { statuses?: number[]; 
   archived: { archive: 1 },
 };
 
+/** Autorule friendly type -> backend typeId (campaign_autorules.typeId). */
+export const AUTORULE_TYPE_MAP = { area: 1, campaign: 2, creo: 3, bid: 4 } as const;
+export const AUTORULE_TYPE_NAME: Record<number, string> = {
+  1: "area",
+  2: "campaign",
+  3: "creo",
+  4: "bid",
+};
+
 export function parseCommaSeparatedIds(raw: string): number[] {
   return raw
     .split(",")

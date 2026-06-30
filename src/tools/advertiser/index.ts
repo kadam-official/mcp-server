@@ -6,6 +6,8 @@ import { audiencesModule } from "./audiences.js";
 import { creativesModule } from "./creatives.js";
 import { financesModule } from "./finances.js";
 import { statsModule } from "./stats.js";
+import { autorulesModule } from "./autorules.js";
+import { bidOptimizationModule } from "./bid-optimization.js";
 
 export const advToolModules: ToolModule[] = [
   campaignsModule,
@@ -15,4 +17,6 @@ export const advToolModules: ToolModule[] = [
   creativesModule,
   financesModule,
   statsModule,
+  autorulesModule,
+  bidOptimizationModule,
 ];

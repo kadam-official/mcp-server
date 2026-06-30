@@ -15,6 +15,11 @@ import {
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
   folderCreateResponseSchema,
+  autoruleSchema,
+  autorulesResultSchema,
+  autoruleWriteResponseSchema,
+  extendedBidsResultSchema,
+  extendedBidsUpdateResponseSchema,
 } from "./schemas/advertiser.js";
 import type {
   CampaignRow,
@@ -23,6 +28,8 @@ import type {
   AudienceRow,
   AudienceDetail,
   FinanceRow,
+  Autorule,
+  ExtendedBid,
 } from "./schemas/advertiser.js";
 import { z } from "zod";
 import { OptionsRegistry } from "./options-registry.js";
@@ -197,5 +204,60 @@ export class PartnersClient {
   ): Promise<ListResponse<Record<string, unknown>>> {
     const raw = await this.http.post("/stats/conversions", params);
     return listResponseSchema(z.record(z.unknown())).parse(raw);
+  }
+
+  // --- Autorules ---
+  async listAutorules(): Promise<Autorule[]> {
+    const raw = await this.http.get("/autorules");
+    return autorulesResultSchema.parse(raw).rules;
+  }
+
+  async listCampaignAutorules(campaignId: number): Promise<Autorule[]> {
+    const raw = await this.http.get(`/campaigns/${campaignId}/autorules`);
+    return autorulesResultSchema.parse(raw).rules;
+  }
+
+  async getAutorule(id: number): Promise<Autorule> {
+    const raw = await this.http.get(`/autorules/${id}`);
+    return autoruleSchema.parse(raw);
+  }
+
+  async createAutorule(
+    campaignId: number,
+    data: Record<string, unknown>,
+  ): Promise<{ id?: number }> {
+    const raw = await this.http.post(`/campaigns/${campaignId}/autorules`, data);
+    return autoruleWriteResponseSchema.parse(raw);
+  }
+
+  async updateAutorule(id: number, data: Record<string, unknown>): Promise<unknown> {
+    return this.http.put(`/autorules/${id}`, data);
+  }
+
+  async setAutoruleStatus(id: number, isActive: boolean): Promise<unknown> {
+    return this.http.put(`/autorules/${id}/status`, { isActive });
+  }
+
+  async deleteAutorule(id: number): Promise<unknown> {
+    return this.http.delete(`/autorules/${id}`);
+  }
+
+  // --- Extended statistics / Bid Optimization ---
+  async getExtendedStats(
+    params: Record<string, unknown>,
+  ): Promise<ListResponse<Record<string, unknown>>> {
+    const raw = await this.http.post("/stats/extended", params);
+    return listResponseSchema(z.record(z.unknown())).parse(raw);
+  }
+
+  async listExtendedBids(campaignIds: number[]): Promise<Record<string, ExtendedBid[]>> {
+    const qs = campaignIds.map((id) => `campaignIds[]=${id}`).join("&");
+    const raw = await this.http.get(`/stats/extended/bids?${qs}`);
+    return extendedBidsResultSchema.parse(raw).bids;
+  }
+
+  async updateExtendedBids(data: Record<string, unknown>): Promise<{ affectedCampaigns?: number }> {
+    const raw = await this.http.put("/stats/extended/bids", data);
+    return extendedBidsUpdateResponseSchema.parse(raw);
   }
 }
