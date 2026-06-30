@@ -39,19 +39,31 @@ const ruleFields = {
   conditions: z
     .array(conditionSchema)
     .min(1)
-    .describe("Conditions ANDed together; each {metric, match, value}"),
+    .describe(
+      "Conditions ANDed together; each {metric, match, value}. Note: bidChange (bid) rules don't allow the ROI metric, and spend/clicks conditions can't use value 0.",
+    ),
   statBy: z.enum(["campaign", "account"]).optional(),
   action: z
     .enum(RULE_ACTION)
     .describe(
-      "Action: areaBlPut/areaBlRemove (type area), campaignStop (campaign), creoStop/creoActivate (creo), bidChange/dayLimitIncrease (bid)",
+      "Action (must match type): areaBlPut/areaBlRemove (area), campaignStop/dayLimitIncrease (campaign), creoStop/creoActivate (creo), bidChange (bid)",
     ),
   slices: z
     .array(z.number())
     .optional()
-    .describe("bid rules: dimension IDs for granularity, e.g. [180,190] = per source x site"),
-  bidRate: z.number().optional().describe("bid rules: bid multiplier (e.g. 0.5)"),
-  bidMax: z.number().optional().describe("bid rules: max bid cap"),
+    .describe(
+      "bid rules: granularity dimension IDs, e.g. [180,190] = per source x site. REQUIRED for bidChange.",
+    ),
+  bidRate: z
+    .number()
+    .optional()
+    .describe(
+      "bidChange: coefficient on the slice EPC (earnings/click ~ eCPC); new bid = EPC x bidRate, capped at bidMax. REQUIRED for bidChange, range 0.1-2. bidRate=1 = set bid to the eCPC (valid, NOT a no-op).",
+    ),
+  bidMax: z
+    .number()
+    .optional()
+    .describe("bidChange: max bid cap (>=0.001). REQUIRED for bidChange."),
   dayLimitValue: z.number().optional().describe("dayLimitIncrease only"),
   dayLimitType: z.enum(["strict", "percent"]).optional().describe("dayLimitIncrease only"),
   isActive: z.boolean().optional(),
@@ -73,6 +85,51 @@ function formatAutoruleRow(rule: Autorule, index: number): string {
     `${index + 1}. [ID: ${rule.id}] campaign #${rule.campaignId} | ${type} -> ${rule.action} | ` +
     `if ${formatConditions(rule)} over ${rule.period}d | ${state}${extra}${slices}`
   );
+}
+
+/**
+ * Enforce the backend's action-specific required-field matrix client-side, so the
+ * agent gets a precise message up front instead of an opaque 422. Mirrors
+ * CampaignAutoruleForm::rules(): bidChange requires slices + bidRate(0.1-2) +
+ * bidMax(>=0.001) and a spend/clicks condition; dayLimitIncrease requires
+ * dayLimitValue(>=0.01) + dayLimitType. Called on the effective (merged) rule.
+ */
+function assertRuleConstraints(rule: {
+  action?: unknown;
+  slices?: unknown;
+  bidRate?: unknown;
+  bidMax?: unknown;
+  dayLimitValue?: unknown;
+  dayLimitType?: unknown;
+  conditions?: unknown;
+}): void {
+  const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
+
+  if (rule.action === "bidChange") {
+    const problems: string[] = [];
+    if (!Array.isArray(rule.slices) || rule.slices.length === 0)
+      problems.push("slices (granularity dims, e.g. [180,190])");
+    const bidRate = num(rule.bidRate);
+    if (bidRate == null) problems.push("bidRate (coefficient on slice EPC, range 0.1-2)");
+    else if (bidRate < 0.1 || bidRate > 2) problems.push("bidRate must be between 0.1 and 2");
+    const bidMax = num(rule.bidMax);
+    if (bidMax == null) problems.push("bidMax (max bid cap, >=0.001)");
+    else if (bidMax < 0.001) problems.push("bidMax must be >= 0.001");
+    const conditions = Array.isArray(rule.conditions)
+      ? (rule.conditions as Array<{ metric?: unknown }>)
+      : [];
+    if (!conditions.some((c) => c.metric === "spend" || c.metric === "clicks"))
+      problems.push("at least one condition on metric 'spend' or 'clicks'");
+    if (problems.length) throw new Error(`bidChange autorule requires: ${problems.join("; ")}.`);
+  } else if (rule.action === "dayLimitIncrease") {
+    const problems: string[] = [];
+    const dayLimitValue = num(rule.dayLimitValue);
+    if (dayLimitValue == null) problems.push("dayLimitValue (>=0.01)");
+    else if (dayLimitValue < 0.01) problems.push("dayLimitValue must be >= 0.01");
+    if (rule.dayLimitType == null) problems.push("dayLimitType (strict|percent)");
+    if (problems.length)
+      throw new Error(`dayLimitIncrease autorule requires: ${problems.join("; ")}.`);
+  }
 }
 
 /** Build the API rule body from friendly args (type -> typeId), dropping unset fields. */
@@ -126,7 +183,7 @@ export const autorulesModule: ToolModule = {
       {
         name: "kadam_adv_create_autorule",
         description:
-          "Create an autorule on a CPC campaign. Campaigns usually carry several rules (a strategy); call once per rule. Backend validates type/action/field coupling.",
+          "Create an autorule on a CPC campaign (autorules are CPC-only). Campaigns usually carry several rules (a strategy); call once per rule. bidChange rules require slices + bidRate + bidMax and a spend/clicks condition.",
         product: "advertiser",
         annotations: { title: "Create autorule", readOnlyHint: false },
       },
@@ -135,7 +192,10 @@ export const autorulesModule: ToolModule = {
         ...ruleFields,
       },
       async (args, ctx) => {
-        const res = await ctx.adv.createAutorule(args.campaignId, buildRuleBody(args));
+        assertRuleConstraints(args);
+        // The form requires isActive; new rules launch active unless told otherwise.
+        const body = buildRuleBody({ ...args, isActive: args.isActive ?? true });
+        const res = await ctx.adv.createAutorule(args.campaignId, body);
         return `Autorule created${res.id != null ? ` [ID: ${res.id}]` : ""} on campaign #${args.campaignId}.`;
       },
     );
@@ -155,9 +215,20 @@ export const autorulesModule: ToolModule = {
         conditions: z.array(conditionSchema).min(1).optional(),
         statBy: z.enum(["campaign", "account"]).optional(),
         action: z.enum(RULE_ACTION).optional(),
-        slices: z.array(z.number()).optional(),
-        bidRate: z.number().optional(),
-        bidMax: z.number().optional(),
+        slices: z
+          .array(z.number())
+          .optional()
+          .describe("bid rules: granularity dims, e.g. [180,190]. REQUIRED for bidChange."),
+        bidRate: z
+          .number()
+          .optional()
+          .describe(
+            "bidChange: coefficient on slice EPC (new bid = EPC x bidRate, capped at bidMax). REQUIRED for bidChange, range 0.1-2; bidRate=1 = set bid to eCPC.",
+          ),
+        bidMax: z
+          .number()
+          .optional()
+          .describe("bidChange: max bid cap (>=0.001). REQUIRED for bidChange."),
         dayLimitValue: z.number().optional(),
         dayLimitType: z.enum(["strict", "percent"]).optional(),
         isActive: z.boolean().optional(),
@@ -192,6 +263,7 @@ export const autorulesModule: ToolModule = {
         if (changes.dayLimitType != null) merged.dayLimitType = changes.dayLimitType;
         if (changes.isActive != null) merged.isActive = changes.isActive;
 
+        assertRuleConstraints(merged);
         await ctx.adv.updateAutorule(id, merged);
         return `Autorule #${id} updated.`;
       },

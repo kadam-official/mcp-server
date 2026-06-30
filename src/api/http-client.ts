@@ -191,21 +191,51 @@ function tryParseJson(text: string): unknown {
   }
 }
 
+/**
+ * Flatten Kadam's validation payloads into one human/agent-readable line.
+ * Handles the shapes the API actually emits:
+ * - string                         -> the string
+ * - array (of strings/{message})   -> "a; b"
+ * - field map {field: [msgs]|str}  -> "field: a, b; field2: c" (bare string vals
+ *   are emitted as-is, so e.g. {exception:"..."} keeps the BearerValidator signal)
+ * Returns undefined when there is nothing meaningful to show.
+ */
+function flattenFieldErrors(value: unknown): string | undefined {
+  if (value == null) return undefined;
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((e) => {
+        if (typeof e === "string") return e;
+        if (e && typeof e === "object" && "message" in e)
+          return String((e as { message: unknown }).message);
+        return JSON.stringify(e);
+      })
+      .filter((s) => s && s.length);
+    return parts.length ? parts.join("; ") : undefined;
+  }
+
+  if (typeof value === "object") {
+    const parts: string[] = [];
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      if (Array.isArray(val)) parts.push(`${key}: ${val.join(", ")}`);
+      else if (typeof val === "string") parts.push(val);
+      else parts.push(`${key}: ${JSON.stringify(val)}`);
+    }
+    return parts.length ? parts.join("; ") : undefined;
+  }
+
+  return undefined;
+}
+
 function unwrapApiResponse<T>(json: Record<string, unknown>): T {
   if ("success" in json && json.success === false) {
-    const msg = json.msg;
-    let message = "API request failed";
-    if (msg && typeof msg === "object" && !Array.isArray(msg)) {
-      const parts: string[] = [];
-      for (const [key, val] of Object.entries(msg as Record<string, unknown>)) {
-        if (Array.isArray(val)) parts.push(`${key}: ${val.join(", ")}`);
-        else if (typeof val === "string") parts.push(val);
-        else parts.push(`${key}: ${JSON.stringify(val)}`);
-      }
-      if (parts.length) message = parts.join("; ");
-    } else if (typeof msg === "string") {
-      message = msg;
-    }
+    const message = flattenFieldErrors(json.msg) ?? "API request failed";
     throw new ApiError(message, (json.code as number) ?? 0);
   }
   if ("data" in json) return json.data as T;
@@ -219,18 +249,24 @@ function formatApiError(status: number, parsed: unknown, raw: string): string {
 
   if (parsed && typeof parsed === "object") {
     const obj = parsed as Record<string, unknown>;
-    if (obj.message) return String(obj.message);
-    if (obj.error) return String(obj.error);
-    if (obj.errors && Array.isArray(obj.errors)) {
-      return obj.errors
-        .map((e: unknown) => {
-          if (typeof e === "string") return e;
-          if (typeof e === "object" && e !== null && "message" in e)
-            return String((e as { message: unknown }).message);
-          return JSON.stringify(e);
-        })
-        .join("; ");
+
+    // Kadam validation envelope: {success:false, code, msg:{<field>:[...]}|"..."}.
+    const fromMsg = flattenFieldErrors(obj.msg);
+    if (fromMsg) return fromMsg;
+
+    // Some endpoints nest field errors under `errors` (object map or array).
+    const fromErrors = flattenFieldErrors(obj.errors);
+    if (fromErrors) return fromErrors;
+
+    // Single-message shapes, including a JSON-encoded errors blob inside `message`.
+    if (typeof obj.message === "string") {
+      const decoded = tryParseJson(obj.message);
+      const fromDecoded =
+        decoded && typeof decoded === "object" ? flattenFieldErrors(decoded) : undefined;
+      return fromDecoded ?? obj.message;
     }
+    if (obj.message != null) return String(obj.message);
+    if (obj.error != null) return String(obj.error);
   }
 
   return `API error ${status}: ${raw.slice(0, 300)}`;
