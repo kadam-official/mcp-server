@@ -144,3 +144,63 @@ export const folderCreateResponseSchema = z
     id: z.number(),
   })
   .passthrough();
+
+// --- Autorules (CPC campaign automation) ---
+export const autoruleConditionSchema = z
+  .object({
+    metric: z.string(),
+    match: z.string(),
+    value: z.number(),
+  })
+  .passthrough();
+
+export const autoruleSchema = z
+  .object({
+    id: z.number(),
+    campaignId: z.number(),
+    typeId: z.number(),
+    period: z.number().optional(),
+    conditions: z.array(autoruleConditionSchema).default([]),
+    statBy: z.string().nullable().optional(),
+    action: z.string(),
+    position: z.number().nullable().optional(),
+    isActive: z.union([z.boolean(), z.number()]).optional(),
+    slices: z.array(z.number()).nullable().optional(),
+    bidRate: z.number().nullable().optional(),
+    bidMax: z.number().nullable().optional(),
+    dayLimitValue: z.number().nullable().optional(),
+    dayLimitType: z.string().nullable().optional(),
+    createdAt: z.number().nullable().optional(),
+  })
+  .passthrough();
+
+export type Autorule = z.infer<typeof autoruleSchema>;
+
+/** GET /autorules and GET /campaigns/{id}/autorules — tolerate `{rules:[]}` or a bare array. */
+export const autorulesResultSchema = z.union([
+  z.object({ rules: z.array(autoruleSchema).default([]) }).passthrough(),
+  z.array(autoruleSchema).transform((rules) => ({ rules })),
+]);
+
+/** Create/status/delete write responses — only `id` is reliably present. */
+export const autoruleWriteResponseSchema = z.object({ id: z.number().optional() }).passthrough();
+
+// --- Extended statistics / Bid Optimization ---
+export const extendedBidSchema = z
+  .object({
+    pathIds: z.array(z.number()).default([]),
+    bid: z.union([z.string(), z.number()]).optional(),
+    mode: z.string().nullable().optional(),
+    state: z.string().optional(),
+  })
+  .passthrough();
+
+export type ExtendedBid = z.infer<typeof extendedBidSchema>;
+
+export const extendedBidsResultSchema = z
+  .object({ bids: z.record(z.array(extendedBidSchema)).default({}) })
+  .passthrough();
+
+export const extendedBidsUpdateResponseSchema = z
+  .object({ affectedCampaigns: z.number().optional() })
+  .passthrough();
