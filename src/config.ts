@@ -30,6 +30,11 @@ const envSchema = z.object({
   // (embedded/local mode where resource and AS share a host).
   KADAM_ADV_MCP_DOMAIN: z.string().url().optional(),
   KADAM_PUB_MCP_DOMAIN: z.string().url().optional(),
+  // In HTTP mode each deployment serves exactly ONE cabinet: partners-mcp.* and
+  // pub-mcp.* are separate services/pods, each fronted by its own ingress. The
+  // cabinet is therefore fixed by config, not detected from the request Host.
+  // Required by the HTTP bootstrap; unused by stdio (which serves both).
+  KADAM_MCP_CABINET: z.enum(["adv", "pub"]).optional(),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   // Upstream HTTP budget (interactive HTTP mode lowers the defaults at bootstrap).
   KADAM_HTTP_MAX_RETRIES: z.coerce.number().int().min(0).max(10).optional(),

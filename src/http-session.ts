@@ -1,32 +1,6 @@
-import type { Config } from "./config.js";
 import type { ToolCredentials } from "./middleware/tool-wrapper.js";
 
 export type CabinetType = "adv" | "pub";
-
-/**
- * Resolve which Kadam cabinet a request targets from its Host header.
- * `partners.*` -> advertiser tools, `pub.*` -> publisher tools. Unknown hosts
- * return null (request is rejected). Port is ignored.
- */
-function hostname(url: string): string {
-  return new URL(url).host.split(":")[0];
-}
-
-export function detectCabinet(host: string, config: Config): CabinetType | null {
-  const requestHost = host.split(":")[0];
-
-  const advHost = hostname(config.KADAM_ADV_DOMAIN);
-  const pubHost = hostname(config.KADAM_PUB_DOMAIN);
-  // The resource may be served on a dedicated subdomain; match it too. Unset
-  // MCP domain falls back to the cabinet host (embedded mode), so this is a
-  // no-op there.
-  const advMcpHost = hostname(config.KADAM_ADV_MCP_DOMAIN ?? config.KADAM_ADV_DOMAIN);
-  const pubMcpHost = hostname(config.KADAM_PUB_MCP_DOMAIN ?? config.KADAM_PUB_DOMAIN);
-
-  if (requestHost === advHost || requestHost === advMcpHost) return "adv";
-  if (requestHost === pubHost || requestHost === pubMcpHost) return "pub";
-  return null;
-}
 
 /**
  * Map a session's Bearer + cabinet to the tool credentials the ToolWrapper

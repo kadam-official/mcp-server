@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  detectCabinet,
-  isSessionAuthorized,
-  type SessionIdentity,
-} from "../../src/http-session.js";
+import { isSessionAuthorized, type SessionIdentity } from "../../src/http-session.js";
 import { buildPrm } from "../../src/http-bootstrap.js";
 import type { Config } from "../../src/config.js";
 
@@ -20,41 +16,6 @@ const config = {
 } as Config;
 
 describe("multi-tenant HTTP isolation", () => {
-  describe("detectCabinet", () => {
-    it("maps the advertiser host to adv", () => {
-      expect(detectCabinet("partners.kadam.net", config)).toBe("adv");
-      expect(detectCabinet("partners.kadam.net:443", config)).toBe("adv");
-    });
-
-    it("maps the publisher host to pub", () => {
-      expect(detectCabinet("pub.kadam.net", config)).toBe("pub");
-    });
-
-    it("rejects unknown hosts", () => {
-      expect(detectCabinet("evil.example.com", config)).toBeNull();
-      expect(detectCabinet("", config)).toBeNull();
-    });
-
-    it("works with local dev domains from env", () => {
-      const local = {
-        KADAM_ADV_DOMAIN: "https://partners.kadam-docker.sdev.pw",
-        KADAM_PUB_DOMAIN: "https://pub.kadam-docker.sdev.pw",
-      } as Config;
-      expect(detectCabinet("partners.kadam-docker.sdev.pw", local)).toBe("adv");
-      expect(detectCabinet("pub.kadam-docker.sdev.pw", local)).toBe("pub");
-      expect(detectCabinet("partners.kadam.net", local)).toBeNull();
-    });
-
-    it("maps dedicated MCP subdomains to their cabinet (and cabinet hosts still resolve)", () => {
-      expect(detectCabinet("partners-mcp.kadam.net", configWithMcpSubdomains)).toBe("adv");
-      expect(detectCabinet("pub-mcp.kadam.net", configWithMcpSubdomains)).toBe("pub");
-      // the OAuth AS still lives on the cabinet host, so it must resolve too
-      expect(detectCabinet("partners.kadam.net", configWithMcpSubdomains)).toBe("adv");
-      expect(detectCabinet("pub.kadam.net", configWithMcpSubdomains)).toBe("pub");
-      expect(detectCabinet("mcp.evil.com", configWithMcpSubdomains)).toBeNull();
-    });
-  });
-
   describe("buildPrm (RFC 9728 resource / AS split)", () => {
     it("keeps resource and AS on the cabinet host when no MCP domain is set", () => {
       expect(buildPrm(config, "adv")).toEqual({

@@ -6,12 +6,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ClientPool } from "./api/client-pool.js";
 import { BearerValidator } from "./bearer-validation.js";
 import { getConfig, type Config } from "./config.js";
-import {
-  detectCabinet,
-  isSessionAuthorized,
-  sessionCredentials,
-  type CabinetType,
-} from "./http-session.js";
+import { isSessionAuthorized, sessionCredentials, type CabinetType } from "./http-session.js";
 import type { ToolCredentials } from "./middleware/tool-wrapper.js";
 import { assembleServer } from "./server-assembly.js";
 import { logger } from "./logger.js";
@@ -129,6 +124,16 @@ export async function bootstrapHttp(): Promise<void> {
   const config = getConfig();
   const { MCP_HTTP_PORT: port, MCP_HTTP_HOST: host } = config;
 
+  // Each HTTP deployment serves exactly one cabinet (partners-mcp.* and pub-mcp.*
+  // are separate services/pods, each fronted by its own ingress), so the cabinet
+  // is fixed here rather than detected from the request Host.
+  const cabinet = config.KADAM_MCP_CABINET;
+  if (!cabinet) {
+    throw new Error(
+      "KADAM_MCP_CABINET must be set to 'adv' or 'pub' in HTTP mode (one cabinet per deployment)",
+    );
+  }
+
   // One shared pool for the whole process: per-bearer clients (and their options
   // cache) persist across sessions. Interactive HTTP mode lowers the retry/timeout
   // budget unless overridden by env.
@@ -149,7 +154,6 @@ export async function bootstrapHttp(): Promise<void> {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     const pathname = url.pathname;
     const method = req.method ?? "GET";
-    const requestHost = req.headers.host ?? "";
 
     try {
       if (pathname === "/healthz" && method === "GET") {
@@ -158,22 +162,11 @@ export async function bootstrapHttp(): Promise<void> {
       }
 
       if (pathname === "/.well-known/oauth-protected-resource" && method === "GET") {
-        const cabinet = detectCabinet(requestHost, config);
-        if (!cabinet) {
-          sendJson(res, 404, { error: "Unknown host" });
-          return;
-        }
         sendJson(res, 200, buildPrm(config, cabinet));
         return;
       }
 
       if (pathname === "/mcp") {
-        const cabinet = detectCabinet(requestHost, config);
-        if (!cabinet) {
-          sendJson(res, 404, { error: "Unknown host" });
-          return;
-        }
-
         const bearer = extractBearer(req);
         if (!bearer) {
           const rmDomain = mcpDomain(config, cabinet);
