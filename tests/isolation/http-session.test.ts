@@ -4,7 +4,15 @@ import {
   isSessionAuthorized,
   type SessionIdentity,
 } from "../../src/http-session.js";
+import { buildPrm } from "../../src/http-bootstrap.js";
 import type { Config } from "../../src/config.js";
+
+const configWithMcpSubdomains = {
+  KADAM_ADV_DOMAIN: "https://partners.kadam.net",
+  KADAM_PUB_DOMAIN: "https://pub.kadam.net",
+  KADAM_ADV_MCP_DOMAIN: "https://partners-mcp.kadam.net",
+  KADAM_PUB_MCP_DOMAIN: "https://pub-mcp.kadam.net",
+} as Config;
 
 const config = {
   KADAM_ADV_DOMAIN: "https://partners.kadam.net",
@@ -35,6 +43,38 @@ describe("multi-tenant HTTP isolation", () => {
       expect(detectCabinet("partners.kadam-docker.sdev.pw", local)).toBe("adv");
       expect(detectCabinet("pub.kadam-docker.sdev.pw", local)).toBe("pub");
       expect(detectCabinet("partners.kadam.net", local)).toBeNull();
+    });
+
+    it("maps dedicated MCP subdomains to their cabinet (and cabinet hosts still resolve)", () => {
+      expect(detectCabinet("partners-mcp.kadam.net", configWithMcpSubdomains)).toBe("adv");
+      expect(detectCabinet("pub-mcp.kadam.net", configWithMcpSubdomains)).toBe("pub");
+      // the OAuth AS still lives on the cabinet host, so it must resolve too
+      expect(detectCabinet("partners.kadam.net", configWithMcpSubdomains)).toBe("adv");
+      expect(detectCabinet("pub.kadam.net", configWithMcpSubdomains)).toBe("pub");
+      expect(detectCabinet("mcp.evil.com", configWithMcpSubdomains)).toBeNull();
+    });
+  });
+
+  describe("buildPrm (RFC 9728 resource / AS split)", () => {
+    it("keeps resource and AS on the cabinet host when no MCP domain is set", () => {
+      expect(buildPrm(config, "adv")).toEqual({
+        resource: "https://partners.kadam.net/mcp",
+        authorization_servers: ["https://partners.kadam.net"],
+        bearer_methods_supported: ["header"],
+      });
+    });
+
+    it("points resource at the MCP subdomain but keeps AS on the cabinet host", () => {
+      expect(buildPrm(configWithMcpSubdomains, "adv")).toEqual({
+        resource: "https://partners-mcp.kadam.net/mcp",
+        authorization_servers: ["https://partners.kadam.net"],
+        bearer_methods_supported: ["header"],
+      });
+      expect(buildPrm(configWithMcpSubdomains, "pub")).toEqual({
+        resource: "https://pub-mcp.kadam.net/mcp",
+        authorization_servers: ["https://pub.kadam.net"],
+        bearer_methods_supported: ["header"],
+      });
     });
   });
 

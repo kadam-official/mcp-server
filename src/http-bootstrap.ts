@@ -88,11 +88,21 @@ function extractBearer(req: IncomingMessage): string | null {
   return auth.slice(7).trim() || null;
 }
 
-function buildPrm(config: Config, cabinet: CabinetType): object {
-  const domain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
+/** Public host the MCP resource is served on (dedicated subdomain, or the
+ * cabinet host when unset / embedded). This is the RFC 9728 `resource`. */
+export function mcpDomain(config: Config, cabinet: CabinetType): string {
+  return cabinet === "adv"
+    ? (config.KADAM_ADV_MCP_DOMAIN ?? config.KADAM_ADV_DOMAIN)
+    : (config.KADAM_PUB_MCP_DOMAIN ?? config.KADAM_PUB_DOMAIN);
+}
+
+export function buildPrm(config: Config, cabinet: CabinetType): object {
+  // Resource = the MCP host; the Authorization Server stays the cabinet host
+  // (login/consent/token). They coincide in embedded mode.
+  const asDomain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
   return {
-    resource: `${domain}/mcp`,
-    authorization_servers: [domain],
+    resource: `${mcpDomain(config, cabinet)}/mcp`,
+    authorization_servers: [asDomain],
     bearer_methods_supported: ["header"],
   };
 }
@@ -166,9 +176,9 @@ export async function bootstrapHttp(): Promise<void> {
 
         const bearer = extractBearer(req);
         if (!bearer) {
-          const domain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
+          const rmDomain = mcpDomain(config, cabinet);
           res.writeHead(401, {
-            "WWW-Authenticate": `Bearer resource_metadata="${domain}/.well-known/oauth-protected-resource"`,
+            "WWW-Authenticate": `Bearer resource_metadata="${rmDomain}/.well-known/oauth-protected-resource"`,
             "Content-Type": "application/json",
           });
           res.end(
@@ -184,9 +194,9 @@ export async function bootstrapHttp(): Promise<void> {
         if (method !== "DELETE") {
           const valid = await bearerValidator.validate(bearer, cabinet);
           if (!valid) {
-            const domain = cabinet === "adv" ? config.KADAM_ADV_DOMAIN : config.KADAM_PUB_DOMAIN;
+            const rmDomain = mcpDomain(config, cabinet);
             res.writeHead(401, {
-              "WWW-Authenticate": `Bearer resource_metadata="${domain}/.well-known/oauth-protected-resource"`,
+              "WWW-Authenticate": `Bearer resource_metadata="${rmDomain}/.well-known/oauth-protected-resource"`,
               "Content-Type": "application/json",
             });
             res.end(
