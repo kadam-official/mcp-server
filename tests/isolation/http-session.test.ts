@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { isSessionAuthorized, type SessionIdentity } from "../../src/http-session.js";
-import { buildPrm } from "../../src/http-bootstrap.js";
+import { buildPrm, isProtectedResourceMetadataPath } from "../../src/http-bootstrap.js";
 import type { Config } from "../../src/config.js";
 
 const configWithMcpSubdomains = {
@@ -36,6 +36,28 @@ describe("multi-tenant HTTP isolation", () => {
         authorization_servers: ["https://pub.kadam.net"],
         bearer_methods_supported: ["header"],
       });
+    });
+  });
+
+  describe("isProtectedResourceMetadataPath (RFC 9728 path routing)", () => {
+    it("matches the bare well-known path", () => {
+      expect(isProtectedResourceMetadataPath("/.well-known/oauth-protected-resource")).toBe(true);
+    });
+
+    it("matches the resource-path-suffixed metadata (resource is <host>/mcp)", () => {
+      expect(isProtectedResourceMetadataPath("/.well-known/oauth-protected-resource/mcp")).toBe(
+        true,
+      );
+    });
+
+    it("rejects unrelated or deeper paths", () => {
+      expect(isProtectedResourceMetadataPath("/.well-known/oauth-protected-resource/other")).toBe(
+        false,
+      );
+      expect(isProtectedResourceMetadataPath("/.well-known/oauth-authorization-server")).toBe(
+        false,
+      );
+      expect(isProtectedResourceMetadataPath("/mcp")).toBe(false);
     });
   });
 
