@@ -8,13 +8,23 @@ export type CabinetType = "adv" | "pub";
  * `partners.*` -> advertiser tools, `pub.*` -> publisher tools. Unknown hosts
  * return null (request is rejected). Port is ignored.
  */
+function hostname(url: string): string {
+  return new URL(url).host.split(":")[0];
+}
+
 export function detectCabinet(host: string, config: Config): CabinetType | null {
-  const advHost = new URL(config.KADAM_ADV_DOMAIN).host.split(":")[0];
-  const pubHost = new URL(config.KADAM_PUB_DOMAIN).host.split(":")[0];
   const requestHost = host.split(":")[0];
 
-  if (requestHost === advHost) return "adv";
-  if (requestHost === pubHost) return "pub";
+  const advHost = hostname(config.KADAM_ADV_DOMAIN);
+  const pubHost = hostname(config.KADAM_PUB_DOMAIN);
+  // The resource may be served on a dedicated subdomain; match it too. Unset
+  // MCP domain falls back to the cabinet host (embedded mode), so this is a
+  // no-op there.
+  const advMcpHost = hostname(config.KADAM_ADV_MCP_DOMAIN ?? config.KADAM_ADV_DOMAIN);
+  const pubMcpHost = hostname(config.KADAM_PUB_MCP_DOMAIN ?? config.KADAM_PUB_DOMAIN);
+
+  if (requestHost === advHost || requestHost === advMcpHost) return "adv";
+  if (requestHost === pubHost || requestHost === pubMcpHost) return "pub";
   return null;
 }
 

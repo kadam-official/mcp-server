@@ -24,6 +24,12 @@ const envSchema = z.object({
   KADAM_PUB_API_BASE: z.string().url().default("https://pub.kadam.net/api"),
   KADAM_ADV_DOMAIN: z.string().url().default("https://partners.kadam.net"),
   KADAM_PUB_DOMAIN: z.string().url().default("https://pub.kadam.net"),
+  // Public host the MCP resource is served on. When the resource lives on a
+  // dedicated subdomain (partners-mcp.*/pub-mcp.*) it differs from the OAuth AS
+  // (the cabinet domain above). Unset -> falls back to the cabinet domain at use
+  // (embedded/local mode where resource and AS share a host).
+  KADAM_ADV_MCP_DOMAIN: z.string().url().optional(),
+  KADAM_PUB_MCP_DOMAIN: z.string().url().optional(),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
   // Upstream HTTP budget (interactive HTTP mode lowers the defaults at bootstrap).
   KADAM_HTTP_MAX_RETRIES: z.coerce.number().int().min(0).max(10).optional(),
