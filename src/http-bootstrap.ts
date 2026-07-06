@@ -6,12 +6,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ClientPool } from "./api/client-pool.js";
 import { BearerValidator } from "./bearer-validation.js";
 import { getConfig, type Config } from "./config.js";
-import {
-  detectCabinet,
-  isSessionAuthorized,
-  sessionCredentials,
-  type CabinetType,
-} from "./http-session.js";
+import { isSessionAuthorized, sessionCredentials, type CabinetType } from "./http-session.js";
 import type { ToolCredentials } from "./middleware/tool-wrapper.js";
 import { assembleServer } from "./server-assembly.js";
 import { logger } from "./logger.js";
@@ -96,6 +91,19 @@ export function mcpDomain(config: Config, cabinet: CabinetType): string {
     : (config.KADAM_PUB_MCP_DOMAIN ?? config.KADAM_PUB_DOMAIN);
 }
 
+/**
+ * The resource is served at `<host>/mcp`, so per RFC 9728 §3.1 its metadata
+ * lives at `/.well-known/oauth-protected-resource/mcp`. We also answer the bare
+ * `/.well-known/oauth-protected-resource` for clients that discover it via the
+ * WWW-Authenticate `resource_metadata` hint rather than the resource path.
+ */
+export function isProtectedResourceMetadataPath(pathname: string): boolean {
+  return (
+    pathname === "/.well-known/oauth-protected-resource" ||
+    pathname === "/.well-known/oauth-protected-resource/mcp"
+  );
+}
+
 export function buildPrm(config: Config, cabinet: CabinetType): object {
   // Resource = the MCP host; the Authorization Server stays the cabinet host
   // (login/consent/token). They coincide in embedded mode.
@@ -129,6 +137,16 @@ export async function bootstrapHttp(): Promise<void> {
   const config = getConfig();
   const { MCP_HTTP_PORT: port, MCP_HTTP_HOST: host } = config;
 
+  // Each HTTP deployment serves exactly one cabinet (partners-mcp.* and pub-mcp.*
+  // are separate services/pods, each fronted by its own ingress), so the cabinet
+  // is fixed here rather than detected from the request Host.
+  const cabinet = config.KADAM_MCP_CABINET;
+  if (!cabinet) {
+    throw new Error(
+      "KADAM_MCP_CABINET must be set to 'adv' or 'pub' in HTTP mode (one cabinet per deployment)",
+    );
+  }
+
   // One shared pool for the whole process: per-bearer clients (and their options
   // cache) persist across sessions. Interactive HTTP mode lowers the retry/timeout
   // budget unless overridden by env.
@@ -149,7 +167,6 @@ export async function bootstrapHttp(): Promise<void> {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     const pathname = url.pathname;
     const method = req.method ?? "GET";
-    const requestHost = req.headers.host ?? "";
 
     try {
       if (pathname === "/healthz" && method === "GET") {
@@ -157,23 +174,12 @@ export async function bootstrapHttp(): Promise<void> {
         return;
       }
 
-      if (pathname === "/.well-known/oauth-protected-resource" && method === "GET") {
-        const cabinet = detectCabinet(requestHost, config);
-        if (!cabinet) {
-          sendJson(res, 404, { error: "Unknown host" });
-          return;
-        }
+      if (isProtectedResourceMetadataPath(pathname) && method === "GET") {
         sendJson(res, 200, buildPrm(config, cabinet));
         return;
       }
 
       if (pathname === "/mcp") {
-        const cabinet = detectCabinet(requestHost, config);
-        if (!cabinet) {
-          sendJson(res, 404, { error: "Unknown host" });
-          return;
-        }
-
         const bearer = extractBearer(req);
         if (!bearer) {
           const rmDomain = mcpDomain(config, cabinet);
