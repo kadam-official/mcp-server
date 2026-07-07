@@ -6,7 +6,13 @@
 # from GitHub Actions / GitLab.com SaaS / CircleCI — self-hosted GitLab is not
 # in npm's OIDC trust list. This pipeline owns all quality/security/build gates.
 #
-# Stages: setup -> quality -> arch_gates -> security -> test -> build -> publish
+# Stages: setup -> quality -> arch_gates -> security -> test -> package -> publish
+#
+# The dist-build stage is named `package` (not `build`): the injected pipeline
+# execution policy (devops/gitlab-policies) places its jobs in the default-order
+# stages `build`/`deploy` (build BEFORE test), so a project-declared `build`
+# stage after `test` makes the merged stage graph cyclic. Same layout as
+# adverif/mcp.
 
 default:
   image: node:22-alpine
@@ -19,7 +25,7 @@ stages:
   - arch_gates
   - security
   - test
-  - build
+  - package
   - publish
 
 # Single pipeline per commit: suppress the detached merge_request_event pipeline
@@ -135,7 +141,7 @@ prod:smoke:
 
 # ─────────────────────────── build ───────────────────────────
 build:
-  stage: build
+  stage: package
   needs:
     - setup
     - lint
@@ -160,7 +166,7 @@ build:
 
 # Exercises the SAME Dockerfile production runs (kaniko, no docker daemon).
 docker:build:
-  stage: build
+  stage: package
   needs: [setup]
   image:
     name: gcr.io/kaniko-project/executor:v1.23.2-debug
