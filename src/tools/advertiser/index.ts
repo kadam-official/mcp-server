@@ -5,6 +5,7 @@ import { campaignFoldersModule } from "./campaign-folders.js";
 import { audiencesModule } from "./audiences.js";
 import { creativesModule } from "./creatives.js";
 import { financesModule } from "./finances.js";
+import { profileModule } from "./profile.js";
 import { statsModule } from "./stats.js";
 import { autorulesModule } from "./autorules.js";
 import { bidOptimizationModule } from "./bid-optimization.js";
@@ -16,6 +17,7 @@ export const advToolModules: ToolModule[] = [
   audiencesModule,
   creativesModule,
   financesModule,
+  profileModule,
   statsModule,
   autorulesModule,
   bidOptimizationModule,

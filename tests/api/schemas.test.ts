@@ -5,6 +5,8 @@ import {
   audienceRowSchema_,
   audienceDetailSchema,
   financeRowSchema,
+  accountProfileSchema,
+  accountBalanceSchema,
 } from "../../src/api/schemas/advertiser.js";
 import {
   sourceDetailSchema,
@@ -289,5 +291,59 @@ describe("financeRowSchema", () => {
       totalRows: 2,
     });
     expect(result.rows).toHaveLength(2);
+  });
+});
+
+describe("accountProfileSchema", () => {
+  it("parses the KUI-6966 profile payload", () => {
+    const result = accountProfileSchema.parse({
+      id: 127296,
+      balance: 3698.99,
+      currency: "usd",
+      registeredAt: "2021-01-01T00:00:00Z",
+      timezone: "+03:00",
+      dayLimit: 500,
+    });
+    expect(result.id).toBe(127296);
+    expect(result.balance).toBe(3698.99);
+    expect(result.dayLimit).toBe(500);
+  });
+
+  it("strips nothing extra but still keeps known fields if PII is present", () => {
+    const result = accountProfileSchema.parse({
+      id: 1,
+      balance: 0,
+      currency: "rub",
+      registeredAt: "1970-01-01T00:00:00Z",
+      timezone: "+00:00",
+      dayLimit: 0,
+      email: "secret@example.com",
+    });
+    expect(result.id).toBe(1);
+    expect((result as { email?: string }).email).toBe("secret@example.com");
+  });
+
+  it("rejects a payload without id", () => {
+    expect(() =>
+      accountProfileSchema.parse({
+        balance: 0,
+        currency: "rub",
+        registeredAt: "1970-01-01T00:00:00Z",
+        timezone: "+00:00",
+        dayLimit: 0,
+      }),
+    ).toThrow(z.ZodError);
+  });
+});
+
+describe("accountBalanceSchema", () => {
+  it("parses the lightweight balance payload", () => {
+    const result = accountBalanceSchema.parse({ balance: 3698.99, currency: "usd" });
+    expect(result.balance).toBe(3698.99);
+    expect(result.currency).toBe("usd");
+  });
+
+  it("rejects a payload without balance", () => {
+    expect(() => accountBalanceSchema.parse({ currency: "usd" })).toThrow(z.ZodError);
   });
 });
