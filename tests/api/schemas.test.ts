@@ -301,12 +301,11 @@ describe("accountProfileSchema", () => {
       balance: 3698.99,
       currency: "usd",
       registeredAt: "2021-01-01T00:00:00Z",
-      timezone: "+03:00",
-      dayLimit: 500,
+      timezone: 3,
     });
     expect(result.id).toBe(127296);
     expect(result.balance).toBe(3698.99);
-    expect(result.dayLimit).toBe(500);
+    expect(result.timezone).toBe(3);
   });
 
   it("strips nothing extra but still keeps known fields if PII is present", () => {
@@ -315,8 +314,7 @@ describe("accountProfileSchema", () => {
       balance: 0,
       currency: "rub",
       registeredAt: "1970-01-01T00:00:00Z",
-      timezone: "+00:00",
-      dayLimit: 0,
+      timezone: 0,
       email: "secret@example.com",
     });
     expect(result.id).toBe(1);
@@ -329,8 +327,19 @@ describe("accountProfileSchema", () => {
         balance: 0,
         currency: "rub",
         registeredAt: "1970-01-01T00:00:00Z",
-        timezone: "+00:00",
-        dayLimit: 0,
+        timezone: 0,
+      }),
+    ).toThrow(z.ZodError);
+  });
+
+  it("rejects a timezone outside -12..12", () => {
+    expect(() =>
+      accountProfileSchema.parse({
+        id: 1,
+        balance: 0,
+        currency: "usd",
+        registeredAt: "1970-01-01T00:00:00Z",
+        timezone: 13,
       }),
     ).toThrow(z.ZodError);
   });

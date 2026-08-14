@@ -15,7 +15,7 @@ export function registerAccountOverviewPrompt(server: McpServer): void {
 
 Steps:
 1. Get account profile:
-   Call kadam_adv_get_account to read id, balance, currency, registration date, timezone, and daily spend limit.
+   Call kadam_adv_get_account to read id, balance, currency, registration date, and timezone.
 
 2. Get recent finance operations:
    Call kadam_adv_list_finance_operations with perPage 5 to see recent transactions.
@@ -27,7 +27,7 @@ Steps:
    Call kadam_adv_get_stats with reportType "custom", groupBy "campaign", period "7days", metrics "spend,clicks,impressions,ctr,conversions,cpa", sortBy "spend", sortOrder "desc"
 
 5. Summarize:
-   - Account id, balance, currency, timezone, and day limit
+   - Account id, balance, currency, and timezone
    - Recent deposits/charges
    - Total active campaigns and total daily budget
    - Top 5 campaigns by spend with key metrics

@@ -133,8 +133,7 @@ export const accountProfileSchema = z
     balance: z.number(),
     currency: z.string(),
     registeredAt: z.string(),
-    timezone: z.string(),
-    dayLimit: z.number(),
+    timezone: z.number().int().min(-12).max(12),
   })
   .passthrough();
 

@@ -182,12 +182,12 @@ export class PartnersClient {
   }
 
   async getAccountProfile(): Promise<AccountProfile> {
-    const raw = await this.http.get("/profile");
+    const raw = await this.http.get("/me");
     return accountProfileSchema.parse(raw);
   }
 
   async getAccountBalance(): Promise<AccountBalance> {
-    const raw = await this.http.get("/profile/balance");
+    const raw = await this.http.get("/finance/balance");
     return accountBalanceSchema.parse(raw);
   }
 

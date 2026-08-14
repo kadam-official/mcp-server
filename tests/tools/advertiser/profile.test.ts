@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe("advertiser profile tools", () => {
-  it("get_account returns id, balance, currency, registeredAt, timezone and dayLimit", async () => {
+  it("get_account returns id, balance, currency, registeredAt and timezone", async () => {
     const { client, mockApi } = await createToolClient(profileModule);
     const api = mockApi as MockPartnersClient;
     api.getAccountProfile.mockResolvedValue({
@@ -28,8 +28,7 @@ describe("advertiser profile tools", () => {
       balance: 3698.99,
       currency: "usd",
       registeredAt: "2021-01-01T00:00:00Z",
-      timezone: "+03:00",
-      dayLimit: 500,
+      timezone: 3,
       email: "should-not-appear@example.com",
       name: "Dmitry",
     });
@@ -45,13 +44,13 @@ describe("advertiser profile tools", () => {
     expect(text).toContain("$3698.99");
     expect(text).toContain("usd");
     expect(text).toContain("2021-01-01T00:00:00Z");
-    expect(text).toContain("+03:00");
-    expect(text).toContain("$500");
+    expect(text).toMatch(/Timezone\s+: 3/);
+    expect(text).not.toContain("Day limit");
     expect(text).not.toContain("should-not-appear@example.com");
     expect(text).not.toContain("Dmitry");
   });
 
-  it("renders dayLimit 0 as unlimited", async () => {
+  it("renders a negative timezone offset", async () => {
     const { client, mockApi } = await createToolClient(profileModule);
     const api = mockApi as MockPartnersClient;
     api.getAccountProfile.mockResolvedValue({
@@ -59,8 +58,7 @@ describe("advertiser profile tools", () => {
       balance: 0,
       currency: "rub",
       registeredAt: "1970-01-01T00:00:00Z",
-      timezone: "+00:00",
-      dayLimit: 0,
+      timezone: -5,
     });
 
     const result = await client.callTool({
@@ -70,7 +68,8 @@ describe("advertiser profile tools", () => {
     const text = getTextFromResult(result);
 
     expect(text).toContain("₽0");
-    expect(text).toContain("unlimited");
+    expect(text).toMatch(/Timezone\s+: -5/);
+    expect(text).not.toContain("unlimited");
     expect(api.getAccountProfile).toHaveBeenCalledTimes(1);
   });
 

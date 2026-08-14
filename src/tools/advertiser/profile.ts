@@ -11,14 +11,6 @@ const CURRENCY_SYMBOL: Record<string, string> = {
   kzt: "₸",
 };
 
-function formatDayLimit(dayLimit: number, currency: string): string {
-  if (dayLimit <= 0) {
-    return "unlimited";
-  }
-  const sym = CURRENCY_SYMBOL[currency] ?? currency;
-  return `${sym}${dayLimit}`;
-}
-
 function formatProfile(profile: AccountProfile): string {
   const sym = CURRENCY_SYMBOL[profile.currency] ?? profile.currency;
   return formatSingleEntity("Advertiser Account", [
@@ -26,8 +18,7 @@ function formatProfile(profile: AccountProfile): string {
     ["Balance", `${sym}${profile.balance}`],
     ["Currency", profile.currency],
     ["Registered at", profile.registeredAt],
-    ["Timezone", profile.timezone],
-    ["Day limit", formatDayLimit(profile.dayLimit, profile.currency)],
+    ["Timezone", String(profile.timezone)],
   ]);
 }
 
@@ -38,7 +29,7 @@ export const profileModule: ToolModule = {
       {
         name: "kadam_adv_get_account",
         description:
-          "Gets the current advertiser account profile: id, balance, currency, registration date, timezone, and daily spend limit. Does not return email or name.",
+          "Gets the current advertiser account profile: id, balance, currency, registration date, and timezone offset in hours from UTC (-12 to 12). Does not return email or name.",
         product: "advertiser",
         annotations: { title: "Get advertiser account profile", readOnlyHint: true },
       },
