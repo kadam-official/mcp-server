@@ -15,6 +15,8 @@ import {
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
   folderCreateResponseSchema,
+  folderViewSchema,
+  folderBulkActionResultSchema,
   autoruleSchema,
   autorulesResultSchema,
   autoruleWriteResponseSchema,
@@ -24,6 +26,8 @@ import {
 import type {
   CampaignRow,
   FolderRow,
+  FolderView,
+  FolderBulkActionResult,
   CreativeRow,
   AudienceRow,
   AudienceDetail,
@@ -119,8 +123,22 @@ export class PartnersClient {
     return folderCreateResponseSchema.parse(raw);
   }
 
-  async updateCampaignFolder(id: number, data: Record<string, unknown>): Promise<unknown> {
-    return this.http.put(`/campaigns/folders/${id}/settings`, data);
+  async getCampaignFolder(id: number): Promise<FolderView> {
+    const raw = await this.http.get(`/campaigns/folders/${id}`);
+    return folderViewSchema.parse(raw);
+  }
+
+  async updateCampaignFolder(id: number, data: Record<string, unknown>): Promise<FolderView> {
+    const raw = await this.http.patch(`/campaigns/folders/${id}`, data);
+    return folderViewSchema.parse(raw);
+  }
+
+  async setCampaignFolderStatus(
+    ids: number[],
+    action: "activate" | "pause" | "archive",
+  ): Promise<FolderBulkActionResult> {
+    const raw = await this.http.post(`/campaigns/folders/${action}`, { folderIds: ids });
+    return folderBulkActionResultSchema.parse(raw);
   }
 
   async listAudiences(params: Record<string, unknown>): Promise<ListResponse<AudienceRow>> {

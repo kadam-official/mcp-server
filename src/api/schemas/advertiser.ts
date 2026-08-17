@@ -145,6 +145,41 @@ export const folderCreateResponseSchema = z
   })
   .passthrough();
 
+export const folderViewSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    isDefault: z.boolean().optional().default(false),
+    isArchived: z.boolean().optional().default(false),
+    limitsEnabled: z.boolean().optional().default(false),
+    groupDailyLimit: z.number().optional().default(0),
+    groupTotalLimit: z.number().optional().default(0),
+    groupSpendingEvenly: z.boolean().optional().default(false),
+    groupBlockStatus: z.number().optional().default(0),
+  })
+  .passthrough();
+
+export type FolderView = z.infer<typeof folderViewSchema>;
+
+export const folderBulkActionResultSchema = z
+  .object({
+    folders: z.array(
+      z
+        .object({
+          id: z.number(),
+          success: z.boolean(),
+          campaignsTotal: z.number(),
+          campaignsProcessed: z.number(),
+        })
+        .passthrough(),
+    ),
+    totalFolders: z.number(),
+    processedFolders: z.number(),
+  })
+  .passthrough();
+
+export type FolderBulkActionResult = z.infer<typeof folderBulkActionResultSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({
