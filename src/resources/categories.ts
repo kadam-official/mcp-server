@@ -21,10 +21,12 @@ function formatCategoryTree(cats: CategoryItem[], indent: string): string[] {
  */
 export async function buildCategoriesContent(registry: OptionsRegistry | null): Promise<string> {
   if (!registry) {
-    return "Category tree unavailable (static mode). Pass numeric category IDs to create/update_campaign (or the 'mainstream'/'adult' keyword).";
+    return "Category tree unavailable (static mode). Pass 'mainstream', 'adult' (1001), or adult subcategory IDs to create/update_campaign.";
   }
   const lines = [
     "Category IDs per campaign type (for the `categories` parameter of create/update_campaign).",
+    "Selector is Adult (parent 1001 + subcategories) plus a non-expandable `mainstream` token.",
+    "On create, send `mainstream` and/or adult IDs — not other numeric category IDs.",
     "Top-level labels are also summarized in kadam://reference/campaign-types.",
     "",
   ];

@@ -29,13 +29,12 @@ function createMockRegistry(overrides: Partial<CampaignOptions> = {}): OptionsRe
     ],
     languages: [{ id: 2, label: "English" }],
     categories: [
-      { id: 1001, label: "Adult content (IAB25-3)" },
       {
-        id: 122,
-        label: "News (IAB12)",
+        id: 1001,
+        label: "Adult content (IAB25-3)",
         children: [
-          { id: 1567, label: "News general" },
-          { id: 1488, label: "Technology news" },
+          { id: 1560, label: "Adult general" },
+          { id: 1507, label: "Gay" },
         ],
       },
       { id: "mainstream", label: "Mainstream" },
@@ -180,26 +179,13 @@ describe("mapCampaignFields", () => {
 
   it("flattens category tree from options (push-like with mainstream)", async () => {
     const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
-    expect(result.categories).toEqual([1001, 122, 1567, 1488, "mainstream"]);
+    expect(result.categories).toEqual([1001, "mainstream"]);
   });
 
-  it("flattens category tree for native-like types (no mainstream alias)", async () => {
-    const registry = createMockRegistry({
-      categories: [
-        { id: 1001, label: "Adult" },
-        {
-          id: 128,
-          label: "Health",
-          children: [
-            { id: 1564, label: "Medicine general" },
-            { id: 1112, label: "Healthcare Goods" },
-          ],
-        },
-        { id: 132, label: "Cars", children: [{ id: 1506, label: "Selling a car" }] },
-      ],
-    });
+  it("flattens category tree for native with the same Adult plus mainstream leaf", async () => {
+    const registry = createMockRegistry();
     const result = await mapCampaignFields({ type: "native" }, registry);
-    expect(result.categories).toEqual([1001, 128, 1564, 1112, 132, 1506]);
+    expect(result.categories).toEqual([1001, "mainstream"]);
   });
 
   it("does not set categories when options returns empty array", async () => {
