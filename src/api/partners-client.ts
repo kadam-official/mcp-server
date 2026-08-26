@@ -187,7 +187,7 @@ export class PartnersClient {
   }
 
   async getAccountBalance(): Promise<AccountBalance> {
-    const raw = await this.http.get("/finance/balance");
+    const raw = await this.http.get("/finances/balance");
     return accountBalanceSchema.parse(raw);
   }
 
