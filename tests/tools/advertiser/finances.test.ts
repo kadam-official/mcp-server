@@ -138,3 +138,207 @@ describe("finances tools", () => {
     });
   });
 });
+
+describe("payment systems tool", () => {
+  it("lists each system with its per-currency deposit conditions", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listPaymentSystems.mockResolvedValue({
+      paymentSystems: [
+        {
+          id: 38,
+          name: "paypal",
+          isManualThroughManager: false,
+          isPromocodeAvailable: true,
+          taxPercent: 5,
+          currencies: [
+            {
+              currency: "usd",
+              currencyId: 20,
+              commission: 3,
+              constCommission: 0.5,
+              min: 50,
+              max: 10000,
+              exchangeRateToAccountCurrency: 1,
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_list_payment_systems",
+      arguments: {},
+    });
+    const text = getTextFromResult(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(text).toContain("Payment systems (1)");
+    expect(text).toContain("[ID: 38] paypal");
+    expect(text).toContain("promo code accepted");
+    expect(text).toContain("tax 5%");
+    expect(text).toContain("usd");
+    expect(text).toContain("commission 3%");
+    expect(text).toContain("+0.5 fixed");
+    expect(text).toContain("min 50");
+    expect(text).toContain("max 10000");
+    expect(text).toContain("rate to account currency 1");
+  });
+
+  it("says no max when the system is unbounded and hides a zero fixed fee", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listPaymentSystems.mockResolvedValue({
+      paymentSystems: [
+        {
+          id: 12,
+          name: "wire",
+          isManualThroughManager: true,
+          isPromocodeAvailable: false,
+          taxPercent: 0,
+          currencies: [
+            {
+              currency: "eur",
+              currencyId: 30,
+              commission: 0,
+              constCommission: 0,
+              min: 100,
+              max: null,
+              exchangeRateToAccountCurrency: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_list_payment_systems",
+      arguments: {},
+    });
+    const text = getTextFromResult(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(text).toContain("arranged through a manager");
+    expect(text).toContain("no max");
+    expect(text).not.toContain("fixed");
+    expect(text).not.toContain("tax 0%");
+    // A missing rate must be omitted rather than rendered as an empty value.
+    expect(text).not.toContain("rate to account currency");
+    expect(text).not.toContain("null");
+    expect(text).not.toContain("undefined");
+  });
+
+  it("reports an empty list as zero systems rather than an empty answer", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.listPaymentSystems.mockResolvedValue({ paymentSystems: [] });
+
+    const result = await client.callTool({
+      name: "kadam_adv_list_payment_systems",
+      arguments: {},
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(getTextFromResult(result)).toContain("Payment systems (0)");
+  });
+});
+
+describe("account daily limit tools", () => {
+  it("reports the current limit together with the minimum it may be set to", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getDayMoneyLimit.mockResolvedValue({
+      limit: 500,
+      minimum: 50,
+      currency: "usd",
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_day_money_limit",
+      arguments: {},
+    });
+    const text = getTextFromResult(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(text).toContain("Account Daily Spending Limit");
+    expect(text).toContain("500 usd");
+    expect(text).toMatch(/Minimum\s+: 50/);
+    expect(api.getDayMoneyLimit).toHaveBeenCalledTimes(1);
+  });
+
+  it("spells out that a zero limit means no cap", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getDayMoneyLimit.mockResolvedValue({ limit: 0, minimum: 50, currency: "usd" });
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_get_day_money_limit", arguments: {} }),
+    );
+
+    expect(text).toContain("no daily limit set");
+  });
+
+  it("says the limit is not changeable when the account currency has no minimum", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getDayMoneyLimit.mockResolvedValue({ limit: 0, minimum: null, currency: "rub" });
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_get_day_money_limit", arguments: {} }),
+    );
+
+    expect(text).toContain("not changeable on a rub account");
+    expect(text).not.toContain("null");
+  });
+
+  it("sets the limit and reports the value the API saved", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setDayMoneyLimit.mockResolvedValue({
+      limit: 300,
+      minimum: 50,
+      currency: "usd",
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_day_money_limit",
+      arguments: { limit: 300 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(api.setDayMoneyLimit).toHaveBeenCalledWith(300);
+    expect(text).toContain("300 usd");
+    expect(api.getDayMoneyLimit).not.toHaveBeenCalled();
+  });
+
+  it("forwards a zero limit so the cap can be removed", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setDayMoneyLimit.mockResolvedValue({ limit: 0, minimum: 50, currency: "usd" });
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_day_money_limit",
+        arguments: { limit: 0 },
+      }),
+    );
+
+    // 0 is the documented way to remove the limit, so it must not be dropped as falsy.
+    expect(api.setDayMoneyLimit).toHaveBeenCalledWith(0);
+    expect(text).toContain("no daily limit set");
+  });
+
+  it("rejects a negative limit without calling the API", async () => {
+    const { client, mockApi } = await createToolClient(financesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_day_money_limit",
+      arguments: { limit: -1 },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(api.setDayMoneyLimit).not.toHaveBeenCalled();
+  });
+});

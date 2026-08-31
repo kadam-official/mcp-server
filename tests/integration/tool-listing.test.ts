@@ -47,11 +47,11 @@ describe("Tool listing integration", () => {
     resetConfig();
   });
 
-  it("all 39 tools are listed", async () => {
+  it("all 42 tools are listed", async () => {
     const { client } = await createFullServer();
     const result = await client.listTools();
     expect(result.tools).toBeDefined();
-    expect(result.tools!.length).toBe(39);
+    expect(result.tools!.length).toBe(42);
   });
 
   it("all advertiser tools have names starting with kadam_adv_", async () => {
@@ -148,5 +148,33 @@ describe("Tool listing integration", () => {
     expect(tool).toBeDefined();
     expect(tool!.annotations).toBeDefined();
     expect(tool!.annotations!.readOnlyHint).toBe(true);
+  });
+
+  it("tool kadam_adv_list_payment_systems has readOnlyHint annotation", async () => {
+    const { client } = await createFullServer();
+    const result = await client.listTools();
+    const tool = result.tools!.find((t) => t.name === "kadam_adv_list_payment_systems");
+    expect(tool).toBeDefined();
+    expect(tool!.annotations).toBeDefined();
+    expect(tool!.annotations!.readOnlyHint).toBe(true);
+  });
+
+  it("tool kadam_adv_get_day_money_limit has readOnlyHint annotation", async () => {
+    const { client } = await createFullServer();
+    const result = await client.listTools();
+    const tool = result.tools!.find((t) => t.name === "kadam_adv_get_day_money_limit");
+    expect(tool).toBeDefined();
+    expect(tool!.annotations).toBeDefined();
+    expect(tool!.annotations!.readOnlyHint).toBe(true);
+  });
+
+  it("tool kadam_adv_set_day_money_limit is not marked read-only", async () => {
+    const { client } = await createFullServer();
+    const result = await client.listTools();
+    const tool = result.tools!.find((t) => t.name === "kadam_adv_set_day_money_limit");
+    expect(tool).toBeDefined();
+    expect(tool!.annotations).toBeDefined();
+    expect(tool!.annotations!.readOnlyHint).toBeFalsy();
+    expect(tool!.annotations!.idempotentHint).toBe(true);
   });
 });

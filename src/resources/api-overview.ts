@@ -10,6 +10,7 @@ const ADV_SECTION = `Advertisers:
   - Target by country, device, OS, browser, language, audience segments
   - Set budgets (daily/total), bids (CPC/CPM/CPA), and schedules
   - Monitor performance via custom reports and per-site statistics
+  - Deposit through payment systems and cap account-wide daily spending
   - Manage audience segments for retargeting`;
 
 const PUB_SECTION = `Publishers:

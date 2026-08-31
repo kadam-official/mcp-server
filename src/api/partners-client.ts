@@ -12,6 +12,8 @@ import {
   audienceRowSchema_,
   audienceDetailSchema,
   financeRowSchema,
+  paymentSystemsSchema,
+  dayMoneyLimitSchema,
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
   folderCreateResponseSchema,
@@ -28,6 +30,8 @@ import type {
   AudienceRow,
   AudienceDetail,
   FinanceRow,
+  PaymentSystems,
+  DayMoneyLimit,
   Autorule,
   ExtendedBid,
 } from "./schemas/advertiser.js";
@@ -175,6 +179,21 @@ export class PartnersClient {
   async listFinanceOperations(params: Record<string, unknown>): Promise<ListResponse<FinanceRow>> {
     const raw = await this.http.post("/finances/operations", params);
     return financeListSchema.parse(raw);
+  }
+
+  async listPaymentSystems(): Promise<PaymentSystems> {
+    const raw = await this.http.get("/finances/payment-systems");
+    return paymentSystemsSchema.parse(raw);
+  }
+
+  async getDayMoneyLimit(): Promise<DayMoneyLimit> {
+    const raw = await this.http.get("/finances/day-money-limit");
+    return dayMoneyLimitSchema.parse(raw);
+  }
+
+  async setDayMoneyLimit(limit: number): Promise<DayMoneyLimit> {
+    const raw = await this.http.put("/finances/day-money-limit", { limit });
+    return dayMoneyLimitSchema.parse(raw);
   }
 
   async getReportConfig(): Promise<ReportConfig> {
