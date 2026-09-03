@@ -9,9 +9,28 @@ import {
   CAMPAIGN_LIST_STATUS_FILTER,
   parseCommaSeparatedIds,
 } from "../../utils/status-actions.js";
-import type { CampaignRow } from "../../api/schemas/advertiser.js";
+import type { CampaignBulkAction, CampaignRow } from "../../api/schemas/advertiser.js";
 import { flattenCategoryIds } from "../../api/options-registry.js";
 import type { OptionsRegistry, CampaignOptions } from "../../api/options-registry.js";
+
+/**
+ * Bulk actions answer with HTTP 200 even when the backend refused some campaigns, so the
+ * refused IDs have to be surfaced — otherwise the model reports work that never happened.
+ */
+function formatBulkActionResult(result: CampaignBulkAction, actionLabel: string): string {
+  const applied = result.campaigns.filter((c) => c.success).map((c) => `#${c.id}`);
+  const refused = result.campaigns.filter((c) => !c.success).map((c) => `#${c.id}`);
+
+  const lines = [`${applied.length}/${result.totalCampaigns} campaigns ${actionLabel}`];
+  if (applied.length) lines.push(`Applied: ${applied.join(", ")}`);
+  if (refused.length) {
+    lines.push(
+      `Not ${actionLabel} (current campaign state does not allow it): ${refused.join(", ")}`,
+    );
+  }
+
+  return lines.join("\n");
+}
 
 function formatCampaignRow(row: CampaignRow, index: number): string {
   const c = row.campaign;
@@ -866,20 +885,45 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_set_campaign_status",
         description:
-          "Set status for multiple campaigns. Pass comma-separated IDs and status: active, paused, or archived.",
+          "Set status for multiple campaigns. Pass comma-separated IDs and status: active, paused, archived, " +
+          "or restored (take out of the archive). The API answers per campaign, so some IDs can be refused " +
+          "while others succeed.",
         product: "advertiser",
         annotations: { title: "Set campaign status", idempotentHint: true },
       },
       {
         ids: z.string().min(1),
-        status: z.enum(["active", "paused", "archived"]),
+        status: z.enum(["active", "paused", "archived", "restored"]),
       },
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await ctx.adv.setCampaignStatus(parsedIds, action);
-        const idList = parsedIds.map((id) => `#${id}`).join(", ");
-        return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;
+        const result = await ctx.adv.setCampaignStatus(parsedIds, action);
+
+        return formatBulkActionResult(result, `set to ${args.status}`);
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_delete_campaigns",
+        description:
+          "Permanently delete campaigns together with their creatives. Requires confirm=true. " +
+          "A campaign must be archived first (use set_campaign_status with status=archived), otherwise " +
+          "the whole call is rejected. Retrying a call that already deleted the campaigns is rejected too, " +
+          "since deleted campaigns are no longer addressable.",
+        product: "advertiser",
+        annotations: { title: "Delete campaigns", destructiveHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated campaign IDs"),
+        confirm: z.literal(true),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        const result = await ctx.adv.deleteCampaigns(parsedIds);
+
+        return formatBulkActionResult(result, "deleted");
       },
     );
 

@@ -12,6 +12,11 @@ describe("ADV_STATUS_ACTION_MAP", () => {
   it("maps archived to archive", () => {
     expect(ADV_STATUS_ACTION_MAP.archived).toBe("archive");
   });
+
+  it("maps restored to restore, not activate", () => {
+    // Unarchiving clears campaignArchive; activate only moves the state and leaves it set.
+    expect(ADV_STATUS_ACTION_MAP.restored).toBe("restore");
+  });
 });
 
 describe("parseCommaSeparatedIds", () => {

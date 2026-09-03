@@ -19,6 +19,17 @@ afterEach(() => {
   resetConfig();
 });
 
+function bulkActionResult(applied: number[], refused: number[] = []) {
+  return {
+    campaigns: [
+      ...applied.map((id) => ({ id, success: true })),
+      ...refused.map((id) => ({ id, success: false })),
+    ],
+    totalCampaigns: applied.length + refused.length,
+    processedCampaigns: applied.length,
+  };
+}
+
 describe("campaigns tools", () => {
   it("list_campaigns returns formatted list with [ID: 1] and Test", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
@@ -335,7 +346,7 @@ describe("campaigns tools", () => {
   it("set_campaign_status with ids 1,2,3 and active calls api with activate", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
-    api.setCampaignStatus.mockResolvedValue(undefined as never);
+    api.setCampaignStatus.mockResolvedValue(bulkActionResult([1, 2, 3]) as never);
 
     const result = await client.callTool({
       name: "kadam_adv_set_campaign_status",
@@ -344,7 +355,70 @@ describe("campaigns tools", () => {
     const text = getTextFromResult(result);
 
     expect(api.setCampaignStatus).toHaveBeenCalledWith([1, 2, 3], "activate");
-    expect(text).toContain("3 campaigns set to active");
+    expect(text).toContain("3/3 campaigns set to active");
+    expect(text).toContain("#1, #2, #3");
+  });
+
+  it.each([
+    ["paused", "pause"],
+    ["archived", "archive"],
+    ["restored", "restore"],
+  ])("set_campaign_status with %s calls api with %s", async (status, action) => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignStatus.mockResolvedValue(bulkActionResult([7]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_status",
+      arguments: { ids: "7", status },
+    });
+
+    expect(api.setCampaignStatus).toHaveBeenCalledWith([7], action);
+    expect(getTextFromResult(result)).toContain(`1/1 campaigns set to ${status}`);
+  });
+
+  it("set_campaign_status reports campaigns the backend refused", async () => {
+    // Partial failures arrive with HTTP 200, so the refused IDs must reach the model.
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignStatus.mockResolvedValue(bulkActionResult([1], [2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_status",
+      arguments: { ids: "1,2", status: "archived" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("1/2 campaigns set to archived");
+    expect(text).toContain("Applied: #1");
+    expect(text).toContain("#2");
+  });
+
+  it("delete_campaigns requires confirm", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_campaigns",
+      arguments: { ids: "1" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(api.deleteCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("delete_campaigns with confirm deletes the listed campaigns", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.deleteCampaigns.mockResolvedValue(bulkActionResult([1, 2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_campaigns",
+      arguments: { ids: "1, 2", confirm: true },
+    });
+
+    expect(api.deleteCampaigns).toHaveBeenCalledWith([1, 2]);
+    expect(getTextFromResult(result)).toContain("2/2 campaigns deleted");
   });
 
   it("list_campaigns with empty data handles gracefully", async () => {
