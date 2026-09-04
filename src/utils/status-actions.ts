@@ -49,3 +49,9 @@ export function parseCommaSeparatedIds(raw: string): number[] {
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !Number.isNaN(n));
 }
+
+export function requireUniqueIds(ids: number[]): void {
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Campaign identifiers must be unique.");
+  }
+}

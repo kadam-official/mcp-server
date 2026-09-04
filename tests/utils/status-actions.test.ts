@@ -1,4 +1,8 @@
-import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../src/utils/status-actions.js";
+import {
+  ADV_STATUS_ACTION_MAP,
+  parseCommaSeparatedIds,
+  requireUniqueIds,
+} from "../../src/utils/status-actions.js";
 
 describe("ADV_STATUS_ACTION_MAP", () => {
   it("maps active to activate", () => {
@@ -38,5 +42,15 @@ describe("parseCommaSeparatedIds", () => {
 
   it("returns empty array for all-invalid input", () => {
     expect(parseCommaSeparatedIds("abc,def")).toEqual([]);
+  });
+});
+
+describe("requireUniqueIds", () => {
+  it("allows a list without repeats", () => {
+    expect(() => requireUniqueIds([1, 2, 3])).not.toThrow();
+  });
+
+  it("rejects duplicate identifiers", () => {
+    expect(() => requireUniqueIds([1, 2, 1])).toThrow("must be unique");
   });
 });

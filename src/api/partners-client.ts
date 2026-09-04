@@ -105,6 +105,11 @@ export class PartnersClient {
     return campaignBulkActionSchema.parse(raw);
   }
 
+  async moveCampaigns(ids: number[], folderId: number): Promise<CampaignBulkAction> {
+    const raw = await this.http.post("/campaigns/move", { campaignIds: ids, folderId });
+    return campaignBulkActionSchema.parse(raw);
+  }
+
   async updateCampaignBid(id: number, bids: unknown[]): Promise<unknown> {
     return this.http.put(`/campaigns/${id}/bid`, { bids });
   }

@@ -421,6 +421,81 @@ describe("campaigns tools", () => {
     expect(getTextFromResult(result)).toContain("2/2 campaigns deleted");
   });
 
+  it("move_campaigns calls API with campaign IDs and target folder", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.moveCampaigns.mockResolvedValue(bulkActionResult([1, 2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "1, 2", folderId: 7 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.moveCampaigns).toHaveBeenCalledWith([1, 2], 7);
+    expect(text).toContain("2/2 campaigns moved to campaign group #7");
+    expect(text).toContain("Applied: #1, #2");
+  });
+
+  it("move_campaigns rejects input without a valid campaign ID", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "not-an-id", folderId: 7 },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("At least one valid campaign ID");
+    expect(api.moveCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("move_campaigns rejects more than 100 campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: {
+        ids: Array.from({ length: 101 }, (_, index) => index + 1).join(","),
+        folderId: 7,
+      },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("No more than 100 campaigns");
+    expect(api.moveCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("move_campaigns rejects duplicate campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "1,1", folderId: 7 },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("must be unique");
+    expect(api.moveCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("set_campaign_status rejects duplicate campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_status",
+      arguments: { ids: "1,1", status: "paused" },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("must be unique");
+    expect(api.setCampaignStatus).not.toHaveBeenCalled();
+  });
+
   it("list_campaigns with empty data handles gracefully", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;

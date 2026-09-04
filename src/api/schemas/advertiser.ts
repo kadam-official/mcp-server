@@ -146,7 +146,7 @@ export const folderCreateResponseSchema = z
   .passthrough();
 
 /**
- * Bulk campaign actions (activate/pause/archive/restore/delete) report each campaign separately:
+ * Bulk campaign actions (activate/pause/archive/restore/delete/move) report each campaign separately:
  * a campaign the backend refused still arrives inside a 200 with `success: false`.
  */
 export const campaignBulkActionSchema = z

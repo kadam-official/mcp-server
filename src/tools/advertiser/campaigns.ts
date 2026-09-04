@@ -8,6 +8,7 @@ import {
   ADV_STATUS_ACTION_MAP,
   CAMPAIGN_LIST_STATUS_FILTER,
   parseCommaSeparatedIds,
+  requireUniqueIds,
 } from "../../utils/status-actions.js";
 import type { CampaignBulkAction, CampaignRow } from "../../api/schemas/advertiser.js";
 import { flattenCategoryIds } from "../../api/options-registry.js";
@@ -897,6 +898,7 @@ export const campaignsModule: ToolModule = {
       },
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds);
         const action = ADV_STATUS_ACTION_MAP[args.status];
         const result = await ctx.adv.setCampaignStatus(parsedIds, action);
 
@@ -921,9 +923,37 @@ export const campaignsModule: ToolModule = {
       },
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds);
         const result = await ctx.adv.deleteCampaigns(parsedIds);
 
         return formatBulkActionResult(result, "deleted");
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_move_campaigns",
+        description:
+          "Move one or more campaigns to a campaign group. Pass comma-separated campaign IDs and the target campaign group ID. Validation errors reject the whole request; a successful response means every requested campaign was moved.",
+        product: "advertiser",
+        annotations: { title: "Move campaigns to group", idempotentHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated campaign IDs"),
+        folderId: z.number().int().positive().describe("Target campaign group ID"),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        if (parsedIds.length === 0) {
+          throw new Error("At least one valid campaign ID is required.");
+        }
+        if (parsedIds.length > 100) {
+          throw new Error("No more than 100 campaigns can be moved at once.");
+        }
+        requireUniqueIds(parsedIds);
+        const result = await ctx.adv.moveCampaigns(parsedIds, args.folderId);
+
+        return formatBulkActionResult(result, `moved to campaign group #${args.folderId}`);
       },
     );
 
