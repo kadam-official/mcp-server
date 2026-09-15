@@ -510,4 +510,52 @@ describe("mapCampaignFields", () => {
     const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
     expect(result.conversion).toBeNull();
   });
+
+  it("passes trafficSources through and parses audienceEngagementLevels to an array", async () => {
+    const result = await mapCampaignFields(
+      {
+        type: "popunder",
+        trafficSources: "all",
+        audienceEngagementLevels: "very_high,high,medium",
+      },
+      createMockRegistry(),
+    );
+    expect(result.trafficSources).toBe("all");
+    expect(result.audienceEngagementLevels).toEqual(["very_high", "high", "medium"]);
+  });
+
+  it("rejects unknown audience engagement slugs listing the canonical five", async () => {
+    await expect(
+      mapCampaignFields(
+        { type: "popunder", audienceEngagementLevels: "very_high,super" },
+        createMockRegistry(),
+      ),
+    ).rejects.toThrow(
+      "Unknown level(s): super. audienceEngagementLevels must be a comma-separated list of: " +
+        "very_high, high, medium, low, not_rated.",
+    );
+  });
+
+  it("rejects an empty audienceEngagementLevels list", async () => {
+    await expect(
+      mapCampaignFields(
+        { type: "popunder", audienceEngagementLevels: " , " },
+        createMockRegistry(),
+      ),
+    ).rejects.toThrow("Empty list");
+  });
+
+  it("dedupes audience engagement slugs and keeps canonical order", async () => {
+    const result = await mapCampaignFields(
+      { type: "popunder", audienceEngagementLevels: " medium, very_high ,medium,high " },
+      createMockRegistry(),
+    );
+    expect(result.audienceEngagementLevels).toEqual(["very_high", "high", "medium"]);
+  });
+
+  it("does not set trafficSources or audienceEngagementLevels when not provided", async () => {
+    const result = await mapCampaignFields({ type: "popunder" }, createMockRegistry());
+    expect(result.trafficSources).toBeUndefined();
+    expect(result.audienceEngagementLevels).toBeUndefined();
+  });
 });

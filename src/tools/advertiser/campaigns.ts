@@ -91,7 +91,34 @@ const CAMPAIGN_WRITABLE_FIELDS = new Set<string>([
   "forecastMinBid",
   "autorules",
   "postConversion",
+  "trafficSources",
+  "audienceEngagementLevels",
 ]);
+
+/** Canonical Audience Engagement slugs in canonical (highest-first) order. */
+const AUDIENCE_ENGAGEMENT_SLUGS = ["very_high", "high", "medium", "low", "not_rated"] as const;
+
+/**
+ * Parse comma-separated Audience Engagement slugs: trim, reject unknown slugs,
+ * dedupe, and return them in canonical order.
+ */
+function parseAudienceEngagementLevels(raw: string): string[] {
+  const tokens = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const known = new Set<string>(AUDIENCE_ENGAGEMENT_SLUGS);
+  const unknown = tokens.filter((t) => !known.has(t));
+  if (tokens.length === 0 || unknown.length > 0) {
+    const problem = unknown.length > 0 ? `Unknown level(s): ${unknown.join(", ")}` : "Empty list";
+    throw new Error(
+      `${problem}. audienceEngagementLevels must be a comma-separated list of: ` +
+        `${AUDIENCE_ENGAGEMENT_SLUGS.join(", ")}.`,
+    );
+  }
+  const selected = new Set(tokens);
+  return AUDIENCE_ENGAGEMENT_SLUGS.filter((s) => selected.has(s));
+}
 
 /** Keep only writable fields from a GET campaign detail; drops read-only keys (id, status, state, ...). */
 function pickWritable(current: Record<string, unknown>): Record<string, unknown> {
@@ -176,6 +203,13 @@ async function mapField(
     case "conversionHold":
     case "conversionReject":
       break; // handled after loop
+    case "trafficSources":
+      mapped.trafficSources = value;
+      break;
+    case "audienceEngagementLevels":
+      if (typeof value === "string")
+        mapped.audienceEngagementLevels = parseAudienceEngagementLevels(value);
+      break;
     case "countries":
     case "audienceIncludeIds":
     case "audienceExcludeIds":
@@ -519,6 +553,25 @@ const campaignBudgetFields = {
     .describe("Postback status name for 'Rejected' conversions"),
 };
 
+const trafficSourceFields = {
+  trafficSources: z
+    .enum(["all", "proven"])
+    .optional()
+    .describe(
+      "Traffic source pool: 'proven' = EasyStart pool of proven sources, 'all' = full pool filtered by Audience Engagement levels. " +
+        "Supported formats are configured server-side (popunder at release); for unsupported formats the API rejects the field with 422. " +
+        "Under 'proven' the API ignores audienceEngagementLevels.",
+    ),
+  audienceEngagementLevels: z
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated Audience Engagement level slugs, e.g. 'very_high,high,medium'. " +
+        "Allowed slugs: very_high, high, medium, low, not_rated. " +
+        "Only meaningful with trafficSources=all; at least one level is required.",
+    ),
+};
+
 const postConversionFields = {
   postViewWindow: z
     .number()
@@ -634,6 +687,7 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
+        ...trafficSourceFields,
         countries: z
           .string()
           .describe(
@@ -685,6 +739,7 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
+        ...trafficSourceFields,
       },
       async (args, ctx) => {
         const { id, ...changes } = args;
@@ -848,6 +903,22 @@ export const campaignsModule: ToolModule = {
             hold: changes.conversionHold ?? currentConv.hold ?? "",
             reject: changes.conversionReject ?? currentConv.reject ?? "",
           };
+        }
+
+        if (changes.trafficSources != null) merged.trafficSources = changes.trafficSources;
+        if (changes.audienceEngagementLevels != null) {
+          merged.audienceEngagementLevels = parseAudienceEngagementLevels(
+            changes.audienceEngagementLevels,
+          );
+        }
+        // A round-tripped empty array (legacy campaign with every level banned)
+        // would trigger the API's "at least one level" 422; dropping the key
+        // preserves the current state instead.
+        if (
+          Array.isArray(merged.audienceEngagementLevels) &&
+          merged.audienceEngagementLevels.length === 0
+        ) {
+          delete merged.audienceEngagementLevels;
         }
 
         // id/status are read-only view keys; pickWritable already excludes them.
