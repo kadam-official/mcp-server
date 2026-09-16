@@ -73,7 +73,12 @@
     "zod": "^3.24.0"
   },
   "overrides": {
-    "hono": "^4.12.25"
+    "hono": "^4.13.5",
+    "@hono/node-server": "^1.19.15",
+    "body-parser": "^2.2.3",
+    "fast-uri": "^3.1.6",
+    "ip-address": "^10.3.1",
+    "qs": "^6.15.4"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
