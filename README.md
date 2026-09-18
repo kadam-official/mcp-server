@@ -159,11 +159,13 @@ Requires `KADAM_ADV_API_KEY`.
 
 #### Campaign Folders
 
-| Tool                               | Description                                   | Annotations |
-| ---------------------------------- | --------------------------------------------- | ----------- |
-| `kadam_adv_list_campaign_folders`  | List folders with campaign counts and budgets | readOnly    |
-| `kadam_adv_create_campaign_folder` | Create a new folder (name min 4 chars)        | —           |
-| `kadam_adv_update_campaign_folder` | Update folder budgets and distribution        | —           |
+| Tool                                   | Description                                                                                               | Annotations |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_list_campaign_folders`      | List folders with campaign counts and budgets                                                             | readOnly    |
+| `kadam_adv_get_campaign_folder`        | Get a single folder: name, archived state, budgets                                                        | readOnly    |
+| `kadam_adv_create_campaign_folder`     | Create a new folder (name 1-50 chars)                                                                     | —           |
+| `kadam_adv_update_campaign_folder`     | Partial update: rename and/or change budgets and distribution                                             | —           |
+| `kadam_adv_set_campaign_folder_status` | Bulk action for comma-separated IDs: activate/pause campaigns, archive folders; returns per-folder result | idempotent  |
 
 #### Creatives
 
@@ -269,7 +271,7 @@ src/
 │   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
-│   ├── advertiser/           # 21 tools across 6 modules
+│   ├── advertiser/           # 32 tools across 9 modules
 │   └── publisher/            # 9 tools across 4 modules
 ├── resources/                # 7 static reference resources
 └── prompts/                  # 4 workflow prompts
@@ -277,7 +279,7 @@ src/
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 30 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 41 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
@@ -321,7 +323,7 @@ npm run inspect         # MCP Inspector (visual debugger)
 
 - **Unit tests** — output formatter, config, HTTP client (mocked fetch)
 - **Middleware tests** — ToolWrapper auth, error formatting, logging
-- **Integration tests** — full server with all 30 tools, 7 resources, 4 prompts via in-memory MCP client
+- **Integration tests** — full server with all 41 tools, 8 resources, 4 prompts via in-memory MCP client
 - **Tool handler tests** — each tool module with mocked API clients
 
 ```bash

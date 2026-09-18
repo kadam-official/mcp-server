@@ -122,4 +122,100 @@ describe("campaign-folders tools", () => {
     expect(api.createCampaignFolder).toHaveBeenCalledWith("SA");
     expect(text).toContain("[ID: 99]");
   });
+
+  it("get_campaign_folder returns formatted folder details", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignFolder.mockResolvedValue({
+      id: 15,
+      name: "US campaigns",
+      isDefault: false,
+      isArchived: false,
+      limitsEnabled: true,
+      groupDailyLimit: 5.05,
+      groupTotalLimit: 100,
+      groupSpendingEvenly: true,
+      groupBlockStatus: 0,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_campaign_folder",
+      arguments: { id: 15 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.getCampaignFolder).toHaveBeenCalledWith(15);
+    expect(text).toContain("[ID: 15]");
+    expect(text).toContain("US campaigns");
+    expect(text).toContain("Daily budget: 5.05");
+    expect(text).toContain("Archived: no");
+  });
+
+  it("update_campaign_folder renames without touching limits", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.updateCampaignFolder.mockResolvedValue(undefined as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_campaign_folder",
+      arguments: { id: 7, name: "Renamed" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateCampaignFolder).toHaveBeenCalledWith(7, { name: "Renamed" });
+    expect(text).toContain("updated successfully");
+  });
+
+  it("update_campaign_folder with no fields does not call the API", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_campaign_folder",
+      arguments: { id: 7 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.updateCampaignFolder).not.toHaveBeenCalled();
+    expect(text).toContain("Nothing to update");
+  });
+
+  it("set_campaign_folder_status reports per-folder results", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignFolderStatus.mockResolvedValue({
+      folders: [
+        { id: 15, success: true, campaignsTotal: 3, campaignsProcessed: 3 },
+        { id: 16, success: false, campaignsTotal: 2, campaignsProcessed: 0 },
+      ],
+      totalFolders: 2,
+      processedFolders: 1,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_folder_status",
+      arguments: { ids: "15, 16", action: "activate" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.setCampaignFolderStatus).toHaveBeenCalledWith([15, 16], "activate");
+    expect(text).toContain("1/2 campaign groups fully processed");
+    expect(text).toContain("#15: ok (3/3 campaigns)");
+    expect(text).toContain("#16: FAILED (0/2 campaigns)");
+  });
+
+  it("set_campaign_folder_status rejects unsupported action", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_folder_status",
+      arguments: { ids: "6", action: "restore" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.setCampaignFolderStatus).not.toHaveBeenCalled();
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(text).toContain("Invalid arguments");
+  });
 });

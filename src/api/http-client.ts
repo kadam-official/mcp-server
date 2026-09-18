@@ -50,6 +50,11 @@ export class HttpClient {
     return this.request<T>("PUT", url, body);
   }
 
+  async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
+    const url = this.buildUrl(path);
+    return this.request<T>("PATCH", url, body);
+  }
+
   async delete<T = unknown>(path: string): Promise<T> {
     const url = this.buildUrl(path);
     return this.request<T>("DELETE", url);
