@@ -112,4 +112,43 @@ describe("creative actions", () => {
     expect(text).toContain("must be unique");
   });
 
+  it("move_creatives states what the move costs the creatives", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.moveCreatives.mockResolvedValue({
+      materials: [
+        { id: 456, success: true },
+        { id: 457, success: false },
+      ],
+      totalMaterials: 2,
+      processedMaterials: 1,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_move_creatives",
+        arguments: { creativeIds: "456,457", campaignId: 9, url: "https://example.com/landing" },
+      }),
+    );
+
+    expect(api.moveCreatives).toHaveBeenCalledWith([456, 457], 9, "https://example.com/landing");
+    expect(text).toContain("1/2 creatives moved to campaign #9");
+    expect(text).toContain("#457");
+    expect(text).toContain("per-geo bids are gone");
+  });
+
+  it("move_creatives rejects duplicate creative ids", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_move_creatives",
+        arguments: { creativeIds: "456,456", campaignId: 9, url: "https://example.com/landing" },
+      }),
+    );
+
+    expect(api.moveCreatives).not.toHaveBeenCalled();
+    expect(text).toContain("Creative identifiers must be unique");
+  });
 });

@@ -1,7 +1,11 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import { parseCommaSeparatedIds, requireUniqueIds } from "../../utils/status-actions.js";
+import {
+  formatMaterialBulkResult,
+  parseCommaSeparatedIds,
+  requireUniqueIds,
+} from "../../utils/status-actions.js";
 import type { CreativeCopyResult } from "../../api/schemas/advertiser.js";
 
 function formatCopyResult(result: CreativeCopyResult, targetCount: number): string {
@@ -72,5 +76,41 @@ export const creativeActionsModule: ToolModule = {
       },
     );
 
+    wrapper.register(
+      {
+        name: "kadam_adv_move_creatives",
+        description:
+          "Move creatives to another campaign of the same ad format and the same pricing model. " +
+          "This is not a silent reparenting: the moved creatives lose their creative-level geo bids, " +
+          "are paused and go back to moderation. If any creative or the target campaign fails the checks, " +
+          "nothing moves. To keep the originals in place, copy instead.",
+        product: "advertiser",
+        annotations: { title: "Move creatives", readOnlyHint: false },
+      },
+      {
+        creativeIds: z.string().describe("Comma-separated creative IDs to move"),
+        campaignId: z
+          .number()
+          .int()
+          .positive()
+          .describe("Target campaign: same ad format and same pricing model as the current one"),
+        url: z
+          .string()
+          .describe(
+            "Landing URL the moved creatives will use; must be on the target campaign's domain",
+          ),
+      },
+      async (args, ctx) => {
+        const ids = parseCommaSeparatedIds(args.creativeIds);
+        requireUniqueIds(ids, "Creative");
+
+        const result = await ctx.adv.moveCreatives(ids, args.campaignId, args.url);
+
+        return [
+          formatMaterialBulkResult(result, `moved to campaign #${args.campaignId}`),
+          "Moved creatives are paused and back on moderation, and their per-geo bids are gone.",
+        ].join("\n");
+      },
+    );
   },
 };
