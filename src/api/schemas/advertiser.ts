@@ -324,6 +324,19 @@ export const campaignUrlReplaceResultSchema = z
 
 export type CampaignUrlReplaceResult = z.infer<typeof campaignUrlReplaceResultSchema>;
 
+/**
+ * Traffic forecast. An empty curve with `hasEnoughData: false` is a valid answer: yesterday's
+ * auction had too little traffic for this targeting, which is not the same as zero traffic.
+ */
+export const campaignForecastResultSchema = z
+  .object({
+    forecast: z.array(z.object({ bid: z.number(), traffic: z.number() }).passthrough()),
+    hasEnoughData: z.boolean(),
+  })
+  .passthrough();
+
+export type CampaignForecastResult = z.infer<typeof campaignForecastResultSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({

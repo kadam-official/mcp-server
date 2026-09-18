@@ -108,10 +108,7 @@ describe("campaign-actions tools", () => {
     });
     const text = getTextFromResult(result);
 
-    expect(api.copyCampaign).toHaveBeenCalledWith(
-      31,
-      expect.objectContaining({ copyBids: true }),
-    );
+    expect(api.copyCampaign).toHaveBeenCalledWith(31, expect.objectContaining({ copyBids: true }));
     expect(text).toContain("job-7");
   });
 
@@ -265,6 +262,62 @@ describe("campaign-actions tools", () => {
 
     expect(getTextFromResult(result)).toContain("unique");
     expect(api.bulkReplaceCampaignUrls).not.toHaveBeenCalled();
+  });
+
+  it("get_traffic_forecast resolves targeting names into the IDs the API expects", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignForecast.mockResolvedValue({
+      forecast: [
+        { bid: 0.011, traffic: 9764 },
+        { bid: 0.015, traffic: 19528 },
+      ],
+      hasEnoughData: true,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_traffic_forecast",
+      arguments: { pricingModel: "cpc", type: "push", countries: "US" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.getCampaignForecast).toHaveBeenCalledWith({
+      cpType: 0,
+      type: 30,
+      regions: [34],
+    });
+    expect(text).toContain("0.011 -> 9764");
+  });
+
+  it("get_traffic_forecast explains an empty curve instead of reporting zero traffic", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignForecast.mockResolvedValue({
+      forecast: [],
+      hasEnoughData: false,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_traffic_forecast",
+      arguments: { pricingModel: "cpm" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("No forecast available");
+    expect(text).toContain("not a zero-traffic verdict");
+  });
+
+  it("get_traffic_forecast refuses a device filter the forecast cannot apply", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_traffic_forecast",
+      arguments: { pricingModel: "cpc", devices: "Smartphone" },
+    });
+
+    expect(getTextFromResult(result)).toContain("not broken down by device");
+    expect(api.getCampaignForecast).not.toHaveBeenCalled();
   });
 
   it("copy_campaign maps a cross-format copy to the target campaign type", async () => {

@@ -16,6 +16,7 @@ import {
   accountBalanceSchema,
   campaignBulkActionSchema,
   campaignCopyResultSchema,
+  campaignForecastResultSchema,
   campaignUrlReplaceResultSchema,
   materialBulkActionSchema,
   paymentSystemsSchema,
@@ -35,6 +36,7 @@ import {
 import type {
   CampaignBulkAction,
   CampaignCopyResult,
+  CampaignForecastResult,
   CampaignUrlReplaceResult,
   MaterialBulkAction,
   CampaignRow,
@@ -128,6 +130,11 @@ export class PartnersClient {
   async copyCampaign(id: number, data: Record<string, unknown>): Promise<CampaignCopyResult> {
     const raw = await this.http.post(`/campaigns/${id}/copy`, data);
     return campaignCopyResultSchema.parse(raw);
+  }
+
+  async getCampaignForecast(payload: Record<string, unknown>): Promise<CampaignForecastResult> {
+    const raw = await this.http.post("/campaigns/forecast", payload);
+    return campaignForecastResultSchema.parse(raw);
   }
 
   async bulkReplaceCampaignUrls(

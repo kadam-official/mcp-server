@@ -4,6 +4,7 @@ import type { ToolModule } from "../../types/tool-module.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import type {
   CampaignCopyResult,
+  CampaignForecastResult,
   CampaignUrlReplaceResult,
 } from "../../api/schemas/advertiser.js";
 import { parseCommaSeparatedIds, requireUniqueIds } from "../../utils/status-actions.js";
@@ -50,6 +51,23 @@ function formatUrlReplaceResult(result: CampaignUrlReplaceResult, dryRun: boolea
   }
   if (result.campaigns.length === 0) {
     lines.push("No campaign in the batch contains that fragment.");
+  }
+
+  return lines.join("\n");
+}
+
+function formatForecastResult(result: CampaignForecastResult): string {
+  if (!result.hasEnoughData || result.forecast.length === 0) {
+    return [
+      "No forecast available for this targeting.",
+      "Yesterday's auction had too little traffic to build a curve (under 1000 clicks for CPC, under 30000 impressions for CPM).",
+      "This is not a zero-traffic verdict: widen the targeting, or pick a bid from the campaign options instead.",
+    ].join(" ");
+  }
+
+  const lines = ["Bid -> expected daily traffic (account currency):"];
+  for (const point of result.forecast) {
+    lines.push(`${point.bid} -> ${point.traffic}`);
   }
 
   return lines.join("\n");
@@ -141,7 +159,8 @@ export const campaignActionsModule: ToolModule = {
         }
         if (args.copyAutorules != null) payload.copyAutorules = args.copyAutorules;
         if (args.copySiteBids != null) payload.copyBids = args.copySiteBids;
-        if (args.targetType != null) payload.targetCampaignType = CAMPAIGN_TYPE_MAP[args.targetType];
+        if (args.targetType != null)
+          payload.targetCampaignType = CAMPAIGN_TYPE_MAP[args.targetType];
 
         if (args.pricingModel != null) {
           const cpType = PRICING_MODEL_MAP[args.pricingModel];
@@ -229,6 +248,70 @@ export const campaignActionsModule: ToolModule = {
         });
 
         return formatUrlReplaceResult(result, args.dryRun);
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_get_traffic_forecast",
+        description:
+          "Forecast how much traffic a bid can buy for a targeting set, based on yesterday's auction. " +
+          "Use it before creating a campaign or raising a bid. Targeting with too little traffic yesterday " +
+          "comes back with an empty curve — that means the forecast could not be built, not that the traffic is zero.",
+        product: "advertiser",
+        annotations: { title: "Forecast traffic", readOnlyHint: true },
+      },
+      {
+        pricingModel: z
+          .enum(["cpc", "cpm", "cpa_target"])
+          .describe("Pricing model to forecast. cpa_target is forecast as cpc, its auction"),
+        type: z
+          .enum(["push", "inpage_push", "native", "banner", "video", "popunder"])
+          .optional()
+          .describe("Ad format. Omit to forecast across all formats"),
+        campaignId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            "Forecast for one of your campaigns: SSPs its creatives are blocked on are excluded and its category scaler applied, so the numbers match what this campaign can buy",
+          ),
+        countries: z
+          .string()
+          .optional()
+          .describe("Comma-separated ISO country codes (e.g. 'US,DE'). Omit for worldwide"),
+        devices: z.string().optional().describe("Comma-separated device names or IDs"),
+        os: z.string().optional().describe("Comma-separated OS names or IDs"),
+        browsers: z.string().optional().describe("Comma-separated browser names or IDs"),
+      },
+      async (args, ctx) => {
+        const registry = ctx.adv.options;
+        const payload: Record<string, unknown> = {
+          cpType: PRICING_MODEL_MAP[args.pricingModel],
+        };
+
+        if (args.type != null) payload.type = CAMPAIGN_TYPE_MAP[args.type];
+        if (args.campaignId != null) payload.campaignId = args.campaignId;
+        if (args.countries != null) {
+          payload.regions = await registry.resolveCountryIds(args.countries);
+        }
+        if (args.os != null) {
+          payload.platformVersions = await registry.resolveIds("platform", args.os);
+        }
+        if (args.browsers != null) {
+          payload.browsers = await registry.resolveIds("browser", args.browsers);
+        }
+        // `devices` has no column in the forecast table; dropping it silently would report
+        // numbers for a wider audience than the caller asked about.
+        if (args.devices != null) {
+          throw new Error(
+            "The forecast is not broken down by device. Drop devices, or narrow it with os instead.",
+          );
+        }
+
+        const result = await ctx.adv.getCampaignForecast(payload);
+        return formatForecastResult(result);
       },
     );
   },
