@@ -1,5 +1,6 @@
 import type { ToolModule } from "../../types/tool-module.js";
 import { campaignsModule } from "./campaigns.js";
+import { campaignActionsModule } from "./campaign-actions.js";
 import { campaignDetailModule } from "./campaign-detail.js";
 import { campaignFoldersModule } from "./campaign-folders.js";
 import { audiencesModule } from "./audiences.js";
@@ -13,6 +14,7 @@ import { dictionariesModule } from "./dictionaries.js";
 
 export const advToolModules: ToolModule[] = [
   campaignsModule,
+  campaignActionsModule,
   campaignDetailModule,
   campaignFoldersModule,
   audiencesModule,

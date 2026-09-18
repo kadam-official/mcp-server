@@ -133,9 +133,9 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (50)
+## Tools (51)
 
-### Advertiser Tools (41)
+### Advertiser Tools (42)
 
 Requires `KADAM_ADV_API_KEY`.
 
@@ -156,6 +156,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived/restored) for comma-separated IDs; reports per-ID result                                          | idempotent  |
 | `kadam_adv_delete_campaigns`    | Bulk delete of archived campaigns by comma-separated IDs; requires `confirm: true`, reports per-ID result                                    | destructive |
 | `kadam_adv_move_campaigns`      | Move campaigns to a campaign group by comma-separated campaign IDs and target group ID                                                       | idempotent  |
+| `kadam_adv_copy_campaign`       | Copy a campaign into a campaign group: settings and bids are cloned, the copy starts paused and re-enters moderation. Optional pricing-model switch, push <-> in-page push cross-format copy, autorules and per-site bids | —           |
 
 #### Bid Management
 
@@ -280,7 +281,7 @@ src/
 │   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
-│   ├── advertiser/           # 40 tools across 11 modules
+│   ├── advertiser/           # 42 tools across 12 modules
 │   └── publisher/            # 9 tools across 4 modules
 ├── resources/                # 7 static reference resources
 └── prompts/                  # 4 workflow prompts
@@ -288,7 +289,7 @@ src/
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 50 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 51 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
@@ -332,7 +333,7 @@ npm run inspect         # MCP Inspector (visual debugger)
 
 - **Unit tests** — output formatter, config, HTTP client (mocked fetch)
 - **Middleware tests** — ToolWrapper auth, error formatting, logging
-- **Integration tests** — full server with all 50 tools, 8 resources, 4 prompts via in-memory MCP client
+- **Integration tests** — full server with all 51 tools, 8 resources, 4 prompts via in-memory MCP client
 - **Tool handler tests** — each tool module with mocked API clients
 
 ```bash

@@ -15,6 +15,7 @@ import {
   accountProfileSchema,
   accountBalanceSchema,
   campaignBulkActionSchema,
+  campaignCopyResultSchema,
   materialBulkActionSchema,
   paymentSystemsSchema,
   dayMoneyLimitSchema,
@@ -32,6 +33,7 @@ import {
 } from "./schemas/advertiser.js";
 import type {
   CampaignBulkAction,
+  CampaignCopyResult,
   MaterialBulkAction,
   CampaignRow,
   FolderRow,
@@ -119,6 +121,11 @@ export class PartnersClient {
   async deleteCampaigns(ids: number[]): Promise<CampaignBulkAction> {
     const raw = await this.http.delete("/campaigns", { campaignIds: ids });
     return campaignBulkActionSchema.parse(raw);
+  }
+
+  async copyCampaign(id: number, data: Record<string, unknown>): Promise<CampaignCopyResult> {
+    const raw = await this.http.post(`/campaigns/${id}/copy`, data);
+    return campaignCopyResultSchema.parse(raw);
   }
 
   async moveCampaigns(ids: number[], folderId: number): Promise<CampaignBulkAction> {

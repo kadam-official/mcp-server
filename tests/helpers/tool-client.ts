@@ -90,6 +90,7 @@ export function createMockPartnersClient() {
     setCampaignStatus: vi.fn(),
     deleteCampaigns: vi.fn(),
     moveCampaigns: vi.fn(),
+    copyCampaign: vi.fn(),
     updateCampaignBid: vi.fn(),
     bulkUpdateCampaignBids: vi.fn(),
     updateSiteBids: vi.fn(),

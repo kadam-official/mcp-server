@@ -280,6 +280,22 @@ export const materialBulkActionSchema = z
 
 export type MaterialBulkAction = z.infer<typeof materialBulkActionSchema>;
 
+/**
+ * Campaign copy. The campaign is created even when creatives fail to come across, so
+ * `failed`/`errors` describe a partial result, not a rejected request.
+ */
+export const campaignCopyResultSchema = z
+  .object({
+    id: z.number(),
+    successful: z.number(),
+    failed: z.number(),
+    errors: z.array(z.string()).default([]),
+    bidsJobId: z.string().nullable().default(null),
+  })
+  .passthrough();
+
+export type CampaignCopyResult = z.infer<typeof campaignCopyResultSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({
