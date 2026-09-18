@@ -47,11 +47,11 @@ describe("Tool listing integration", () => {
     resetConfig();
   });
 
-  it("all 39 tools are listed", async () => {
+  it("all 41 tools are listed", async () => {
     const { client } = await createFullServer();
     const result = await client.listTools();
     expect(result.tools).toBeDefined();
-    expect(result.tools!.length).toBe(39);
+    expect(result.tools!.length).toBe(41);
   });
 
   it("all advertiser tools have names starting with kadam_adv_", async () => {
@@ -145,6 +145,24 @@ describe("Tool listing integration", () => {
     const { client } = await createFullServer();
     const result = await client.listTools();
     const tool = result.tools!.find((t) => t.name === "kadam_adv_list_campaigns");
+    expect(tool).toBeDefined();
+    expect(tool!.annotations).toBeDefined();
+    expect(tool!.annotations!.readOnlyHint).toBe(true);
+  });
+
+  it("tool kadam_adv_get_account has readOnlyHint annotation", async () => {
+    const { client } = await createFullServer();
+    const result = await client.listTools();
+    const tool = result.tools!.find((t) => t.name === "kadam_adv_get_account");
+    expect(tool).toBeDefined();
+    expect(tool!.annotations).toBeDefined();
+    expect(tool!.annotations!.readOnlyHint).toBe(true);
+  });
+
+  it("tool kadam_adv_get_balance has readOnlyHint annotation", async () => {
+    const { client } = await createFullServer();
+    const result = await client.listTools();
+    const tool = result.tools!.find((t) => t.name === "kadam_adv_get_balance");
     expect(tool).toBeDefined();
     expect(tool!.annotations).toBeDefined();
     expect(tool!.annotations!.readOnlyHint).toBe(true);

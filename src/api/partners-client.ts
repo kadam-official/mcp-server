@@ -12,6 +12,8 @@ import {
   audienceRowSchema_,
   audienceDetailSchema,
   financeRowSchema,
+  accountProfileSchema,
+  accountBalanceSchema,
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
   folderCreateResponseSchema,
@@ -28,6 +30,8 @@ import type {
   AudienceRow,
   AudienceDetail,
   FinanceRow,
+  AccountProfile,
+  AccountBalance,
   Autorule,
   ExtendedBid,
 } from "./schemas/advertiser.js";
@@ -175,6 +179,16 @@ export class PartnersClient {
   async listFinanceOperations(params: Record<string, unknown>): Promise<ListResponse<FinanceRow>> {
     const raw = await this.http.post("/finances/operations", params);
     return financeListSchema.parse(raw);
+  }
+
+  async getAccountProfile(): Promise<AccountProfile> {
+    const raw = await this.http.get("/me");
+    return accountProfileSchema.parse(raw);
+  }
+
+  async getAccountBalance(): Promise<AccountBalance> {
+    const raw = await this.http.get("/finances/balance");
+    return accountBalanceSchema.parse(raw);
   }
 
   async getReportConfig(): Promise<ReportConfig> {

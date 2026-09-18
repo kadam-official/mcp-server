@@ -127,6 +127,27 @@ export const financeRowSchema = z
 
 export type FinanceRow = z.infer<typeof financeRowSchema>;
 
+export const accountProfileSchema = z
+  .object({
+    id: z.number(),
+    balance: z.number(),
+    currency: z.string(),
+    registeredAt: z.string(),
+    timezone: z.number().int().min(-12).max(12),
+  })
+  .passthrough();
+
+export type AccountProfile = z.infer<typeof accountProfileSchema>;
+
+export const accountBalanceSchema = z
+  .object({
+    balance: z.number(),
+    currency: z.string(),
+  })
+  .passthrough();
+
+export type AccountBalance = z.infer<typeof accountBalanceSchema>;
+
 export const creativeCreateResponseSchema = z
   .object({
     id: z.number(),

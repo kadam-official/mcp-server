@@ -29,6 +29,9 @@ pre-commit:
               ;;
           esac
         done
+    audit-deps:
+      glob: "package*.json"
+      run: npm run audit:deps
 
 commit-msg:
   commands:
