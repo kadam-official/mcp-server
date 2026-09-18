@@ -13,6 +13,7 @@ const DICTIONARY_TYPES = [
   "connection-types",
   "categories",
   "isps",
+  "conversion-templates",
 ] as const;
 
 const CAMPAIGN_TYPE_NAMES = Object.keys(CAMPAIGN_TYPE_MAP) as [string, ...string[]];
@@ -21,6 +22,10 @@ function describeItem(item: DictionaryItem): string {
   const parts = [`[ID: ${item.id}] ${item.label}`];
   if (item.slug != null) parts.push(`slug: ${item.slug}`);
   if (item.countryLabel != null) parts.push(item.countryLabel);
+  // conversion-templates: without the status strings the entry cannot be acted on.
+  if (item.approved != null) {
+    parts.push(`approved: ${item.approved}`, `hold: ${item.hold}`, `reject: ${item.reject}`);
+  }
   return parts.join(" | ");
 }
 
@@ -43,12 +48,13 @@ export const dictionariesModule: ToolModule = {
       {
         name: "kadam_adv_get_dictionary",
         description:
-          "Gets one reference dictionary used to build campaign targeting: campaign-types, browsers, platforms (OS), devices, connection-types, categories or isps. " +
+          "Gets one reference dictionary used to build campaign targeting: campaign-types, browsers, platforms (OS), devices, connection-types, categories, isps or conversion-templates. " +
           "Call this instead of guessing IDs — every targeting field expects the numeric ids returned here. " +
           "campaign-types only lists the types this account may actually create. " +
           "categories requires campaignType because the allowed set differs per type. " +
           "isps requires countryId, and is paginated and searchable because a single country can hold tens of thousands of providers. " +
-          "platforms, devices and categories are trees: children are nested under their parent.",
+          "platforms, devices and categories are trees: children are nested under their parent. " +
+          "conversion-templates entries carry the approved/hold/reject postback status strings, which are what a campaign's conversion field needs.",
         product: "advertiser",
         annotations: { title: "Get reference dictionary", readOnlyHint: true },
       },

@@ -63,6 +63,37 @@ describe("get_dictionary tool", () => {
     expect(text).toContain("[ID: 10] Native | slug: teaser");
   });
 
+  it("shows the postback status strings of a conversion template", async () => {
+    const { client, mockApi } = await createToolClient(dictionariesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getDictionary.mockResolvedValue({
+      type: "conversion-templates",
+      total: 1,
+      items: [
+        {
+          id: 12,
+          label: "Default CPA",
+          approved: "approved",
+          hold: "pending",
+          reject: "declined",
+        },
+      ],
+    });
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_dictionary",
+        arguments: { type: "conversion-templates" },
+      }),
+    );
+
+    expect(api.getDictionary).toHaveBeenCalledWith("conversion-templates", {});
+    // The label alone is not actionable: the campaign's conversion field needs these strings.
+    expect(text).toContain("approved: approved");
+    expect(text).toContain("hold: pending");
+    expect(text).toContain("reject: declined");
+  });
+
   it("indents tree dictionaries under their parent", async () => {
     const { client, mockApi } = await createToolClient(dictionariesModule);
     const api = mockApi as MockPartnersClient;

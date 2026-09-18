@@ -443,6 +443,10 @@ export interface DictionaryItem {
   slug?: string;
   countryId?: number;
   countryLabel?: string | null;
+  /** conversion-templates only: postback status strings a campaign's `conversion` field needs. */
+  approved?: string;
+  hold?: string;
+  reject?: string;
   children?: DictionaryItem[];
 }
 
@@ -454,6 +458,9 @@ export const dictionaryItemSchema: z.ZodType<DictionaryItem> = z.lazy(() =>
       slug: z.string().optional(),
       countryId: z.number().optional(),
       countryLabel: z.string().nullable().optional(),
+      approved: z.string().optional(),
+      hold: z.string().optional(),
+      reject: z.string().optional(),
       children: z.array(dictionaryItemSchema).optional(),
     })
     .passthrough(),

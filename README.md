@@ -143,7 +143,7 @@ Requires `KADAM_ADV_API_KEY`.
 
 | Tool                       | Description                                                                                                                                   | Annotations |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kadam_adv_get_dictionary` | Reference data for campaign targeting: campaign types, browsers, platforms, devices, connection types, categories, ISPs. Returns the real IDs | readOnly    |
+| `kadam_adv_get_dictionary` | One reference dictionary by type: campaign-types, browsers, platforms, devices, connection-types, categories, isps, conversion-templates | readOnly    |
 
 #### Campaigns
 
