@@ -32,8 +32,6 @@ import {
   folderCreateResponseSchema,
   folderViewSchema,
   folderBulkActionResultSchema,
-  extendedBidsResultSchema,
-  extendedBidsUpdateResponseSchema,
   dictionaryResultSchema,
 } from "./schemas/advertiser.js";
 import type {
@@ -60,12 +58,11 @@ import type {
   AccountBalance,
   PaymentSystems,
   DayMoneyLimit,
-  ExtendedBid,
   DictionaryResult,
 } from "./schemas/advertiser.js";
 import { z } from "zod";
 import { OptionsRegistry } from "./options-registry.js";
-import { AutorulesApiClient } from "./autorules-client.js";
+import { ExtendedStatsApiClient } from "./extended-stats-client.js";
 
 const campaignListSchema = listResponseSchema(campaignRowSchema);
 const folderListSchema = listResponseSchema(folderRowSchema);
@@ -90,7 +87,7 @@ export interface ReportDataParams {
 /** Report config (groups/metrics) rarely changes; cache per client instance (== per tenant). */
 const DEFAULT_REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
 
-export class PartnersClient extends AutorulesApiClient {
+export class PartnersClient extends ExtendedStatsApiClient {
   readonly options: OptionsRegistry;
   private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
   private readonly reportConfigTtlMs: number;
@@ -433,25 +430,6 @@ export class PartnersClient extends AutorulesApiClient {
   ): Promise<ListResponse<Record<string, unknown>>> {
     const raw = await this.http.post("/stats/conversions", params);
     return listResponseSchema(z.record(z.unknown())).parse(raw);
-  }
-
-  // --- Extended statistics / Bid Optimization ---
-  async getExtendedStats(
-    params: Record<string, unknown>,
-  ): Promise<ListResponse<Record<string, unknown>>> {
-    const raw = await this.http.post("/stats/extended", params);
-    return listResponseSchema(z.record(z.unknown())).parse(raw);
-  }
-
-  async listExtendedBids(campaignIds: number[]): Promise<Record<string, ExtendedBid[]>> {
-    const qs = campaignIds.map((id) => `campaignIds[]=${id}`).join("&");
-    const raw = await this.http.get(`/stats/extended/bids?${qs}`);
-    return extendedBidsResultSchema.parse(raw).bids;
-  }
-
-  async updateExtendedBids(data: Record<string, unknown>): Promise<{ affectedCampaigns?: number }> {
-    const raw = await this.http.put("/stats/extended/bids", data);
-    return extendedBidsUpdateResponseSchema.parse(raw);
   }
 
   // --- Dictionaries ---

@@ -166,3 +166,84 @@ describe("bid-optimization tools", () => {
     expect(getTextFromResult(result)).toContain("2 op(s) across 1 campaign(s)");
   });
 });
+
+describe("extended stats scope tools", () => {
+  it("reset_extended_bids drops bids of every listed campaign", async () => {
+    const { client, mockApi } = await createToolClient(bidOptimizationModule);
+    const api = mockApi as MockPartnersClient;
+    api.resetExtendedBids.mockResolvedValue({ affectedCampaigns: 2 } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_reset_extended_bids",
+        arguments: { campaignIds: "10,11" },
+      }),
+    );
+
+    expect(api.resetExtendedBids).toHaveBeenCalledWith([10, 11]);
+    expect(text).toContain("dropped in 2 campaign(s)");
+  });
+
+  it("toggle_autorule_slice_block reports the state the slice ended in", async () => {
+    const { client, mockApi } = await createToolClient(bidOptimizationModule);
+    const api = mockApi as MockPartnersClient;
+    api.toggleAutoruleSliceBlock.mockResolvedValue(true as never);
+
+    const blockedText = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_toggle_autorule_slice_block",
+        arguments: { campaignId: 10, pathIds: [130, 34] },
+      }),
+    );
+
+    expect(api.toggleAutoruleSliceBlock).toHaveBeenCalledWith(10, [130, 34]);
+    expect(blockedText).toContain("out of reach of the bid autorules");
+
+    api.toggleAutoruleSliceBlock.mockResolvedValue(false as never);
+
+    const unblockedText = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_toggle_autorule_slice_block",
+        arguments: { campaignId: 10, pathIds: [130, 34] },
+      }),
+    );
+
+    expect(unblockedText).toContain("may change the bid");
+  });
+
+  it("get_campaign_autorule_slices says so when no rule is bound to a slice", async () => {
+    const { client, mockApi } = await createToolClient(bidOptimizationModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignAutoruleSlices.mockResolvedValue([] as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_campaign_autorule_slices",
+        arguments: { campaignId: 10 },
+      }),
+    );
+
+    expect(text).toContain("No bid autorule");
+  });
+
+  it("get_campaign_bid_restrictions spells out an ambiguous base bid", async () => {
+    const { client, mockApi } = await createToolClient(bidOptimizationModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignBidRestrictions.mockResolvedValue({
+      maxBid: "12.5",
+      isCPATarget: false,
+      maxCoefficient: 3,
+      baseBid: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_campaign_bid_restrictions",
+        arguments: { campaignId: 10 },
+      }),
+    );
+
+    expect(text).toContain("Max bid: 12.5");
+    expect(text).toContain("differs between geos");
+  });
+});
