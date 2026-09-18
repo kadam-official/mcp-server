@@ -178,6 +178,23 @@ describe("mapCampaignFields", () => {
     expect(result.timezone).toBe(0);
   });
 
+  it("leaves the bid ceiling to the API, which knows the token tier", async () => {
+    const result = await mapCampaignFields(
+      { type: "push", pricingModel: "cpc", bid: 500 },
+      createMockRegistry(),
+    );
+    const bids = result.bids as Array<Record<string, unknown>>;
+    expect(bids[0]!.bid).toBe(500);
+  });
+
+  it("never defaults the manager-only fields, which a client token may not send", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result).not.toHaveProperty("allowMultiAds");
+    expect(result).not.toHaveProperty("proxies");
+    expect(result).not.toHaveProperty("isDirectTrafficPriority");
+    expect(result).not.toHaveProperty("hasCorrectPostback");
+  });
+
   it("flattens category tree from options (push-like with mainstream)", async () => {
     const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
     expect(result.categories).toEqual([1001, 122, 1567, 1488, "mainstream"]);

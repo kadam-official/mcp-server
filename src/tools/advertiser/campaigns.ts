@@ -399,20 +399,11 @@ export async function mapCampaignFields(
     validateCpType(typeId, mapped.cpType as number, opts);
   }
 
-  const bids = mapped.bids as Array<Record<string, unknown>> | undefined;
-  if (bids?.[0]) {
-    const bidVal = (bids[0].bid ?? bids[0].leadCost) as number | undefined;
-    if (bidVal != null && opts.bidCoefficients) {
-      const cpType = mapped.cpType as number;
-      const maxKey = cpType === 2 ? "maxWithoutStatCPM" : "maxWithoutStatCPC";
-      const maxBid = opts.bidCoefficients[maxKey];
-      if (maxBid != null && bidVal > maxBid) {
-        throw new Error(
-          `Bid ${bidVal} exceeds maximum ${maxBid} for this account. Reduce bid or contact support.`,
-        );
-      }
-    }
-  }
+  // The bid ceiling is not a property of the account: it depends on the token. An ordinary
+  // token is held to the forecast-derived cap, a token impersonating a manager only to the
+  // currency cap, and an admin-tier one to nothing but a positive bid. This server forwards
+  // the bearer untouched and cannot tell which it is, so the cap is left to the API, which
+  // answers 422 with the applicable maximum in the message.
 
   mapped.audiences = buildAudiences(fields);
 
