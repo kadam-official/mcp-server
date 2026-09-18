@@ -102,6 +102,10 @@ export class PartnersClient {
     return campaignListSchema.parse(raw);
   }
 
+  async validateCampaign(data: Record<string, unknown>): Promise<unknown> {
+    return this.http.post("/campaigns/validate", data);
+  }
+
   async createCampaign(data: Record<string, unknown>): Promise<{ id: number }> {
     const raw = await this.http.post("/campaigns/create", data);
     return campaignCreateResponseSchema.parse(raw);

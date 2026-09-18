@@ -151,7 +151,7 @@ Requires `KADAM_ADV_API_KEY`.
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
 | `kadam_adv_list_campaigns`      | List campaigns with filters (folder, status, type, date, search) and pagination                                                              | readOnly    |
 | `kadam_adv_get_campaign`        | Get full campaign configuration by ID: landing page URL, bids per country, budgets, targeting, frequency caps, schedule, conversion settings | readOnly    |
-| `kadam_adv_create_campaign`     | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences)                                               | —           |
+| `kadam_adv_create_campaign`     | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences); `dryRun: true` validates only                 | —           |
 | `kadam_adv_update_campaign`     | Update any campaign fields by ID                                                                                                             | —           |
 | `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived/restored) for comma-separated IDs; reports per-ID result                                          | idempotent  |
 | `kadam_adv_delete_campaigns`    | Bulk delete of archived campaigns by comma-separated IDs; requires `confirm: true`, reports per-ID result                                    | destructive |

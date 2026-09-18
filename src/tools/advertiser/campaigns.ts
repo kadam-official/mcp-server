@@ -636,7 +636,9 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_create_campaign",
         description:
-          "Create a new advertiser campaign. Required: type, name, url, folderId (campaign group ID), pricingModel, bid, dailyBudget.",
+          "Create a new advertiser campaign. Required: type, name, url, folderId (campaign group ID), pricingModel, bid, dailyBudget. " +
+          "Pass dryRun: true to only check the payload — nothing is created and the same field errors are reported, " +
+          "which is the cheap way to find out whether bids, targeting and limits are acceptable before committing.",
         product: "advertiser",
         annotations: { title: "Create campaign", readOnlyHint: false },
       },
@@ -663,9 +665,11 @@ export const campaignsModule: ToolModule = {
           .describe(
             "Comma-separated ISO country codes for bid targeting (e.g. 'US,DE,BR'). Required.",
           ),
+        dryRun: z.boolean().default(false).describe("Validate the payload and create nothing"),
       },
       async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
+        delete mappedArgs.dryRun;
         if (args.categories) {
           mappedArgs.categories = args.categories.split(",").map((s: string) => {
             const n = parseInt(s.trim(), 10);
@@ -673,6 +677,12 @@ export const campaignsModule: ToolModule = {
           });
         }
         const mappedData = await mapCampaignFields(mappedArgs, ctx.adv.options);
+
+        if (args.dryRun) {
+          await ctx.adv.validateCampaign(mappedData);
+          return `Payload for "${args.name}" is valid. Nothing was created — re-run without dryRun to create the campaign.`;
+        }
+
         const result = await ctx.adv.createCampaign(mappedData);
         return `Campaign created: [ID: ${result.id}] "${args.name}" in campaign group #${args.folderId}`;
       },

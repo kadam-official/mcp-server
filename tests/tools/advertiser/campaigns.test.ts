@@ -132,6 +132,38 @@ describe("campaigns tools", () => {
     expect(api.listCampaigns).toHaveBeenCalledWith({ page: 1, perPage: 25 });
   });
 
+  it("create_campaign with dryRun validates and creates nothing", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.validateCampaign.mockResolvedValue({} as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_create_campaign",
+        arguments: {
+          type: "push",
+          name: "Draft",
+          url: "https://example.com",
+          folderId: 1,
+          pricingModel: "cpc",
+          bid: 0.5,
+          dailyBudget: 100,
+          countries: "US",
+          dryRun: true,
+        },
+      }),
+    );
+
+    expect(api.createCampaign).not.toHaveBeenCalled();
+    expect(api.validateCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 30, cpType: 0 }),
+    );
+    expect(api.validateCampaign).toHaveBeenCalledWith(
+      expect.not.objectContaining({ dryRun: expect.anything() }),
+    );
+    expect(text).toContain("Nothing was created");
+  });
+
   it("create_campaign calls api with type 30 (push) and cpType 0 (cpc)", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
