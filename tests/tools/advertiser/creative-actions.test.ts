@@ -273,3 +273,54 @@ describe("creative actions", () => {
     expect(text).toContain("No traffic source blocks this creative");
   });
 });
+
+describe("get_creative_test_conversion", () => {
+  it("hands over the test-click link and warns against fetching it", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCreativeTestConversion.mockResolvedValue({
+      materialId: 70,
+      goUrl: "https://partners.kadam.net/api/materials/test-conversion?teaserId=70&s=abc",
+      previewUrl: null,
+      landingUrl: "https://example.com/landing",
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_creative_test_conversion",
+        arguments: { creativeId: 70 },
+      }),
+    );
+
+    expect(api.getCreativeTestConversion).toHaveBeenCalledWith(70);
+    expect(text).toContain("teaserId=70");
+    expect(text).toContain("do not fetch it");
+    expect(text).toContain("https://example.com/landing");
+    expect(text).not.toContain("Preview");
+  });
+
+  /**
+   * Пустая ссылка у html-тега — не ошибка, а свойство формата; без объяснения модель
+   * начнёт чинить исправный креатив.
+   */
+  it("explains the missing link on an html-tag creative", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCreativeTestConversion.mockResolvedValue({
+      materialId: 72,
+      goUrl: null,
+      previewUrl: "https://partners.kadam.net/api/materials/preview?teaserId=72&s=abc",
+      landingUrl: "https://example.com/landing",
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_creative_test_conversion",
+        arguments: { creativeId: 72 },
+      }),
+    );
+
+    expect(text).toContain("No test-click link");
+    expect(text).toContain("Preview (frame source)");
+  });
+});

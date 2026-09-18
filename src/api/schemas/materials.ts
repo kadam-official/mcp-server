@@ -90,3 +90,14 @@ export const materialBulkActionSchema = z
   .passthrough();
 
 export type MaterialBulkAction = z.infer<typeof materialBulkActionSchema>;
+
+/**
+ * Ссылки тестовой конверсии: подписаны, но не открыты — клик регистрируется переходом.
+ */
+export const creativeTestConversionSchema = z.object({
+  materialId: z.number(),
+  goUrl: z.string().nullable(),
+  previewUrl: z.string().nullable(),
+  landingUrl: z.string().nullable(),
+});
+export type CreativeTestConversion = z.infer<typeof creativeTestConversionSchema>;

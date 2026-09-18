@@ -123,6 +123,7 @@ export function createMockPartnersClient() {
     uploadBulkImages: vi.fn(),
     createBulkCreatives: vi.fn(),
     getBulkJob: vi.fn(),
+    getCreativeTestConversion: vi.fn(),
     listFinanceOperations: vi.fn(),
     getAccountProfile: vi.fn(),
     getAccountBalance: vi.fn(),

@@ -22,6 +22,7 @@ import {
   materialBulkActionSchema,
   materialBulkEnqueuedSchema,
   materialBulkJobSchema,
+  creativeTestConversionSchema,
   creativeCopyResultSchema,
   paymentSystemsSchema,
   dayMoneyLimitSchema,
@@ -46,6 +47,7 @@ import type {
   MaterialBulkAction,
   MaterialBulkEnqueued,
   MaterialBulkJob,
+  CreativeTestConversion,
   CreativeCopyResult,
   CampaignRow,
   FolderRow,
@@ -167,6 +169,11 @@ export class PartnersClient {
   async getCreativeBlockedSsps(creativeId: number): Promise<CampaignBlockedSsps> {
     const raw = await this.http.get(`/materials/${creativeId}/blocked-ssps`);
     return campaignBlockedSspsSchema.parse(raw);
+  }
+
+  async getCreativeTestConversion(creativeId: number): Promise<CreativeTestConversion> {
+    const raw = await this.http.get(`/materials/${creativeId}/test-conversion`);
+    return creativeTestConversionSchema.parse(raw);
   }
 
   async getCampaignForecast(payload: Record<string, unknown>): Promise<CampaignForecastResult> {

@@ -34,6 +34,50 @@ export const creativeActionsModule: ToolModule = {
   register(wrapper: ToolWrapper) {
     wrapper.register(
       {
+        name: "kadam_adv_get_creative_test_conversion",
+        description:
+          "Links for checking that a creative's conversion tracking works. The go link makes a real " +
+          "test click when opened — it writes a click id, resolves the macros and redirects to the " +
+          "landing exactly as a served ad does, so the advertiser's postback can be verified end to end. " +
+          "This tool only hands the links over; nothing is registered until someone opens one. HTML-tag " +
+          "creatives have no single landing link and come back without a go link; the formats rendered " +
+          "in a frame also carry a preview link.",
+        product: "advertiser",
+        annotations: { title: "Creative test conversion links", readOnlyHint: true },
+      },
+      {
+        creativeId: z.number().int().positive().describe("Creative ID"),
+      },
+      async (args, ctx) => {
+        const result = await ctx.adv.getCreativeTestConversion(args.creativeId);
+        const lines: string[] = [];
+
+        if (result.goUrl) {
+          lines.push(
+            `Test click: ${result.goUrl}`,
+            "Opening it registers a click and redirects to the landing — hand it to the advertiser, " +
+              "do not fetch it to 'check' the link.",
+          );
+        } else {
+          lines.push(
+            "No test-click link: the markup of an HTML-tag creative can hold several click anchors, " +
+              "so there is no single landing link to follow.",
+          );
+        }
+
+        if (result.previewUrl) {
+          lines.push(`Preview (frame source): ${result.previewUrl}`);
+        }
+        if (result.landingUrl) {
+          lines.push(`Landing as stored (macros unresolved): ${result.landingUrl}`);
+        }
+
+        return lines.join("\n");
+      },
+    );
+
+    wrapper.register(
+      {
         name: "kadam_adv_copy_creatives",
         description:
           "Copy creatives into other campaigns. Every creative is copied into every target campaign, " +
