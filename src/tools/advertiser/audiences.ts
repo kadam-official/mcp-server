@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatEntityList, clampPerPage, formatSingleEntity } from "../../output-formatter.js";
-import type { AudienceRow, AudienceDetail } from "../../api/schemas/advertiser.js";
+import type { AudienceRow, AudienceDetail, AudienceParams } from "../../api/schemas/advertiser.js";
 import { extractPagination } from "../../utils/pagination.js";
 
 function formatAudienceRow(a: AudienceRow, index: number): string {
@@ -52,6 +52,19 @@ function formatAudienceDetail(a: AudienceDetail): string {
   }
 
   return formatSingleEntity(`Audience #${a.id}`, pairs);
+}
+
+function formatAudienceParams(id: number, params: AudienceParams, verb = "of"): string {
+  const entries = Object.entries(params).filter(([, value]) => value !== null);
+
+  if (entries.length === 0) {
+    return `No parameters ${verb === "saved" ? "left" : "set"} for audience #${id}: every slot is empty, so the code keeps its placeholders.`;
+  }
+
+  return [
+    verb === "saved" ? `Parameters saved for audience #${id}:` : `Parameters of audience #${id}:`,
+    ...entries.map(([key, value]) => `- ${key}: ${String(value)}`),
+  ].join("\n");
 }
 
 export const audiencesModule: ToolModule = {
@@ -221,6 +234,57 @@ export const audiencesModule: ToolModule = {
 
         await ctx.adv.updateAudience(id, data);
         return `Audience #${id} updated successfully.`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_get_audience_params",
+        description:
+          "Hardcoded parameter values a pixel or S2S audience substitutes into its tracking code. " +
+          "Only these two audience kinds have them, and only their owner can read them — an audience " +
+          "shared with the account answers as not found. Slots that were never set come back as null, " +
+          "which means the code keeps the {placeholder} as is.",
+        product: "advertiser",
+        annotations: { title: "Get audience parameters", readOnlyHint: true },
+      },
+      {
+        id: z.number().int().positive().describe("Pixel or S2S audience ID"),
+      },
+      async (args, ctx) => {
+        return formatAudienceParams(args.id, await ctx.adv.getAudienceParams(args.id));
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_set_audience_params",
+        description:
+          "Set the hardcoded parameters of a pixel or S2S audience. This replaces the whole set: a slot " +
+          "you do not send is cleared, so send every value you want to keep. Read the current ones with " +
+          "kadam_adv_get_audience_params first. Values that look like a {placeholder} are refused — they " +
+          "would stand in for the template's own placeholders.",
+        product: "advertiser",
+        annotations: { title: "Set audience parameters", readOnlyHint: false },
+      },
+      {
+        id: z.number().int().positive().describe("Pixel or S2S audience ID"),
+        event: z.string().max(255).nullable().optional().describe("Event name, e.g. deposit"),
+        paramStr: z.string().max(255).nullable().optional(),
+        paramStr2: z.string().max(255).nullable().optional(),
+        paramInt: z.number().min(0).nullable().optional().describe("Up to 2 decimal places"),
+        paramInt2: z.number().min(0).nullable().optional().describe("Up to 2 decimal places"),
+      },
+      async (args, ctx) => {
+        const saved = await ctx.adv.setAudienceParams(args.id, {
+          event: args.event ?? null,
+          paramStr: args.paramStr ?? null,
+          paramStr2: args.paramStr2 ?? null,
+          paramInt: args.paramInt ?? null,
+          paramInt2: args.paramInt2 ?? null,
+        });
+
+        return formatAudienceParams(args.id, saved, "saved");
       },
     );
 

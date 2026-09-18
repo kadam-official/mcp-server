@@ -252,3 +252,76 @@ describe("audiences tools", () => {
     expect(text).toContain("updated");
   });
 });
+
+describe("audience params", () => {
+  it("get_audience_params reports only the slots that are set", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getAudienceParams.mockResolvedValue({
+      event: "deposit",
+      paramStr: "campaign_42",
+      paramStr2: null,
+      paramInt: 500,
+      paramInt2: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_get_audience_params", arguments: { id: 27 } }),
+    );
+
+    expect(text).toContain("event: deposit");
+    expect(text).toContain("paramInt: 500");
+    expect(text).not.toContain("paramStr2");
+  });
+
+  /**
+   * Запись заменяет набор целиком, поэтому не переданные аргументы должны уйти на бэкенд
+   * явными null — иначе «оставил как было» и «стёр» стали бы неразличимы.
+   */
+  it("set_audience_params sends every slot, clearing the ones left out", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setAudienceParams.mockResolvedValue({
+      event: "registration",
+      paramStr: null,
+      paramStr2: null,
+      paramInt: null,
+      paramInt2: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_audience_params",
+        arguments: { id: 27, event: "registration" },
+      }),
+    );
+
+    expect(api.setAudienceParams).toHaveBeenCalledWith(27, {
+      event: "registration",
+      paramStr: null,
+      paramStr2: null,
+      paramInt: null,
+      paramInt2: null,
+    });
+    expect(text).toContain("Parameters saved for audience #27");
+    expect(text).toContain("event: registration");
+  });
+
+  it("set_audience_params says when the audience was left with no parameters", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setAudienceParams.mockResolvedValue({
+      event: null,
+      paramStr: null,
+      paramStr2: null,
+      paramInt: null,
+      paramInt2: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_set_audience_params", arguments: { id: 27 } }),
+    );
+
+    expect(text).toContain("No parameters left for audience #27");
+  });
+});

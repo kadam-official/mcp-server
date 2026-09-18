@@ -11,6 +11,7 @@ import {
   creativeRowSchema,
   audienceRowSchema_,
   audienceDetailSchema,
+  audienceParamsSchema,
   financeRowSchema,
   accountProfileSchema,
   accountBalanceSchema,
@@ -56,6 +57,7 @@ import type {
   CreativeRow,
   AudienceRow,
   AudienceDetail,
+  AudienceParams,
   FinanceRow,
   AccountProfile,
   AccountBalance,
@@ -250,6 +252,16 @@ export class PartnersClient {
 
   async updateAudience(id: number, data: Record<string, unknown>): Promise<unknown> {
     return this.http.put(`/audiences/${id}`, data);
+  }
+
+  async getAudienceParams(id: number): Promise<AudienceParams> {
+    const raw = await this.http.get(`/audiences/${id}/params`);
+    return audienceParamsSchema.parse(raw);
+  }
+
+  async setAudienceParams(id: number, params: Record<string, unknown>): Promise<AudienceParams> {
+    const raw = await this.http.put(`/audiences/${id}/params`, params);
+    return audienceParamsSchema.parse(raw);
   }
 
   async deleteAudience(id: number): Promise<unknown> {

@@ -89,6 +89,15 @@ export const audienceRowSchema_ = z
 
 export type AudienceRow = z.infer<typeof audienceRowSchema_>;
 
+export const audienceParamsSchema = z.object({
+  event: z.string().nullable(),
+  paramStr: z.string().nullable(),
+  paramStr2: z.string().nullable(),
+  paramInt: z.number().nullable(),
+  paramInt2: z.number().nullable(),
+});
+export type AudienceParams = z.infer<typeof audienceParamsSchema>;
+
 export const audienceDetailSchema = z
   .object({
     id: z.number(),
