@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Материальные схемы живут отдельным файлом: этот упирался в гейт размера.
+export * from "./materials.js";
+
 export const campaignRowSchema = z
   .object({
     campaign: z
@@ -265,32 +268,6 @@ export const campaignBulkActionSchema = z
   .passthrough();
 
 export type CampaignBulkAction = z.infer<typeof campaignBulkActionSchema>;
-
-/**
- * Bulk material actions (activate/pause/archive/restore/delete) use the same per-id
- * envelope as campaigns, keyed on `materials` instead of `campaigns`.
- */
-/**
- * Copy answers with counters, not per id: one creative copied into three campaigns is
- * three copies, so a per-id shape could not express the result.
- */
-export const creativeCopyResultSchema = z.object({
-  successful: z.number(),
-  failed: z.number(),
-  errors: z.array(z.string()),
-  ids: z.record(z.string(), z.number()),
-});
-export type CreativeCopyResult = z.infer<typeof creativeCopyResultSchema>;
-
-export const materialBulkActionSchema = z
-  .object({
-    materials: z.array(z.object({ id: z.number(), success: z.boolean() }).passthrough()),
-    totalMaterials: z.number(),
-    processedMaterials: z.number(),
-  })
-  .passthrough();
-
-export type MaterialBulkAction = z.infer<typeof materialBulkActionSchema>;
 
 /**
  * Campaign copy. The campaign is created even when creatives fail to come across, so

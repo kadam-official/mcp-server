@@ -20,6 +20,8 @@ import {
   campaignForecastResultSchema,
   campaignUrlReplaceResultSchema,
   materialBulkActionSchema,
+  materialBulkEnqueuedSchema,
+  materialBulkJobSchema,
   creativeCopyResultSchema,
   paymentSystemsSchema,
   dayMoneyLimitSchema,
@@ -42,6 +44,8 @@ import type {
   CampaignForecastResult,
   CampaignUrlReplaceResult,
   MaterialBulkAction,
+  MaterialBulkEnqueued,
+  MaterialBulkJob,
   CreativeCopyResult,
   CampaignRow,
   FolderRow,
@@ -300,6 +304,30 @@ export class PartnersClient {
   ): Promise<MaterialBulkAction> {
     const raw = await this.http.put("/materials/bids", { adsIds: ids, bids });
     return materialBulkActionSchema.parse(raw);
+  }
+
+  async uploadBulkImages(
+    campaignIds: number[],
+    files: Array<{ blob: Blob; filename: string }>,
+    idempotencyKey?: string,
+  ): Promise<MaterialBulkEnqueued> {
+    const fd = new FormData();
+    for (const id of campaignIds) fd.append("campaignIds[]", String(id));
+    for (const file of files) fd.append("files[]", file.blob, file.filename);
+    if (idempotencyKey) fd.set("idempotencyKey", idempotencyKey);
+
+    const raw = await this.http.postFormData("/materials/bulk/upload", fd);
+    return materialBulkEnqueuedSchema.parse(raw);
+  }
+
+  async createBulkCreatives(payload: Record<string, unknown>): Promise<MaterialBulkEnqueued> {
+    const raw = await this.http.post("/materials/bulk", payload);
+    return materialBulkEnqueuedSchema.parse(raw);
+  }
+
+  async getBulkJob(jobId: string): Promise<MaterialBulkJob> {
+    const raw = await this.http.get(`/materials/bulk/${jobId}`);
+    return materialBulkJobSchema.parse(raw);
   }
 
   async deleteCreatives(ids: number[]): Promise<MaterialBulkAction> {
