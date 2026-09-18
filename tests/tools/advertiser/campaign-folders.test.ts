@@ -204,13 +204,33 @@ describe("campaign-folders tools", () => {
     expect(text).toContain("#16: FAILED (0/2 campaigns)");
   });
 
+  it("set_campaign_folder_status with action restore calls the restore endpoint", async () => {
+    const { client, mockApi } = await createToolClient(campaignFoldersModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignFolderStatus.mockResolvedValue({
+      folders: [{ id: 6, success: true, campaignsTotal: 1, campaignsProcessed: 1 }],
+      totalFolders: 1,
+      processedFolders: 1,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_folder_status",
+      arguments: { ids: "6", action: "restore" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.setCampaignFolderStatus).toHaveBeenCalledWith([6], "restore");
+    expect(text).toContain("1/1 campaign groups fully processed");
+    expect(text).toContain("#6: ok (1/1 campaigns)");
+  });
+
   it("set_campaign_folder_status rejects unsupported action", async () => {
     const { client, mockApi } = await createToolClient(campaignFoldersModule);
     const api = mockApi as MockPartnersClient;
 
     const result = await client.callTool({
       name: "kadam_adv_set_campaign_folder_status",
-      arguments: { ids: "6", action: "restore" },
+      arguments: { ids: "6", action: "delete" },
     });
     const text = getTextFromResult(result);
 

@@ -173,7 +173,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_get_campaign_folder`        | Get a single folder: name, archived state, budgets                                                        | readOnly    |
 | `kadam_adv_create_campaign_folder`     | Create a new folder (name 1-50 chars)                                                                     | —           |
 | `kadam_adv_update_campaign_folder`     | Partial update: rename and/or change budgets and distribution                                             | —           |
-| `kadam_adv_set_campaign_folder_status` | Bulk action for comma-separated IDs: activate/pause campaigns, archive folders; returns per-folder result | idempotent  |
+| `kadam_adv_set_campaign_folder_status` | Bulk action for comma-separated IDs: activate/pause campaigns, archive or restore folders with their campaigns; returns per-folder result | idempotent  |
 
 #### Creatives
 

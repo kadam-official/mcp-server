@@ -160,7 +160,7 @@ export class PartnersClient {
 
   async setCampaignFolderStatus(
     ids: number[],
-    action: "activate" | "pause" | "archive",
+    action: "activate" | "pause" | "archive" | "restore",
   ): Promise<FolderBulkActionResult> {
     const raw = await this.http.post(`/campaigns/folders/${action}`, { folderIds: ids });
     return folderBulkActionResultSchema.parse(raw);
