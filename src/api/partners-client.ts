@@ -216,6 +216,11 @@ export class PartnersClient {
     return materialBulkActionSchema.parse(raw);
   }
 
+  async deleteCreatives(ids: number[]): Promise<MaterialBulkAction> {
+    const raw = await this.http.delete("/materials", { adsIds: ids });
+    return materialBulkActionSchema.parse(raw);
+  }
+
   async listFinanceOperations(params: Record<string, unknown>): Promise<ListResponse<FinanceRow>> {
     const raw = await this.http.post("/finances/operations", params);
     return financeListSchema.parse(raw);

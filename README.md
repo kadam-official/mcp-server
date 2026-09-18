@@ -133,9 +133,9 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (49)
+## Tools (50)
 
-### Advertiser Tools (40)
+### Advertiser Tools (41)
 
 Requires `KADAM_ADV_API_KEY`.
 
@@ -183,6 +183,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_create_creative`     | Create creative for a campaign (goes through moderation) | —           |
 | `kadam_adv_update_creative`     | Update creative fields                                   | —           |
 | `kadam_adv_set_creative_status` | Bulk status change for creatives: active/paused/archived/restored; returns per-creative result | idempotent  |
+| `kadam_adv_delete_creatives`    | Bulk delete of archived creatives by comma-separated IDs; requires `confirm: true`, reports per-ID result | destructive |
 
 #### Audiences
 
@@ -287,7 +288,7 @@ src/
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 49 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 50 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
@@ -331,7 +332,7 @@ npm run inspect         # MCP Inspector (visual debugger)
 
 - **Unit tests** — output formatter, config, HTTP client (mocked fetch)
 - **Middleware tests** — ToolWrapper auth, error formatting, logging
-- **Integration tests** — full server with all 49 tools, 8 resources, 4 prompts via in-memory MCP client
+- **Integration tests** — full server with all 50 tools, 8 resources, 4 prompts via in-memory MCP client
 - **Tool handler tests** — each tool module with mocked API clients
 
 ```bash

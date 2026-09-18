@@ -388,5 +388,28 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
       },
     );
 
+    wrapper.register(
+      {
+        name: "kadam_adv_delete_creatives",
+        description:
+          "Permanently delete creatives. Requires confirm=true. A creative must be archived first " +
+          "(use set_creative_status with status=archived), otherwise the whole call is rejected. " +
+          "Retrying a call that already deleted the creatives is rejected too, since deleted creatives " +
+          "are no longer addressable.",
+        product: "advertiser",
+        annotations: { title: "Delete creatives", destructiveHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated creative IDs"),
+        confirm: z.literal(true),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds, "Creative");
+        const result = await ctx.adv.deleteCreatives(parsedIds);
+
+        return formatMaterialBulkResult(result, "deleted");
+      },
+    );
   },
 };

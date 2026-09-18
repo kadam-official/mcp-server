@@ -195,6 +195,40 @@ describe("creatives tools", () => {
     expect(text).toContain("Creative identifiers must be unique.");
   });
 
+  it("delete_creatives requires confirm=true", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_creatives",
+      arguments: { ids: "42" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.deleteCreatives).not.toHaveBeenCalled();
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(text).toContain("Invalid arguments");
+  });
+
+  it("delete_creatives with confirm=true deletes the archived creatives", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.deleteCreatives.mockResolvedValue({
+      materials: [{ id: 42, success: true }],
+      totalMaterials: 1,
+      processedMaterials: 1,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_creatives",
+      arguments: { ids: "42", confirm: true },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.deleteCreatives).toHaveBeenCalledWith([42]);
+    expect(text).toContain("1/1 creatives deleted");
+  });
+
   it("update_creative does read-modify-write, merging changes with current state", async () => {
     const { client, mockApi } = await createToolClient(creativesModule);
     const api = mockApi as MockPartnersClient;
