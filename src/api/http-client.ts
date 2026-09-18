@@ -21,6 +21,15 @@ export class ApiError extends Error {
 const RETRY_DELAYS = [1000, 2000, 4000];
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
+/**
+ * Methods we may replay after a timeout, a dropped connection or a 5xx. Repeating any of
+ * these lands on the same row, so at worst the second call is a no-op. POST does not:
+ * a create that timed out may well have succeeded, and replaying it bills the advertiser
+ * for a second campaign. A 429 is different — the rate limiter rejects before the request
+ * is processed — so that one is retried for every method.
+ */
+const REPLAYABLE_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE", "OPTIONS"]);
+
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -84,7 +93,7 @@ export class HttpClient {
   }
 
   private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
-    return this.executeWithRetry<T>(url, (signal) =>
+    return this.executeWithRetry<T>(url, method, (signal) =>
       fetch(url, {
         method,
         headers: {
@@ -99,7 +108,7 @@ export class HttpClient {
   }
 
   private async requestFormData<T>(url: string, formData: FormData): Promise<T> {
-    return this.executeWithRetry<T>(url, (signal) =>
+    return this.executeWithRetry<T>(url, "POST", (signal) =>
       fetch(url, {
         method: "POST",
         headers: {
@@ -114,9 +123,11 @@ export class HttpClient {
 
   private async executeWithRetry<T>(
     url: string,
+    method: string,
     doFetch: (signal: AbortSignal) => Promise<Response>,
   ): Promise<T> {
     let lastError: Error | null = null;
+    const mayReplay = REPLAYABLE_METHODS.has(method);
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       if (attempt > 0) {
@@ -150,7 +161,7 @@ export class HttpClient {
           const responseBody = await response.text().catch(() => "");
           const parsed = tryParseJson(responseBody);
 
-          if (RETRYABLE_STATUSES.has(response.status) && attempt < this.maxRetries) {
+          if (mayReplay && RETRYABLE_STATUSES.has(response.status) && attempt < this.maxRetries) {
             lastError = new ApiError(
               `API returned ${response.status}: ${responseBody.slice(0, 200)}`,
               response.status,
@@ -173,11 +184,13 @@ export class HttpClient {
 
         if (error instanceof DOMException && error.name === "AbortError") {
           lastError = new Error(`Request timed out after ${this.timeout}ms: ${url}`);
-          if (attempt < this.maxRetries) continue;
+          if (mayReplay && attempt < this.maxRetries) continue;
+          break;
         }
 
         lastError = error instanceof Error ? error : new Error(String(error));
-        if (attempt < this.maxRetries) continue;
+        if (mayReplay && attempt < this.maxRetries) continue;
+        break;
       }
     }
 

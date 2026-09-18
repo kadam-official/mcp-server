@@ -231,4 +231,64 @@ describe("HttpClient", () => {
     expect(result).toEqual({ ok: true });
     vi.useRealTimers();
   });
+
+  // A POST that times out or dies on a 5xx may already have created the campaign.
+  // Replaying it bills the advertiser twice, so these three cases must not retry.
+  it("500 on POST: not replayed", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 2 });
+    fetchMock.mockResolvedValue(mockResponse(500, {}));
+
+    const promise = client.post("/campaigns", { name: "x" });
+    const assertion = expect(promise).rejects.toThrow(ApiError);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await assertion;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("network failure on POST: not replayed", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 2 });
+    fetchMock.mockRejectedValue(new Error("socket hang up"));
+
+    const promise = client.post("/campaigns", { name: "x" });
+    const assertion = expect(promise).rejects.toThrow(/socket hang up/);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await assertion;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("429 on POST: still retried, the request never reached the handler", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 1 });
+    fetchMock
+      .mockResolvedValueOnce(mockResponse(429, {}, { "Retry-After": "1" }))
+      .mockResolvedValueOnce(mockResponse(200, { ok: true }));
+
+    const promise = client.post("/campaigns", { name: "x" });
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(await promise).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("500 on PUT: replayed, the update lands on the same row", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 1 });
+    fetchMock
+      .mockResolvedValueOnce(mockResponse(500, {}))
+      .mockResolvedValueOnce(mockResponse(200, { ok: true }));
+
+    const promise = client.put("/campaigns/1/update", { name: "x" });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(await promise).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
 });

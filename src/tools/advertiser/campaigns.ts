@@ -131,12 +131,21 @@ const MANAGER_ONLY_FIELDS = new Set<string>([
   "allowMultiAds",
 ]);
 
+/**
+ * Fields the campaign detail returns in a different shape than the update accepts, so
+ * they must not be echoed back. `autorules` is the case: the card lists rule IDs, while
+ * the update expects full rule definitions — sending the IDs back fails validation on
+ * every read-modify-write. Rules are managed through the autorule tools instead.
+ */
+const NON_ROUND_TRIP_FIELDS = new Set<string>(["autorules"]);
+
 /** Keep only writable fields from a GET campaign detail; drops read-only keys (id, status, state, ...). */
 function pickWritable(current: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of CAMPAIGN_WRITABLE_FIELDS) {
     if (current[key] === undefined) continue;
     if (current[key] === null && MANAGER_ONLY_FIELDS.has(key)) continue;
+    if (NON_ROUND_TRIP_FIELDS.has(key)) continue;
     out[key] = current[key];
   }
   return out;

@@ -302,6 +302,33 @@ describe("campaigns tools", () => {
     expect(payload.allowMultiAds).toBe(true);
   });
 
+  it("update_campaign does not echo autorule ids back as rule definitions", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      autorules: [7, 9],
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, name: "Updated Name" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("autorules");
+    expect(payload.name).toBe("Updated Name");
+  });
+
   it("update_campaign resolves ISO country codes for bids", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;

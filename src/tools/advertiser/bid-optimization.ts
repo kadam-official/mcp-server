@@ -226,12 +226,14 @@ export const bidOptimizationModule: ToolModule = {
         description:
           "Drop every per-slice bid of the listed campaigns at once, returning them to the campaign-level " +
           "bid. Blacklisted slices (action=off) are dropped too, so those slices start being bought again. " +
+          "Requires confirm=true: the dropped bids are not recoverable. " +
           "To remove a single slice use kadam_adv_update_extended_bids with action=remove.",
         product: "advertiser",
         annotations: { title: "Reset extended bids", readOnlyHint: false, destructiveHint: true },
       },
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),
+        confirm: z.literal(true),
       },
       async (args, ctx) => {
         const ids = parseCommaSeparatedIds(args.campaignIds);

@@ -176,12 +176,25 @@ describe("extended stats scope tools", () => {
     const text = getTextFromResult(
       await client.callTool({
         name: "kadam_adv_reset_extended_bids",
-        arguments: { campaignIds: "10,11" },
+        arguments: { campaignIds: "10,11", confirm: true },
       }),
     );
 
     expect(api.resetExtendedBids).toHaveBeenCalledWith([10, 11]);
     expect(text).toContain("dropped in 2 campaign(s)");
+  });
+
+  it("reset_extended_bids without confirm never reaches the API", async () => {
+    const { client, mockApi } = await createToolClient(bidOptimizationModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_reset_extended_bids",
+      arguments: { campaignIds: "10,11" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(api.resetExtendedBids).not.toHaveBeenCalled();
   });
 
   it("toggle_autorule_slice_block reports the state the slice ended in", async () => {
