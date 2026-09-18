@@ -18,16 +18,20 @@ import type { OptionsRegistry, CampaignOptions } from "../../api/options-registr
  * Bulk actions answer with HTTP 200 even when the backend refused some campaigns, so the
  * refused IDs have to be surfaced — otherwise the model reports work that never happened.
  */
-function formatBulkActionResult(result: CampaignBulkAction, actionLabel: string): string {
+const STATE_REFUSAL_REASON = "current campaign state does not allow it";
+
+function formatBulkActionResult(
+  result: CampaignBulkAction,
+  actionLabel: string,
+  refusalReason: string = STATE_REFUSAL_REASON,
+): string {
   const applied = result.campaigns.filter((c) => c.success).map((c) => `#${c.id}`);
   const refused = result.campaigns.filter((c) => !c.success).map((c) => `#${c.id}`);
 
   const lines = [`${applied.length}/${result.totalCampaigns} campaigns ${actionLabel}`];
   if (applied.length) lines.push(`Applied: ${applied.join(", ")}`);
   if (refused.length) {
-    lines.push(
-      `Not ${actionLabel} (current campaign state does not allow it): ${refused.join(", ")}`,
-    );
+    lines.push(`Not ${actionLabel} (${refusalReason}): ${refused.join(", ")}`);
   }
 
   return lines.join("\n");
@@ -953,7 +957,14 @@ export const campaignsModule: ToolModule = {
         requireUniqueIds(parsedIds);
         const result = await ctx.adv.moveCampaigns(parsedIds, args.folderId);
 
-        return formatBulkActionResult(result, `moved to campaign group #${args.folderId}`);
+        // Move is all-or-nothing on the backend: an id the account does not own rejects the
+        // whole request with 422. A per-id refusal inside a 200 would mean the move itself
+        // failed, not that the campaign state forbids it.
+        return formatBulkActionResult(
+          result,
+          `moved to campaign group #${args.folderId}`,
+          "the backend refused the move",
+        );
       },
     );
 

@@ -437,6 +437,21 @@ describe("campaigns tools", () => {
     expect(text).toContain("Applied: #1, #2");
   });
 
+  it("move_campaigns does not blame the campaign state for a refused move", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.moveCampaigns.mockResolvedValue(bulkActionResult([1], [2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "1, 2", folderId: 7 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("the backend refused the move");
+    expect(text).not.toContain("current campaign state does not allow it");
+  });
+
   it("move_campaigns rejects input without a valid campaign ID", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
