@@ -46,6 +46,9 @@ const FULL_CAMPAIGN = {
   sites: { mode: 1, list: [1001, 1002] },
   ssps: { mode: true, list: [42] },
   macrosGroups: { mode: 1, include: [10101], exclude: [], blocked: [10103] },
+  maxCpm: 1.5,
+  videoFormats: ["instream", "outstream"],
+  autorules: [8, 9],
   disableProxy: 1,
   conversion: { id: 0, approved: "dep", hold: "reg", reject: "" },
   postConversion: {
@@ -80,6 +83,24 @@ describe("kadam_adv_get_campaign", () => {
     expect(text).toContain("Campaign group: #178937");
     expect(text).toContain("Daily budget: 150");
     expect(text).toContain("Total budget: 5000");
+  });
+
+  it("shows the CPM ceiling, video formats and autorule ids without inlining the rules", async () => {
+    const { client, mockApi } = await createToolClient(campaignDetailModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue(FULL_CAMPAIGN);
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_get_campaign", arguments: { id: 1 } }),
+    );
+
+    expect(text).toContain("CPM ceiling: 1.5");
+    expect(text).toContain("Video formats: instream, outstream");
+    expect(text).toContain("Autorule IDs: 8, 9");
+    // Поля названы явно, а не свалены в passthrough-секцию для неизвестных ключей.
+    const passthrough = text.slice(text.indexOf("## Other fields"));
+    expect(passthrough).not.toContain("maxCpm");
+    expect(passthrough).not.toContain("autorules");
   });
 
   it("resolves bid countries to ISO codes and targeting IDs to labels", async () => {

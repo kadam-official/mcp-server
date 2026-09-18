@@ -55,6 +55,9 @@ const HANDLED_KEYS = new Set([
   "isPauseAfterModerate",
   "conversion",
   "postConversion",
+  "maxCpm",
+  "videoFormats",
+  "autorules",
 ]);
 
 interface LabelMaps {
@@ -232,6 +235,7 @@ export async function formatCampaignDetail(
     budget.push(`Daily conversions limit: ${c.dayConversionsLimit}`);
   if (c.totalLossLimit != null && Number(c.totalLossLimit) !== 0)
     budget.push(`Total loss limit: ${c.totalLossLimit}`);
+  if (c.maxCpm != null) budget.push(`CPM ceiling: ${c.maxCpm}`);
   if (budget.length > 0) out.push("", "## Budget & limits", ...budget.map((l) => `- ${l}`));
 
   // Caps
@@ -298,6 +302,16 @@ export async function formatCampaignDetail(
     targeting.push(`Second push: ${c.isNeedSecondPush ? "yes" : "no"}`);
   if (c.isPauseAfterModerate != null)
     targeting.push(`Pause after moderation: ${c.isPauseAfterModerate ? "yes" : "no"}`);
+  if (Array.isArray(c.videoFormats) && c.videoFormats.length > 0)
+    targeting.push(`Video formats: ${c.videoFormats.join(", ")}`);
+  // Only the ids: the rules themselves are read and edited through the autorules tools,
+  // and duplicating their bodies here would drift from them on the first schema change.
+  if (Array.isArray(c.autorules))
+    targeting.push(
+      c.autorules.length > 0
+        ? `Autorule IDs: ${c.autorules.join(", ")} (read them with kadam_adv_list_autorules)`
+        : "Autorules: none",
+    );
   if (targeting.length > 0) out.push("", "## Targeting", ...targeting.map((l) => `- ${l}`));
 
   // Conversion
