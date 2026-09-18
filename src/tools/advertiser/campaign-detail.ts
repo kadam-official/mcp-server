@@ -48,6 +48,7 @@ const HANDLED_KEYS = new Set([
   "audiences",
   "sites",
   "ssps",
+  "macrosGroups",
   "disableProxy",
   "impTracker",
   "isNeedSecondPush",
@@ -282,6 +283,14 @@ export async function formatCampaignDetail(
     const ssps = c.ssps as { mode?: unknown; list?: unknown[] };
     if (Array.isArray(ssps.list) && ssps.list.length > 0)
       targeting.push(`SSP ${ssps.mode ? "whitelist" : "blacklist"}: ${ssps.list.join(", ")}`);
+  }
+  if (c.macrosGroups != null && typeof c.macrosGroups === "object") {
+    const groups = c.macrosGroups as Record<string, unknown>;
+    for (const key of ["include", "exclude", "blocked"]) {
+      const list = groups[key];
+      if (Array.isArray(list) && list.length > 0)
+        targeting.push(`Site groups ${key}: ${list.join(", ")}`);
+    }
   }
   if (c.disableProxy != null) targeting.push(`Proxy/VPN blocked: ${c.disableProxy ? "yes" : "no"}`);
   if (c.impTracker) targeting.push(`Impression tracker: ${c.impTracker}`);

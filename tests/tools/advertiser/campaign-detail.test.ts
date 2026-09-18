@@ -45,6 +45,7 @@ const FULL_CAMPAIGN = {
   audiences: { mode: 20, include: [555], exclude: [777] },
   sites: { mode: 1, list: [1001, 1002] },
   ssps: { mode: true, list: [42] },
+  macrosGroups: { mode: 1, include: [10101], exclude: [], blocked: [10103] },
   disableProxy: 1,
   conversion: { id: 0, approved: "dep", hold: "reg", reject: "" },
   postConversion: {
@@ -100,6 +101,10 @@ describe("kadam_adv_get_campaign", () => {
     expect(text).toContain("Sites whitelist: 1001, 1002");
     expect(text).toContain("Audiences include: 555");
     expect(text).toContain("Audiences exclude: 777");
+    expect(text).toContain("Site groups include: 10101");
+    expect(text).toContain("Site groups blocked: 10103");
+    // An empty list is not a setting; printing it would read as a restriction.
+    expect(text).not.toContain("Site groups exclude");
   });
 
   it("summarizes schedule, caps, and conversion settings", async () => {
