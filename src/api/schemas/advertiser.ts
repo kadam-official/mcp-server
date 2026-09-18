@@ -148,6 +148,57 @@ export const accountBalanceSchema = z
 
 export type AccountBalance = z.infer<typeof accountBalanceSchema>;
 
+export const paymentSystemCurrencySchema = z
+  .object({
+    currency: z.string(),
+    currencyId: z.number(),
+    commission: z.number(),
+    constCommission: z.number(),
+    min: z.number(),
+    // null means the system sets no upper bound on a deposit.
+    max: z.number().nullable(),
+    // null means the platform has no rate for this currency, so the credited
+    // amount cannot be predicted client-side.
+    exchangeRateToAccountCurrency: z.number().nullable(),
+  })
+  .passthrough();
+
+export type PaymentSystemCurrency = z.infer<typeof paymentSystemCurrencySchema>;
+
+export const paymentSystemSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    isManualThroughManager: z.boolean(),
+    isPromocodeAvailable: z.boolean(),
+    taxPercent: z.number(),
+    currencies: z.array(paymentSystemCurrencySchema),
+  })
+  .passthrough();
+
+export type PaymentSystem = z.infer<typeof paymentSystemSchema>;
+
+export const paymentSystemsSchema = z
+  .object({
+    paymentSystems: z.array(paymentSystemSchema),
+  })
+  .passthrough();
+
+export type PaymentSystems = z.infer<typeof paymentSystemsSchema>;
+
+export const dayMoneyLimitSchema = z
+  .object({
+    // 0 means the account has no daily cap. Named `limit` because the endpoint
+    // already scopes it — `dayMoneyLimit` is the per-campaign budget.
+    limit: z.number(),
+    // null means this account may not change the limit at all.
+    minimum: z.number().nullable(),
+    currency: z.string(),
+  })
+  .passthrough();
+
+export type DayMoneyLimit = z.infer<typeof dayMoneyLimitSchema>;
+
 export const creativeCreateResponseSchema = z
   .object({
     id: z.number(),

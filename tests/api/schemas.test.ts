@@ -8,6 +8,8 @@ import {
   financeRowSchema,
   accountProfileSchema,
   accountBalanceSchema,
+  paymentSystemsSchema,
+  dayMoneyLimitSchema,
 } from "../../src/api/schemas/advertiser.js";
 import {
   sourceDetailSchema,
@@ -375,5 +377,88 @@ describe("accountBalanceSchema", () => {
 
   it("rejects a payload without balance", () => {
     expect(() => accountBalanceSchema.parse({ currency: "usd" })).toThrow(z.ZodError);
+  });
+});
+
+describe("paymentSystemsSchema", () => {
+  const currency = {
+    currency: "usd",
+    currencyId: 20,
+    commission: 3,
+    constCommission: 0.5,
+    min: 50,
+    max: 10000,
+    exchangeRateToAccountCurrency: 1,
+  };
+  const system = {
+    id: 38,
+    name: "paypal",
+    isManualThroughManager: false,
+    isPromocodeAvailable: true,
+    taxPercent: 0,
+    currencies: [currency],
+  };
+
+  it("parses a system with its currency conditions", () => {
+    const result = paymentSystemsSchema.parse({ paymentSystems: [system] });
+
+    expect(result.paymentSystems).toHaveLength(1);
+    expect(result.paymentSystems[0]!.currencies[0]!.currencyId).toBe(20);
+    expect(result.paymentSystems[0]!.currencies[0]!.max).toBe(10000);
+  });
+
+  it("accepts a null max and a null exchange rate", () => {
+    const result = paymentSystemsSchema.parse({
+      paymentSystems: [
+        {
+          ...system,
+          currencies: [{ ...currency, max: null, exchangeRateToAccountCurrency: null }],
+        },
+      ],
+    });
+
+    expect(result.paymentSystems[0]!.currencies[0]!.max).toBeNull();
+    expect(result.paymentSystems[0]!.currencies[0]!.exchangeRateToAccountCurrency).toBeNull();
+  });
+
+  it("keeps unknown fields so a new API field does not break the client", () => {
+    const result = paymentSystemsSchema.parse({
+      paymentSystems: [{ ...system, someFutureFlag: true }],
+    });
+
+    expect(result.paymentSystems[0]).toHaveProperty("someFutureFlag", true);
+  });
+
+  it("rejects a system whose currencies are missing", () => {
+    const { currencies: _omitted, ...withoutCurrencies } = system;
+
+    expect(() => paymentSystemsSchema.parse({ paymentSystems: [withoutCurrencies] })).toThrow();
+  });
+});
+
+describe("dayMoneyLimitSchema", () => {
+  it("parses a limit with its minimum", () => {
+    const result = dayMoneyLimitSchema.parse({
+      limit: 500,
+      minimum: 50,
+      currency: "usd",
+    });
+
+    expect(result.limit).toBe(500);
+    expect(result.minimum).toBe(50);
+  });
+
+  it("accepts a null minimum, which marks the limit as not changeable", () => {
+    const result = dayMoneyLimitSchema.parse({
+      limit: 0,
+      minimum: null,
+      currency: "rub",
+    });
+
+    expect(result.minimum).toBeNull();
+  });
+
+  it("rejects a payload without a limit", () => {
+    expect(() => dayMoneyLimitSchema.parse({ minimum: 50, currency: "usd" })).toThrow();
   });
 });

@@ -11,6 +11,7 @@ const ADV_SECTION = `Advertisers:
   - Set budgets (daily/total), bids (CPC/CPM/CPA), and schedules
   - Monitor performance via custom reports and per-site statistics
   - Inspect account profile (id, balance, currency, timezone, day limit)
+  - Deposit through payment systems and cap account-wide daily spending
   - Manage audience segments for retargeting`;
 
 const PUB_SECTION = `Publishers:
