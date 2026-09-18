@@ -441,6 +441,12 @@ export interface DictionaryItem {
   slug?: string;
   countryId?: number;
   countryLabel?: string | null;
+  /** countries only: ISO 3166-1 alpha-2 code. */
+  geoCountry?: string;
+  /** regions only: ISO 3166-2 subdivision code. */
+  isoCode?: string;
+  /** cities only: the region the city belongs to. */
+  regionId?: number;
   /** conversion-templates only: postback status strings a campaign's `conversion` field needs. */
   approved?: string;
   hold?: string;
@@ -456,6 +462,9 @@ export const dictionaryItemSchema: z.ZodType<DictionaryItem> = z.lazy(() =>
       slug: z.string().optional(),
       countryId: z.number().optional(),
       countryLabel: z.string().nullable().optional(),
+      geoCountry: z.string().optional(),
+      isoCode: z.string().optional(),
+      regionId: z.number().optional(),
       approved: z.string().optional(),
       hold: z.string().optional(),
       reject: z.string().optional(),

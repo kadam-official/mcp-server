@@ -143,7 +143,7 @@ Requires `KADAM_ADV_API_KEY`.
 
 | Tool                       | Description                                                                                                                                   | Annotations |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kadam_adv_get_dictionary` | One reference dictionary by type: campaign-types, browsers, platforms, devices, connection-types, categories, isps, conversion-templates | readOnly    |
+| `kadam_adv_get_dictionary`                | Reference dictionary: campaign types, browsers, platforms, devices, connections, categories, isps, conversion templates, countries, regions, cities | readOnly    |
 
 #### Campaigns
 

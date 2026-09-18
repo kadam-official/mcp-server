@@ -14,7 +14,16 @@ const DICTIONARY_TYPES = [
   "categories",
   "isps",
   "conversion-templates",
+  "countries",
+  "regions",
+  "cities",
 ] as const;
+
+/** Dictionaries that are scoped to one country and returned page by page. */
+const COUNTRY_SCOPED = ["isps", "regions", "cities"] as const;
+
+/** Dictionaries whose result is paginated and searchable. */
+const PAGINATED = ["isps", "regions", "cities"] as const;
 
 const CAMPAIGN_TYPE_NAMES = Object.keys(CAMPAIGN_TYPE_MAP) as [string, ...string[]];
 
@@ -22,6 +31,9 @@ function describeItem(item: DictionaryItem): string {
   const parts = [`[ID: ${item.id}] ${item.label}`];
   if (item.slug != null) parts.push(`slug: ${item.slug}`);
   if (item.countryLabel != null) parts.push(item.countryLabel);
+  if (item.geoCountry != null) parts.push(item.geoCountry);
+  if (item.isoCode != null) parts.push(item.isoCode);
+  if (item.regionId != null) parts.push(`region: ${item.regionId}`);
   // conversion-templates: without the status strings the entry cannot be acted on.
   if (item.approved != null) {
     parts.push(`approved: ${item.approved}`, `hold: ${item.hold}`, `reject: ${item.reject}`);
@@ -48,11 +60,13 @@ export const dictionariesModule: ToolModule = {
       {
         name: "kadam_adv_get_dictionary",
         description:
-          "Gets one reference dictionary used to build campaign targeting: campaign-types, browsers, platforms (OS), devices, connection-types, categories, isps or conversion-templates. " +
+          "Gets one reference dictionary used to build campaign targeting: campaign-types, browsers, platforms (OS), devices, connection-types, categories, isps, conversion-templates, countries, regions or cities. " +
           "Call this instead of guessing IDs — every targeting field expects the numeric ids returned here. " +
           "campaign-types only lists the types this account may actually create. " +
           "categories requires campaignType because the allowed set differs per type. " +
-          "isps requires countryId, and is paginated and searchable because a single country can hold tens of thousands of providers. " +
+          "isps, regions and cities require countryId, and are paginated and searchable because a single country can hold tens of thousands of entries. " +
+          "countries is the entry point of the geo chain: its ids are what a campaign stores in countries and what countryId expects here, while regions and cities give the ids a campaign stores in cities. " +
+          "cities can be narrowed to one region with regionId. " +
           "platforms, devices and categories are trees: children are nested under their parent. " +
           "conversion-templates entries carry the approved/hold/reject postback status strings, which are what a campaign's conversion field needs.",
         product: "advertiser",
@@ -67,15 +81,27 @@ export const dictionariesModule: ToolModule = {
         countryId: z
           .number()
           .optional()
-          .describe(
-            "Required for type=isps. Country id from the countries dictionary of kadam_adv_list_campaigns options",
-          ),
+          .describe("Required for type=isps, regions and cities. Country id from type=countries"),
+        regionId: z
+          .number()
+          .optional()
+          .describe("Narrows type=cities to one region; ignored otherwise"),
         search: z
           .string()
           .optional()
-          .describe("Substring filter on the entry name; applies to isps"),
-        page: z.number().optional().default(1).describe("1-based page; applies to isps"),
-        perPage: z.number().optional().default(50).describe("Page size, max 200; applies to isps"),
+          .describe(
+            "Substring filter on the entry name; applies to isps, countries, regions, cities",
+          ),
+        page: z
+          .number()
+          .optional()
+          .default(1)
+          .describe("1-based page; applies to isps, regions and cities"),
+        perPage: z
+          .number()
+          .optional()
+          .default(50)
+          .describe("Page size, max 200; applies to isps, regions and cities"),
       },
       async (args, ctx) => {
         const { type } = args;
@@ -92,21 +118,33 @@ export const dictionariesModule: ToolModule = {
           params.campaignType = String(CAMPAIGN_TYPE_MAP[args.campaignType]);
         }
 
-        if (type === "isps") {
+        const countryScoped = (COUNTRY_SCOPED as readonly string[]).includes(type);
+        const paginated = (PAGINATED as readonly string[]).includes(type);
+
+        if (countryScoped) {
           if (args.countryId == null) {
-            throw new Error("countryId is required for type=isps");
+            throw new Error(`countryId is required for type=${type}`);
           }
           params.countryId = String(args.countryId);
+        }
+
+        if (type === "cities" && args.regionId != null) {
+          params.regionId = String(args.regionId);
+        }
+
+        if (paginated) {
           params.page = String(page);
           params.perPage = String(perPage);
-          if (args.search != null) params.search = args.search;
         }
+
+        if (args.search != null) params.search = args.search;
 
         const res = await ctx.adv.getDictionary(type, params);
         const header = `Dictionary "${res.type}"`;
 
-        // Only isps can return fewer entries than it counts, so only it needs the pager hint.
-        if (type === "isps") {
+        // Only the paginated dictionaries can return fewer entries than they count, so only
+        // they need the pager hint.
+        if (paginated) {
           const totalPages = Math.max(1, Math.ceil(res.total / perPage));
           return formatEntityList(res.items, formatItem, header, {
             page,

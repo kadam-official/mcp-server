@@ -256,3 +256,62 @@ describe("get_dictionary tool", () => {
     expect(api.getDictionary).not.toHaveBeenCalled();
   });
 });
+
+describe("geo dictionaries", () => {
+  it("countries are returned in full with their ISO code", async () => {
+    const { client, mockApi } = await createToolClient(dictionariesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getDictionary.mockResolvedValue({
+      type: "countries",
+      total: 1,
+      items: [{ id: 1, label: "Russia", geoCountry: "RU" }],
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_dictionary",
+        arguments: { type: "countries" },
+      }),
+    );
+
+    expect(api.getDictionary).toHaveBeenCalledWith("countries", {});
+    expect(text).toContain("[ID: 1] Russia | RU");
+  });
+
+  it("cities pass the country, the region and the pager through", async () => {
+    const { client, mockApi } = await createToolClient(dictionariesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getDictionary.mockResolvedValue({
+      type: "cities",
+      total: 1,
+      items: [{ id: 524901, label: "Moscow", countryId: 1, regionId: 524894 }],
+    } as never);
+
+    await client.callTool({
+      name: "kadam_adv_get_dictionary",
+      arguments: { type: "cities", countryId: 1, regionId: 524894, perPage: 10, page: 2 },
+    });
+
+    expect(api.getDictionary).toHaveBeenCalledWith("cities", {
+      countryId: "1",
+      regionId: "524894",
+      page: "2",
+      perPage: "10",
+    });
+  });
+
+  it("regions without a country are refused before the request goes out", async () => {
+    const { client, mockApi } = await createToolClient(dictionariesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_dictionary",
+        arguments: { type: "regions" },
+      }),
+    );
+
+    expect(api.getDictionary).not.toHaveBeenCalled();
+    expect(text).toContain("countryId is required for type=regions");
+  });
+});
