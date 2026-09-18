@@ -337,6 +337,38 @@ export const campaignForecastResultSchema = z
 
 export type CampaignForecastResult = z.infer<typeof campaignForecastResultSchema>;
 
+const blockedSspSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    visits: z.number(),
+    clicks: z.number(),
+    views: z.number(),
+  })
+  .passthrough();
+
+export const campaignBlockedSspsSchema = z
+  .object({
+    category: z.string().nullish(),
+    payModel: z.string().nullish(),
+    totalClicks: z.number().nullish(),
+    totalViews: z.number().nullish(),
+    byCategory: z.array(blockedSspSchema),
+    byTags: z.array(
+      z
+        .object({
+          id: z.number(),
+          name: z.string(),
+          description: z.string().nullish(),
+          ssps: z.array(blockedSspSchema),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export type CampaignBlockedSsps = z.infer<typeof campaignBlockedSspsSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({

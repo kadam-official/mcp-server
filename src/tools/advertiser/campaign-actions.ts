@@ -3,6 +3,7 @@ import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import type {
+  CampaignBlockedSsps,
   CampaignCopyResult,
   CampaignForecastResult,
   CampaignUrlReplaceResult,
@@ -68,6 +69,37 @@ function formatForecastResult(result: CampaignForecastResult): string {
   const lines = ["Bid -> expected daily traffic (account currency):"];
   for (const point of result.forecast) {
     lines.push(`${point.bid} -> ${point.traffic}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatBlockedSsps(result: CampaignBlockedSsps): string {
+  const lines: string[] = [];
+  const unit = result.payModel === "cpm" ? "views" : "clicks";
+  const total = result.payModel === "cpm" ? result.totalViews : result.totalClicks;
+
+  lines.push(`Category of the campaign's creative: ${result.category ?? "unknown"}.`);
+  lines.push(`Traffic locked behind the blocks below: ${total ?? 0} ${unit}/day.`);
+
+  if (result.byCategory.length === 0 && result.byTags.length === 0) {
+    return "No traffic source blocks this campaign over its category or moderation tags.";
+  }
+
+  if (result.byCategory.length > 0) {
+    lines.push("", "Blocked by category (cannot be lifted without changing the category):");
+    for (const ssp of result.byCategory) {
+      lines.push(`- ${ssp.name} (id ${ssp.id}): ${ssp.clicks} clicks, ${ssp.views} views`);
+    }
+  }
+
+  for (const tag of result.byTags) {
+    lines.push("", `Blocked by moderation tag "${tag.name}" (id ${tag.id}):`);
+    if (tag.description) lines.push(`  ${tag.description}`);
+    for (const ssp of tag.ssps) {
+      lines.push(`- ${ssp.name} (id ${ssp.id}): ${ssp.clicks} clicks, ${ssp.views} views`);
+    }
+    lines.push("  Removing the tag from the creative unblocks these sources.");
   }
 
   return lines.join("\n");
@@ -312,6 +344,30 @@ export const campaignActionsModule: ToolModule = {
 
         const result = await ctx.adv.getCampaignForecast(payload);
         return formatForecastResult(result);
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_get_blocked_traffic_sources",
+        description:
+          "Explain why a campaign is not reaching part of the inventory: which traffic sources reject it " +
+          "over the creative's category, which over a moderation tag, and how much traffic each of them holds. " +
+          "Requires a token impersonating an administrator (plain client tokens get 403), because the cabinet " +
+          "does not show the source breakdown to advertisers.",
+        product: "advertiser",
+        annotations: { title: "Blocked traffic sources", readOnlyHint: true },
+      },
+      {
+        campaignId: z
+          .number()
+          .int()
+          .positive()
+          .describe("Campaign ID. It must have a clickunder creative with a category assigned"),
+      },
+      async (args, ctx) => {
+        const result = await ctx.adv.getCampaignBlockedSsps(args.campaignId);
+        return formatBlockedSsps(result);
       },
     );
   },

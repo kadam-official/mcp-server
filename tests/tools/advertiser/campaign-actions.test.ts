@@ -320,6 +320,59 @@ describe("campaign-actions tools", () => {
     expect(api.getCampaignForecast).not.toHaveBeenCalled();
   });
 
+  it("get_blocked_traffic_sources separates category blocks from tag blocks", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignBlockedSsps.mockResolvedValue({
+      category: "Dating",
+      payModel: "cpc",
+      totalClicks: 18402,
+      totalViews: 0,
+      byCategory: [{ id: 4, name: "Some SSP", visits: 100, clicks: 12000, views: 300000 }],
+      byTags: [
+        {
+          id: 17,
+          name: "Shock content",
+          description: "Blood or injuries",
+          ssps: [{ id: 9, name: "Other SSP", visits: 50, clicks: 6402, views: 120000 }],
+        },
+      ],
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_blocked_traffic_sources",
+      arguments: { campaignId: 31 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.getCampaignBlockedSsps).toHaveBeenCalledWith(31);
+    expect(text).toContain("Dating");
+    expect(text).toContain("18402 clicks/day");
+    expect(text).toContain("Some SSP");
+    expect(text).toContain('Blocked by moderation tag "Shock content"');
+    expect(text).toContain("Removing the tag");
+  });
+
+  it("get_blocked_traffic_sources says so when nothing blocks the campaign", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaignBlockedSsps.mockResolvedValue({
+      category: "Dating",
+      payModel: "cpc",
+      totalClicks: 0,
+      totalViews: 0,
+      byCategory: [],
+      byTags: [],
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_blocked_traffic_sources",
+      arguments: { campaignId: 31 },
+    });
+
+    expect(getTextFromResult(result)).toContain("No traffic source blocks this campaign");
+  });
+
   it("copy_campaign maps a cross-format copy to the target campaign type", async () => {
     const { client, mockApi } = await createToolClient(campaignActionsModule);
     const api = mockApi as MockPartnersClient;

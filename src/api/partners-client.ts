@@ -16,6 +16,7 @@ import {
   accountBalanceSchema,
   campaignBulkActionSchema,
   campaignCopyResultSchema,
+  campaignBlockedSspsSchema,
   campaignForecastResultSchema,
   campaignUrlReplaceResultSchema,
   materialBulkActionSchema,
@@ -36,6 +37,7 @@ import {
 import type {
   CampaignBulkAction,
   CampaignCopyResult,
+  CampaignBlockedSsps,
   CampaignForecastResult,
   CampaignUrlReplaceResult,
   MaterialBulkAction,
@@ -130,6 +132,11 @@ export class PartnersClient {
   async copyCampaign(id: number, data: Record<string, unknown>): Promise<CampaignCopyResult> {
     const raw = await this.http.post(`/campaigns/${id}/copy`, data);
     return campaignCopyResultSchema.parse(raw);
+  }
+
+  async getCampaignBlockedSsps(campaignId: number): Promise<CampaignBlockedSsps> {
+    const raw = await this.http.get(`/campaigns/${campaignId}/blocked-ssps`);
+    return campaignBlockedSspsSchema.parse(raw);
   }
 
   async getCampaignForecast(payload: Record<string, unknown>): Promise<CampaignForecastResult> {
