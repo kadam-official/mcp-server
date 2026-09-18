@@ -27,6 +27,7 @@ import {
   autoruleWriteResponseSchema,
   extendedBidsResultSchema,
   extendedBidsUpdateResponseSchema,
+  dictionaryResultSchema,
 } from "./schemas/advertiser.js";
 import type {
   CampaignBulkAction,
@@ -44,6 +45,7 @@ import type {
   DayMoneyLimit,
   Autorule,
   ExtendedBid,
+  DictionaryResult,
 } from "./schemas/advertiser.js";
 import { z } from "zod";
 import { OptionsRegistry } from "./options-registry.js";
@@ -323,5 +325,11 @@ export class PartnersClient {
   async updateExtendedBids(data: Record<string, unknown>): Promise<{ affectedCampaigns?: number }> {
     const raw = await this.http.put("/stats/extended/bids", data);
     return extendedBidsUpdateResponseSchema.parse(raw);
+  }
+
+  // --- Dictionaries ---
+  async getDictionary(type: string, params?: Record<string, string>): Promise<DictionaryResult> {
+    const raw = await this.http.get(`/dictionaries/${type}`, params);
+    return dictionaryResultSchema.parse(raw);
   }
 }

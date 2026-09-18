@@ -9,6 +9,7 @@ import { profileModule } from "./profile.js";
 import { statsModule } from "./stats.js";
 import { autorulesModule } from "./autorules.js";
 import { bidOptimizationModule } from "./bid-optimization.js";
+import { dictionariesModule } from "./dictionaries.js";
 
 export const advToolModules: ToolModule[] = [
   campaignsModule,
@@ -21,4 +22,5 @@ export const advToolModules: ToolModule[] = [
   statsModule,
   autorulesModule,
   bidOptimizationModule,
+  dictionariesModule,
 ];

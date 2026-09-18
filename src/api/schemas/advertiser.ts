@@ -325,3 +325,44 @@ export const extendedBidsResultSchema = z
 export const extendedBidsUpdateResponseSchema = z
   .object({ affectedCampaigns: z.number().optional() })
   .passthrough();
+
+// --- Dictionaries ---
+
+/**
+ * One reference entry from GET /dictionaries/{type}.
+ * `id` is an integer everywhere except the pseudo category `mainstream`.
+ * `slug` is campaign-types only; `countryId`/`countryLabel` are isps only;
+ * `children` is present on the tree dictionaries (platforms, devices, categories).
+ */
+export interface DictionaryItem {
+  id: number | string;
+  label: string;
+  slug?: string;
+  countryId?: number;
+  countryLabel?: string | null;
+  children?: DictionaryItem[];
+}
+
+export const dictionaryItemSchema: z.ZodType<DictionaryItem> = z.lazy(() =>
+  z
+    .object({
+      id: z.union([z.number(), z.string()]),
+      label: z.string(),
+      slug: z.string().optional(),
+      countryId: z.number().optional(),
+      countryLabel: z.string().nullable().optional(),
+      children: z.array(dictionaryItemSchema).optional(),
+    })
+    .passthrough(),
+);
+
+/** `total` ignores pagination, so for `isps` it can exceed `items.length`. */
+export const dictionaryResultSchema = z
+  .object({
+    type: z.string(),
+    total: z.number().default(0),
+    items: z.array(dictionaryItemSchema).default([]),
+  })
+  .passthrough();
+
+export type DictionaryResult = z.infer<typeof dictionaryResultSchema>;

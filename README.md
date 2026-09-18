@@ -139,6 +139,12 @@ Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp`
 
 Requires `KADAM_ADV_API_KEY`.
 
+#### Dictionaries
+
+| Tool                       | Description                                                                                                                                   | Annotations |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_get_dictionary` | Reference data for campaign targeting: campaign types, browsers, platforms, devices, connection types, categories, ISPs. Returns the real IDs | readOnly    |
+
 #### Campaigns
 
 | Tool                            | Description                                                                                                                                  | Annotations |

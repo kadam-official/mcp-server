@@ -128,6 +128,7 @@ export function createMockPartnersClient() {
     getExtendedStats: vi.fn(),
     listExtendedBids: vi.fn(),
     updateExtendedBids: vi.fn(),
+    getDictionary: vi.fn(),
   };
 }
 
