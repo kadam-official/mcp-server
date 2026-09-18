@@ -313,6 +313,7 @@ src/
 - **Tool annotations** — `readOnlyHint`, `destructiveHint`, `idempotentHint` to guide agent behavior
 - **Server instructions** — usage patterns and constraints sent to the LLM on connection
 - **Dimension mapping** — stats tools accept human-readable names ("clicks", "spend") and resolve them to API IDs internally
+- **Tier-agnostic bearer** — the token is forwarded untouched, so an impersonating token unlocks the manager-only tools and fields on the API side without any switch here. Manager campaign fields (`proxies`, `hasCorrectPostback`, `isDirectTrafficPriority`, `allowMultiAds`) come back `null` for an ordinary token and are a 422 if sent, so the campaign read-modify-write drops them when they read as `null`
 
 ## Development
 
