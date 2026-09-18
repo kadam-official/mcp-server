@@ -349,6 +349,53 @@ export const campaignActionsModule: ToolModule = {
 
     wrapper.register(
       {
+        name: "kadam_adv_set_campaign_rss",
+        description:
+          "Point a native campaign at an RSS feed so creatives are imported from it, or stop the import " +
+          "by sending an empty link. Native campaigns only — other formats are rejected. " +
+          "The import runs on a schedule, so a success here means the feed was saved, not that creatives exist yet.",
+        product: "advertiser",
+        annotations: { title: "Set campaign RSS feed", idempotentHint: true },
+      },
+      {
+        campaignId: z.number().int().positive().describe("Campaign ID, must be a native campaign"),
+        link: z
+          .string()
+          .describe("Feed URL. Pass an empty string to stop importing; imported creatives stay"),
+        keepRemovedCreatives: z
+          .boolean()
+          .default(true)
+          .describe(
+            "Keep creatives whose item left the feed; false archives them on the next import",
+          ),
+        pauseAfterModeration: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Imported creatives stay paused after moderation so they can be reviewed first",
+          ),
+      },
+      async (args, ctx) => {
+        await ctx.adv.setCampaignRss(args.campaignId, {
+          link: args.link,
+          notRemove: args.keepRemovedCreatives,
+          isPauseAfterModer: args.pauseAfterModeration,
+        });
+
+        if (args.link === "") {
+          return `Campaign ${args.campaignId} no longer imports from a feed. Creatives imported earlier are untouched.`;
+        }
+
+        return [
+          `Campaign ${args.campaignId} now imports creatives from ${args.link}.`,
+          "The import runs on a schedule, so the creatives are not there yet;",
+          "check the campaign's creatives later rather than immediately.",
+        ].join(" ");
+      },
+    );
+
+    wrapper.register(
+      {
         name: "kadam_adv_set_easy_start",
         description:
           "Turn Easy Start on or off for a campaign: it restricts delivery to a curated site set " +

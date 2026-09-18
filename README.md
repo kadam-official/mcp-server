@@ -133,9 +133,9 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (55)
+## Tools (56)
 
-### Advertiser Tools (46)
+### Advertiser Tools (47)
 
 Requires `KADAM_ADV_API_KEY`.
 
@@ -158,6 +158,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_move_campaigns`      | Move campaigns to a campaign group by comma-separated campaign IDs and target group ID                                                       | idempotent  |
 | `kadam_adv_copy_campaign`       | Copy a campaign into a campaign group: settings and bids are cloned, the copy starts paused and re-enters moderation. Optional pricing-model switch, push <-> in-page push cross-format copy, autorules and per-site bids | —           |
 | `kadam_adv_bulk_replace_urls`   | Find and replace a landing-URL fragment across campaigns and their creatives. Requires a token impersonating an administrator (plain client tokens get 403); supports `dryRun` | destructive |
+| `kadam_adv_set_campaign_rss`    | Point a native campaign at an RSS feed to import creatives, or stop the import with an empty link | idempotent  |
 | `kadam_adv_set_easy_start`      | Turn Easy Start (curated site set) on or off for a campaign. Requires a token impersonating an administrator | idempotent  |
 | `kadam_adv_get_blocked_traffic_sources` | Traffic sources rejecting a campaign, split into category blocks and moderation-tag blocks. Requires a token impersonating an administrator (plain client tokens get 403) | readOnly    |
 | `kadam_adv_get_traffic_forecast` | Bid-to-traffic curve for a targeting set from yesterday's auction. An empty curve means the forecast could not be built, not that traffic is zero | readOnly    |
@@ -285,7 +286,7 @@ src/
 │   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
-│   ├── advertiser/           # 46 tools across 12 modules
+│   ├── advertiser/           # 47 tools across 12 modules
 │   └── publisher/            # 9 tools across 4 modules
 ├── resources/                # 7 static reference resources
 └── prompts/                  # 4 workflow prompts
@@ -293,7 +294,7 @@ src/
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 55 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 56 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
@@ -337,7 +338,7 @@ npm run inspect         # MCP Inspector (visual debugger)
 
 - **Unit tests** — output formatter, config, HTTP client (mocked fetch)
 - **Middleware tests** — ToolWrapper auth, error formatting, logging
-- **Integration tests** — full server with all 55 tools, 8 resources, 4 prompts via in-memory MCP client
+- **Integration tests** — full server with all 56 tools, 8 resources, 4 prompts via in-memory MCP client
 - **Tool handler tests** — each tool module with mocked API clients
 
 ```bash

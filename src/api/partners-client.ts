@@ -134,6 +134,13 @@ export class PartnersClient {
     return campaignCopyResultSchema.parse(raw);
   }
 
+  async setCampaignRss(
+    campaignId: number,
+    payload: { link: string; notRemove: boolean; isPauseAfterModer: boolean },
+  ): Promise<unknown> {
+    return this.http.put(`/campaigns/${campaignId}/rss`, payload);
+  }
+
   async setCampaignEasyStart(campaignId: number, enabled: boolean): Promise<unknown> {
     return this.http.put(`/campaigns/${campaignId}/easy-start`, { enabled });
   }

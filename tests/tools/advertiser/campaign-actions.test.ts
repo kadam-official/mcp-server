@@ -320,6 +320,47 @@ describe("campaign-actions tools", () => {
     expect(api.getCampaignForecast).not.toHaveBeenCalled();
   });
 
+  it("set_campaign_rss saves the feed and warns the creatives are not there yet", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignRss.mockResolvedValue({} as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_campaign_rss",
+        arguments: { campaignId: 31, link: "https://example.com/feed.xml" },
+      }),
+    );
+
+    expect(api.setCampaignRss).toHaveBeenCalledWith(31, {
+      link: "https://example.com/feed.xml",
+      notRemove: true,
+      isPauseAfterModer: false,
+    });
+    expect(text).toContain("not there yet");
+  });
+
+  it("set_campaign_rss treats an empty link as stopping the import", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignRss.mockResolvedValue({} as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_campaign_rss",
+        arguments: { campaignId: 31, link: "", keepRemovedCreatives: false },
+      }),
+    );
+
+    expect(api.setCampaignRss).toHaveBeenCalledWith(31, {
+      link: "",
+      notRemove: false,
+      isPauseAfterModer: false,
+    });
+    expect(text).toContain("no longer imports");
+    expect(text).toContain("imported earlier are untouched");
+  });
+
   it("set_easy_start reports which inventory the campaign can buy after the change", async () => {
     const { client, mockApi } = await createToolClient(campaignActionsModule);
     const api = mockApi as MockPartnersClient;
