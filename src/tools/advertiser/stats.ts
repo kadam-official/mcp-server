@@ -15,6 +15,7 @@ import {
   describeGroups,
 } from "../../utils/dimension-mapper.js";
 import { resolvePeriodToDates } from "../../utils/date-helpers.js";
+import { parseCommaSeparatedIds } from "../../utils/status-actions.js";
 
 export const statsModule: ToolModule = {
   product: "advertiser",
@@ -241,6 +242,33 @@ export const statsModule: ToolModule = {
         }
 
         return "Unknown reportType. Use: custom, sites, or conversions.";
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_block_sites",
+        description:
+          "Stop or resume buying traffic from sites (zones) in the given campaigns. Zone IDs come from " +
+          "the sites report (`macrosId`). Blocking is per campaign: a site blocked in one campaign keeps " +
+          "running in the others, so list every campaign it should be stopped in. Repeating the call " +
+          "changes nothing, and a campaign that does not belong to the account refuses the whole request.",
+        product: "advertiser",
+        annotations: { title: "Block or unblock sites", idempotentHint: true },
+      },
+      {
+        campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),
+        zones: z.string().min(1).describe("Comma-separated site (zone) IDs from the sites report"),
+        blocked: z.boolean().describe("true — stop buying these sites, false — resume buying them"),
+      },
+      async (args, ctx) => {
+        const campaignIds = parseCommaSeparatedIds(args.campaignIds);
+        const zones = parseCommaSeparatedIds(args.zones);
+
+        await ctx.adv.blockStatsSites(campaignIds, zones, args.blocked);
+
+        const verb = args.blocked ? "Blocked" : "Unblocked";
+        return `${verb} ${zones.length} site(s) in ${campaignIds.length} campaign(s). Sites: ${zones.join(", ")}.`;
       },
     );
   },

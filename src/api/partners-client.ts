@@ -32,9 +32,6 @@ import {
   folderCreateResponseSchema,
   folderViewSchema,
   folderBulkActionResultSchema,
-  autoruleSchema,
-  autorulesResultSchema,
-  autoruleWriteResponseSchema,
   extendedBidsResultSchema,
   extendedBidsUpdateResponseSchema,
   dictionaryResultSchema,
@@ -63,12 +60,12 @@ import type {
   AccountBalance,
   PaymentSystems,
   DayMoneyLimit,
-  Autorule,
   ExtendedBid,
   DictionaryResult,
 } from "./schemas/advertiser.js";
 import { z } from "zod";
 import { OptionsRegistry } from "./options-registry.js";
+import { AutorulesApiClient } from "./autorules-client.js";
 
 const campaignListSchema = listResponseSchema(campaignRowSchema);
 const folderListSchema = listResponseSchema(folderRowSchema);
@@ -93,15 +90,13 @@ export interface ReportDataParams {
 /** Report config (groups/metrics) rarely changes; cache per client instance (== per tenant). */
 const DEFAULT_REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
 
-export class PartnersClient {
+export class PartnersClient extends AutorulesApiClient {
   readonly options: OptionsRegistry;
   private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
   private readonly reportConfigTtlMs: number;
 
-  constructor(
-    private readonly http: HttpClient,
-    optionsTtlMs?: number,
-  ) {
+  constructor(http: HttpClient, optionsTtlMs?: number) {
+    super(http);
     this.options = new OptionsRegistry(http, optionsTtlMs);
     this.reportConfigTtlMs =
       optionsTtlMs && optionsTtlMs > 0 ? optionsTtlMs : DEFAULT_REPORT_CONFIG_TTL_MS;
@@ -205,6 +200,19 @@ export class PartnersClient {
 
   async updateSiteBids(campaignIds: number[], bids: unknown[]): Promise<unknown> {
     return this.http.put("/stats/sites/bids", { campaignIds, bids });
+  }
+
+  async blockStatsSites(
+    campaignIds: number[],
+    zones: number[],
+    blocked: boolean,
+  ): Promise<{ campaignsCount: number; sitesCount: number }> {
+    const path = blocked ? "/stats/sites/block" : "/stats/sites/unblock";
+
+    return (await this.http.post(path, { campaignIds, zones })) as {
+      campaignsCount: number;
+      sitesCount: number;
+    };
   }
 
   async listCampaignFolders(params: Record<string, unknown>): Promise<ListResponse<FolderRow>> {
@@ -425,42 +433,6 @@ export class PartnersClient {
   ): Promise<ListResponse<Record<string, unknown>>> {
     const raw = await this.http.post("/stats/conversions", params);
     return listResponseSchema(z.record(z.unknown())).parse(raw);
-  }
-
-  // --- Autorules ---
-  async listAutorules(): Promise<Autorule[]> {
-    const raw = await this.http.get("/autorules");
-    return autorulesResultSchema.parse(raw).rules;
-  }
-
-  async listCampaignAutorules(campaignId: number): Promise<Autorule[]> {
-    const raw = await this.http.get(`/campaigns/${campaignId}/autorules`);
-    return autorulesResultSchema.parse(raw).rules;
-  }
-
-  async getAutorule(id: number): Promise<Autorule> {
-    const raw = await this.http.get(`/autorules/${id}`);
-    return autoruleSchema.parse(raw);
-  }
-
-  async createAutorule(
-    campaignId: number,
-    data: Record<string, unknown>,
-  ): Promise<{ id?: number }> {
-    const raw = await this.http.post(`/campaigns/${campaignId}/autorules`, data);
-    return autoruleWriteResponseSchema.parse(raw);
-  }
-
-  async updateAutorule(id: number, data: Record<string, unknown>): Promise<unknown> {
-    return this.http.put(`/autorules/${id}`, data);
-  }
-
-  async setAutoruleStatus(id: number, isActive: boolean): Promise<unknown> {
-    return this.http.put(`/autorules/${id}/status`, { isActive });
-  }
-
-  async deleteAutorule(id: number): Promise<unknown> {
-    return this.http.delete(`/autorules/${id}`);
   }
 
   // --- Extended statistics / Bid Optimization ---
