@@ -2,6 +2,7 @@ import { z } from "zod";
 import { listResponseSchema, reportConfigSchema } from "../../src/api/schemas/common.js";
 import {
   campaignRowSchema,
+  campaignBulkActionSchema,
   audienceRowSchema_,
   audienceDetailSchema,
   financeRowSchema,
@@ -78,6 +79,26 @@ describe("campaignRowSchema", () => {
 
   it("rejects missing required fields", () => {
     expect(() => campaignRowSchema.parse({ campaign: { id: 1 } })).toThrow(z.ZodError);
+  });
+});
+
+describe("campaignBulkActionSchema", () => {
+  it("parses per-campaign move results", () => {
+    const result = campaignBulkActionSchema.parse({
+      campaigns: [
+        { id: 1, success: true },
+        { id: 2, success: false },
+      ],
+      totalCampaigns: 2,
+      processedCampaigns: 1,
+    });
+
+    expect(result.campaigns).toHaveLength(2);
+    expect(result.processedCampaigns).toBe(1);
+  });
+
+  it("rejects a bare boolean response", () => {
+    expect(() => campaignBulkActionSchema.parse(true)).toThrow(z.ZodError);
   });
 });
 

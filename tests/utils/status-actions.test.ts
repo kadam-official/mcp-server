@@ -1,4 +1,8 @@
-import { ADV_STATUS_ACTION_MAP, parseCommaSeparatedIds } from "../../src/utils/status-actions.js";
+import {
+  ADV_STATUS_ACTION_MAP,
+  parseCommaSeparatedIds,
+  requireUniqueIds,
+} from "../../src/utils/status-actions.js";
 
 describe("ADV_STATUS_ACTION_MAP", () => {
   it("maps active to activate", () => {
@@ -11,6 +15,11 @@ describe("ADV_STATUS_ACTION_MAP", () => {
 
   it("maps archived to archive", () => {
     expect(ADV_STATUS_ACTION_MAP.archived).toBe("archive");
+  });
+
+  it("maps restored to restore, not activate", () => {
+    // Unarchiving clears campaignArchive; activate only moves the state and leaves it set.
+    expect(ADV_STATUS_ACTION_MAP.restored).toBe("restore");
   });
 });
 
@@ -33,5 +42,15 @@ describe("parseCommaSeparatedIds", () => {
 
   it("returns empty array for all-invalid input", () => {
     expect(parseCommaSeparatedIds("abc,def")).toEqual([]);
+  });
+});
+
+describe("requireUniqueIds", () => {
+  it("allows a list without repeats", () => {
+    expect(() => requireUniqueIds([1, 2, 3])).not.toThrow();
+  });
+
+  it("rejects duplicate identifiers", () => {
+    expect(() => requireUniqueIds([1, 2, 1])).toThrow("must be unique");
   });
 });

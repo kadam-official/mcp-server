@@ -14,6 +14,7 @@ import {
   financeRowSchema,
   accountProfileSchema,
   accountBalanceSchema,
+  campaignBulkActionSchema,
   campaignCreateResponseSchema,
   creativeCreateResponseSchema,
   folderCreateResponseSchema,
@@ -26,6 +27,7 @@ import {
   extendedBidsUpdateResponseSchema,
 } from "./schemas/advertiser.js";
 import type {
+  CampaignBulkAction,
   CampaignRow,
   FolderRow,
   FolderView,
@@ -100,9 +102,20 @@ export class PartnersClient {
 
   async setCampaignStatus(
     ids: number[],
-    action: "activate" | "pause" | "archive",
-  ): Promise<unknown> {
-    return this.http.post(`/campaigns/${action}`, { campaignIds: ids });
+    action: "activate" | "pause" | "archive" | "restore",
+  ): Promise<CampaignBulkAction> {
+    const raw = await this.http.post(`/campaigns/${action}`, { campaignIds: ids });
+    return campaignBulkActionSchema.parse(raw);
+  }
+
+  async deleteCampaigns(ids: number[]): Promise<CampaignBulkAction> {
+    const raw = await this.http.delete("/campaigns", { campaignIds: ids });
+    return campaignBulkActionSchema.parse(raw);
+  }
+
+  async moveCampaigns(ids: number[], folderId: number): Promise<CampaignBulkAction> {
+    const raw = await this.http.post("/campaigns/move", { campaignIds: ids, folderId });
+    return campaignBulkActionSchema.parse(raw);
   }
 
   async updateCampaignBid(id: number, bids: unknown[]): Promise<unknown> {

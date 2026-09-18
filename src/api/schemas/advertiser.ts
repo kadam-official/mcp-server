@@ -201,6 +201,20 @@ export const folderBulkActionResultSchema = z
 
 export type FolderBulkActionResult = z.infer<typeof folderBulkActionResultSchema>;
 
+/**
+ * Bulk campaign actions (activate/pause/archive/restore/delete/move) report each campaign separately:
+ * a campaign the backend refused still arrives inside a 200 with `success: false`.
+ */
+export const campaignBulkActionSchema = z
+  .object({
+    campaigns: z.array(z.object({ id: z.number(), success: z.boolean() }).passthrough()),
+    totalCampaigns: z.number(),
+    processedCampaigns: z.number(),
+  })
+  .passthrough();
+
+export type CampaignBulkAction = z.infer<typeof campaignBulkActionSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({

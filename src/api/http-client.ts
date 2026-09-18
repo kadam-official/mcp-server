@@ -55,9 +55,10 @@ export class HttpClient {
     return this.request<T>("PATCH", url, body);
   }
 
-  async delete<T = unknown>(path: string): Promise<T> {
+  /** Body is optional because Kadam deletes collections by id list (DELETE /campaigns). */
+  async delete<T = unknown>(path: string, body?: unknown): Promise<T> {
     const url = this.buildUrl(path);
-    return this.request<T>("DELETE", url);
+    return this.request<T>("DELETE", url, body);
   }
 
   async postFormData<T = unknown>(path: string, formData: FormData): Promise<T> {

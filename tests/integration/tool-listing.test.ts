@@ -167,4 +167,13 @@ describe("Tool listing integration", () => {
     expect(tool!.annotations).toBeDefined();
     expect(tool!.annotations!.readOnlyHint).toBe(true);
   });
+
+  it("tool kadam_adv_move_campaigns is listed as idempotent", async () => {
+    const { client } = await createFullServer();
+    const result = await client.listTools();
+    const tool = result.tools!.find((candidate) => candidate.name === "kadam_adv_move_campaigns");
+
+    expect(tool).toBeDefined();
+    expect(tool!.annotations!.idempotentHint).toBe(true);
+  });
 });

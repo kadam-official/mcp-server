@@ -1,7 +1,12 @@
+/**
+ * `restored` is its own action: unarchiving clears the campaignArchive flag, which
+ * `activate` does not touch — it only moves the campaign state.
+ */
 export const ADV_STATUS_ACTION_MAP = {
   active: "activate",
   paused: "pause",
   archived: "archive",
+  restored: "restore",
 } as const;
 
 /**
@@ -43,4 +48,10 @@ export function parseCommaSeparatedIds(raw: string): number[] {
     .split(",")
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => !Number.isNaN(n));
+}
+
+export function requireUniqueIds(ids: number[]): void {
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Campaign identifiers must be unique.");
+  }
 }
