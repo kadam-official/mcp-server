@@ -125,6 +125,8 @@ export function createMockPartnersClient() {
     getBulkJob: vi.fn(),
     getCreativeTestConversion: vi.fn(),
     getAudienceParams: vi.fn(),
+    getFilteredAudienceSources: vi.fn(),
+    validateAudience: vi.fn(),
     setAudienceParams: vi.fn(),
     listFinanceOperations: vi.fn(),
     getAccountProfile: vi.fn(),

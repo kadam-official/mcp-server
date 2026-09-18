@@ -47,11 +47,11 @@ describe("Tool listing integration", () => {
     resetConfig();
   });
 
-  it("all 66 tools are listed", async () => {
+  it("all 67 tools are listed", async () => {
     const { client } = await createFullServer();
     const result = await client.listTools();
     expect(result.tools).toBeDefined();
-    expect(result.tools!.length).toBe(66);
+    expect(result.tools!.length).toBe(67);
   });
 
   it("all advertiser tools have names starting with kadam_adv_", async () => {

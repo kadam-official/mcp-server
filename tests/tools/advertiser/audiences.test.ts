@@ -325,3 +325,46 @@ describe("audience params", () => {
     expect(text).toContain("No parameters left for audience #27");
   });
 });
+
+describe("filtered audience sources and dry run", () => {
+  it("get_filtered_audience_sources lists what a filter can be built on", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getFilteredAudienceSources.mockResolvedValue([
+      { id: 100, name: "Pixel" },
+      { id: 101, name: "Stat" },
+    ] as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_filtered_audience_sources",
+        arguments: {},
+      }),
+    );
+
+    expect(text).toContain("[ID: 100] Pixel");
+    expect(text).toContain("[ID: 101] Stat");
+  });
+
+  it("create_audience with dryRun validates and creates nothing", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.validateAudience.mockResolvedValue({ valid: true } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_create_audience",
+        arguments: {
+          type: "audience_code",
+          name: "Pixel to be",
+          expireDays: 30,
+          dryRun: true,
+        },
+      }),
+    );
+
+    expect(api.validateAudience).toHaveBeenCalledTimes(1);
+    expect(api.createAudience).not.toHaveBeenCalled();
+    expect(text).toContain("Nothing was created");
+  });
+});

@@ -254,6 +254,20 @@ export class PartnersClient {
     return this.http.put(`/audiences/${id}`, data);
   }
 
+  async getFilteredAudienceSources(
+    searchQuery?: string,
+  ): Promise<Array<{ id: number; name: string }>> {
+    const raw = (await this.http.get("/audiences/filtered-sources", {
+      ...(searchQuery ? { searchQuery } : {}),
+    })) as { items?: Array<{ id: number; name: string }> };
+
+    return raw.items ?? [];
+  }
+
+  async validateAudience(data: Record<string, unknown>): Promise<unknown> {
+    return this.http.post("/audiences/validate", data);
+  }
+
   async getAudienceParams(id: number): Promise<AudienceParams> {
     const raw = await this.http.get(`/audiences/${id}/params`);
     return audienceParamsSchema.parse(raw);

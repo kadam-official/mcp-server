@@ -133,6 +133,7 @@ export const audiencesModule: ToolModule = {
           "• audience (stat) — name, expireDays, campaignIds, plus >=1 of hasClicks/hasConversions/hasHolds/hasRejects.",
           "• s2s — name, expireDays, linkedAudienceIds (pixel/fingerprint IDs).",
           "• fingerprint — not created directly; set createFingerprint=true on a pixel/stat audience.",
+          "Set dryRun=true to check the payload without creating anything — useful while assembling a campaign and its audience together.",
         ].join("\n"),
         product: "advertiser",
         annotations: { title: "Create audience", readOnlyHint: false },
@@ -157,6 +158,11 @@ export const audiencesModule: ToolModule = {
           .boolean()
           .optional()
           .describe("Also create a linked fingerprint audience (type=audience_code or audience)"),
+        dryRun: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Check the payload and create nothing"),
       },
       async (args, ctx) => {
         const data: Record<string, unknown> = {
@@ -178,6 +184,11 @@ export const audiencesModule: ToolModule = {
         }
 
         if (args.createFingerprint != null) data.fp = args.createFingerprint;
+
+        if (args.dryRun) {
+          await ctx.adv.validateAudience(data);
+          return "The payload passes the create-time checks. Nothing was created — send it again with dryRun=false.";
+        }
 
         const a = await ctx.adv.createAudience(data);
         return formatAudienceDetail(a);
@@ -234,6 +245,34 @@ export const audiencesModule: ToolModule = {
 
         await ctx.adv.updateAudience(id, data);
         return `Audience #${id} updated successfully.`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_get_filtered_audience_sources",
+        description:
+          "Audiences that can be used as sources of a filtered audience: own and shared ones, minus the " +
+          "filtered ones — a filter cannot be built on top of another filter. Filtered audiences are an " +
+          "internal instrument, so this list is only available to an impersonating token; a plain client " +
+          "token is refused.",
+        product: "advertiser",
+        annotations: { title: "Filtered audience sources", readOnlyHint: true },
+      },
+      {
+        searchQuery: z.string().min(2).optional().describe("Filter the list by name"),
+      },
+      async (args, ctx) => {
+        const items = await ctx.adv.getFilteredAudienceSources(args.searchQuery);
+
+        if (items.length === 0) {
+          return "No audiences can serve as a source right now.";
+        }
+
+        return [
+          `Audiences available as sources (${items.length}):`,
+          ...items.map((item) => `- [ID: ${item.id}] ${item.name}`),
+        ].join("\n");
       },
     );
 
