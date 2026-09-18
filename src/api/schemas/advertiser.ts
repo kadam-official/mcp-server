@@ -266,6 +266,20 @@ export const campaignBulkActionSchema = z
 
 export type CampaignBulkAction = z.infer<typeof campaignBulkActionSchema>;
 
+/**
+ * Bulk material actions (activate/pause/archive/restore/delete) use the same per-id
+ * envelope as campaigns, keyed on `materials` instead of `campaigns`.
+ */
+export const materialBulkActionSchema = z
+  .object({
+    materials: z.array(z.object({ id: z.number(), success: z.boolean() }).passthrough()),
+    totalMaterials: z.number(),
+    processedMaterials: z.number(),
+  })
+  .passthrough();
+
+export type MaterialBulkAction = z.infer<typeof materialBulkActionSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({

@@ -15,6 +15,7 @@ import {
   accountProfileSchema,
   accountBalanceSchema,
   campaignBulkActionSchema,
+  materialBulkActionSchema,
   paymentSystemsSchema,
   dayMoneyLimitSchema,
   campaignCreateResponseSchema,
@@ -31,6 +32,7 @@ import {
 } from "./schemas/advertiser.js";
 import type {
   CampaignBulkAction,
+  MaterialBulkAction,
   CampaignRow,
   FolderRow,
   FolderView,
@@ -208,9 +210,10 @@ export class PartnersClient {
 
   async setCreativeStatus(
     ids: number[],
-    action: "activate" | "pause" | "archive",
-  ): Promise<unknown> {
-    return this.http.post(`/materials/${action}`, { adsIds: ids });
+    action: "activate" | "pause" | "archive" | "restore",
+  ): Promise<MaterialBulkAction> {
+    const raw = await this.http.post(`/materials/${action}`, { adsIds: ids });
+    return materialBulkActionSchema.parse(raw);
   }
 
   async listFinanceOperations(params: Record<string, unknown>): Promise<ListResponse<FinanceRow>> {

@@ -182,7 +182,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_list_creatives`      | List creatives by campaign, status, or search query      | readOnly    |
 | `kadam_adv_create_creative`     | Create creative for a campaign (goes through moderation) | —           |
 | `kadam_adv_update_creative`     | Update creative fields                                   | —           |
-| `kadam_adv_set_creative_status` | Bulk status change for creatives                         | idempotent  |
+| `kadam_adv_set_creative_status` | Bulk status change for creatives: active/paused/archived/restored; returns per-creative result | idempotent  |
 
 #### Audiences
 

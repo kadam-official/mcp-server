@@ -50,8 +50,8 @@ export function parseCommaSeparatedIds(raw: string): number[] {
     .filter((n) => !Number.isNaN(n));
 }
 
-export function requireUniqueIds(ids: number[]): void {
+export function requireUniqueIds(ids: number[], entity = "Campaign"): void {
   if (new Set(ids).size !== ids.length) {
-    throw new Error("Campaign identifiers must be unique.");
+    throw new Error(`${entity} identifiers must be unique.`);
   }
 }

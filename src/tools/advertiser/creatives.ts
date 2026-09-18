@@ -9,10 +9,29 @@ import {
   ADV_STATUS_ACTION_MAP,
   MATERIAL_LIST_STATUS_FILTER,
   parseCommaSeparatedIds,
+  requireUniqueIds,
 } from "../../utils/status-actions.js";
-import type { CreativeRow } from "../../api/schemas/advertiser.js";
+import type { CreativeRow, MaterialBulkAction } from "../../api/schemas/advertiser.js";
 import type { OptionsRegistry } from "../../api/options-registry.js";
 import { logger } from "../../logger.js";
+
+/**
+ * Bulk creative actions answer with HTTP 200 even when the backend refused some creatives,
+ * so the refused IDs have to be surfaced — otherwise the model reports work that never
+ * happened. Mirrors the campaign formatter.
+ */
+function formatMaterialBulkResult(result: MaterialBulkAction, actionLabel: string): string {
+  const applied = result.materials.filter((m) => m.success).map((m) => `#${m.id}`);
+  const refused = result.materials.filter((m) => !m.success).map((m) => `#${m.id}`);
+
+  const lines = [`${applied.length}/${result.totalMaterials} creatives ${actionLabel}`];
+  if (applied.length) lines.push(`Applied: ${applied.join(", ")}`);
+  if (refused.length) {
+    lines.push(`Not ${actionLabel} (the backend refused it): ${refused.join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
 
 async function validateSizeId(sizeId: number, registry: OptionsRegistry): Promise<void> {
   try {
@@ -348,21 +367,26 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
       {
         name: "kadam_adv_set_creative_status",
         description:
-          "Set status for multiple creatives. Pass comma-separated IDs and status: active, paused, or archived.",
+          "Set status for multiple creatives. Pass comma-separated IDs and status: active, paused, archived, " +
+          "or restored (take out of the archive). The API answers per creative, so some IDs can be refused " +
+          "while others succeed. restored is rejected for the whole call if the creative's campaign is itself " +
+          "archived — restore the campaign first.",
         product: "advertiser",
         annotations: { title: "Set creative status", idempotentHint: true },
       },
       {
         ids: z.string().min(1),
-        status: z.enum(["active", "paused", "archived"]),
+        status: z.enum(["active", "paused", "archived", "restored"]),
       },
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds, "Creative");
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await ctx.adv.setCreativeStatus(parsedIds, action);
-        const idList = parsedIds.map((id) => `#${id}`).join(", ");
-        return `${parsedIds.length} creatives set to ${args.status}: ${idList}`;
+        const result = await ctx.adv.setCreativeStatus(parsedIds, action);
+
+        return formatMaterialBulkResult(result, `set to ${args.status}`);
       },
     );
+
   },
 };
