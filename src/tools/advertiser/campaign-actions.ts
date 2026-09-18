@@ -349,6 +349,30 @@ export const campaignActionsModule: ToolModule = {
 
     wrapper.register(
       {
+        name: "kadam_adv_set_easy_start",
+        description:
+          "Turn Easy Start on or off for a campaign: it restricts delivery to a curated site set " +
+          "instead of the whole inventory, which is the usual first step for a new advertiser. " +
+          "Requires a token impersonating an administrator (plain client tokens get 403). " +
+          "Read the current state from the campaign card field isEasyStart.",
+        product: "advertiser",
+        annotations: { title: "Set Easy Start", idempotentHint: true },
+      },
+      {
+        campaignId: z.number().int().positive().describe("Campaign ID"),
+        enabled: z.boolean().describe("True puts the campaign on the Easy Start site set"),
+      },
+      async (args, ctx) => {
+        await ctx.adv.setCampaignEasyStart(args.campaignId, args.enabled);
+
+        return args.enabled
+          ? `Easy Start is now on for campaign ${args.campaignId}: it will only buy the curated site set.`
+          : `Easy Start is now off for campaign ${args.campaignId}: it can buy the whole inventory its targeting allows.`;
+      },
+    );
+
+    wrapper.register(
+      {
         name: "kadam_adv_get_blocked_traffic_sources",
         description:
           "Explain why a campaign is not reaching part of the inventory: which traffic sources reject it " +

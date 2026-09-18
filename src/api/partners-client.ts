@@ -134,6 +134,10 @@ export class PartnersClient {
     return campaignCopyResultSchema.parse(raw);
   }
 
+  async setCampaignEasyStart(campaignId: number, enabled: boolean): Promise<unknown> {
+    return this.http.put(`/campaigns/${campaignId}/easy-start`, { enabled });
+  }
+
   async getCampaignBlockedSsps(campaignId: number): Promise<CampaignBlockedSsps> {
     const raw = await this.http.get(`/campaigns/${campaignId}/blocked-ssps`);
     return campaignBlockedSspsSchema.parse(raw);

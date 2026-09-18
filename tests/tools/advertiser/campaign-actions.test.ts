@@ -320,6 +320,32 @@ describe("campaign-actions tools", () => {
     expect(api.getCampaignForecast).not.toHaveBeenCalled();
   });
 
+  it("set_easy_start reports which inventory the campaign can buy after the change", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignEasyStart.mockResolvedValue({ id: 31, isEasyStart: true } as never);
+
+    const on = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_easy_start",
+        arguments: { campaignId: 31, enabled: true },
+      }),
+    );
+
+    expect(api.setCampaignEasyStart).toHaveBeenCalledWith(31, true);
+    expect(on).toContain("curated site set");
+
+    const off = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_easy_start",
+        arguments: { campaignId: 31, enabled: false },
+      }),
+    );
+
+    expect(api.setCampaignEasyStart).toHaveBeenLastCalledWith(31, false);
+    expect(off).toContain("whole inventory");
+  });
+
   it("get_blocked_traffic_sources separates category blocks from tag blocks", async () => {
     const { client, mockApi } = await createToolClient(campaignActionsModule);
     const api = mockApi as MockPartnersClient;
