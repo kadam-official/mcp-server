@@ -270,6 +270,18 @@ export type CampaignBulkAction = z.infer<typeof campaignBulkActionSchema>;
  * Bulk material actions (activate/pause/archive/restore/delete) use the same per-id
  * envelope as campaigns, keyed on `materials` instead of `campaigns`.
  */
+/**
+ * Copy answers with counters, not per id: one creative copied into three campaigns is
+ * three copies, so a per-id shape could not express the result.
+ */
+export const creativeCopyResultSchema = z.object({
+  successful: z.number(),
+  failed: z.number(),
+  errors: z.array(z.string()),
+  ids: z.record(z.string(), z.number()),
+});
+export type CreativeCopyResult = z.infer<typeof creativeCopyResultSchema>;
+
 export const materialBulkActionSchema = z
   .object({
     materials: z.array(z.object({ id: z.number(), success: z.boolean() }).passthrough()),

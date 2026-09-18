@@ -20,6 +20,7 @@ import {
   campaignForecastResultSchema,
   campaignUrlReplaceResultSchema,
   materialBulkActionSchema,
+  creativeCopyResultSchema,
   paymentSystemsSchema,
   dayMoneyLimitSchema,
   campaignCreateResponseSchema,
@@ -41,6 +42,7 @@ import type {
   CampaignForecastResult,
   CampaignUrlReplaceResult,
   MaterialBulkAction,
+  CreativeCopyResult,
   CampaignRow,
   FolderRow,
   FolderView,
@@ -259,6 +261,19 @@ export class PartnersClient {
   ): Promise<MaterialBulkAction> {
     const raw = await this.http.post(`/materials/${action}`, { adsIds: ids });
     return materialBulkActionSchema.parse(raw);
+  }
+
+  async copyCreatives(
+    ids: number[],
+    targets: Array<{ campaignId: number; url: string }>,
+    pauseAfterModeration: boolean,
+  ): Promise<CreativeCopyResult> {
+    const raw = await this.http.post("/materials/copy", {
+      adsIds: ids,
+      targets,
+      isPauseAfterModer: pauseAfterModeration,
+    });
+    return creativeCopyResultSchema.parse(raw);
   }
 
   async deleteCreatives(ids: number[]): Promise<MaterialBulkAction> {

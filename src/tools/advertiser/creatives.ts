@@ -6,32 +6,15 @@ import type { ToolModule } from "../../types/tool-module.js";
 import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 import {
+  formatMaterialBulkResult,
   ADV_STATUS_ACTION_MAP,
   MATERIAL_LIST_STATUS_FILTER,
   parseCommaSeparatedIds,
   requireUniqueIds,
 } from "../../utils/status-actions.js";
-import type { CreativeRow, MaterialBulkAction } from "../../api/schemas/advertiser.js";
+import type { CreativeRow } from "../../api/schemas/advertiser.js";
 import type { OptionsRegistry } from "../../api/options-registry.js";
 import { logger } from "../../logger.js";
-
-/**
- * Bulk creative actions answer with HTTP 200 even when the backend refused some creatives,
- * so the refused IDs have to be surfaced — otherwise the model reports work that never
- * happened. Mirrors the campaign formatter.
- */
-function formatMaterialBulkResult(result: MaterialBulkAction, actionLabel: string): string {
-  const applied = result.materials.filter((m) => m.success).map((m) => `#${m.id}`);
-  const refused = result.materials.filter((m) => !m.success).map((m) => `#${m.id}`);
-
-  const lines = [`${applied.length}/${result.totalMaterials} creatives ${actionLabel}`];
-  if (applied.length) lines.push(`Applied: ${applied.join(", ")}`);
-  if (refused.length) {
-    lines.push(`Not ${actionLabel} (the backend refused it): ${refused.join(", ")}`);
-  }
-
-  return lines.join("\n");
-}
 
 async function validateSizeId(sizeId: number, registry: OptionsRegistry): Promise<void> {
   try {

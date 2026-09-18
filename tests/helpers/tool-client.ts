@@ -116,6 +116,7 @@ export function createMockPartnersClient() {
     updateCreative: vi.fn(),
     setCreativeStatus: vi.fn(),
     deleteCreatives: vi.fn(),
+    copyCreatives: vi.fn(),
     listFinanceOperations: vi.fn(),
     getAccountProfile: vi.fn(),
     getAccountBalance: vi.fn(),

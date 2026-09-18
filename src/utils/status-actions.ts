@@ -1,3 +1,5 @@
+import type { MaterialBulkAction } from "../api/schemas/advertiser.js";
+
 /**
  * `restored` is its own action: unarchiving clears the campaignArchive flag, which
  * `activate` does not touch — it only moves the campaign state.
@@ -54,4 +56,22 @@ export function requireUniqueIds(ids: number[], entity = "Campaign"): void {
   if (new Set(ids).size !== ids.length) {
     throw new Error(`${entity} identifiers must be unique.`);
   }
+}
+
+/**
+ * Bulk material actions answer per id, so a 200 does not mean every creative moved.
+ * The refused ones are named explicitly — a bare count leaves the agent guessing which
+ * creative it still has to deal with.
+ */
+export function formatMaterialBulkResult(result: MaterialBulkAction, actionLabel: string): string {
+  const applied = result.materials.filter((m) => m.success).map((m) => `#${m.id}`);
+  const refused = result.materials.filter((m) => !m.success).map((m) => `#${m.id}`);
+
+  const lines = [`${applied.length}/${result.totalMaterials} creatives ${actionLabel}`];
+  if (applied.length) lines.push(`Applied: ${applied.join(", ")}`);
+  if (refused.length) {
+    lines.push(`Not ${actionLabel} (the backend refused it): ${refused.join(", ")}`);
+  }
+
+  return lines.join("\n");
 }
