@@ -151,4 +151,69 @@ describe("creative actions", () => {
     expect(api.moveCreatives).not.toHaveBeenCalled();
     expect(text).toContain("Creative identifiers must be unique");
   });
+
+  it("set_creative_bids states that the list replaces the bids", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCreativeBids.mockResolvedValue({
+      materials: [
+        { id: 456, success: true },
+        { id: 457, success: true },
+      ],
+      totalMaterials: 2,
+      processedMaterials: 2,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_creative_bids",
+        arguments: {
+          creativeIds: "456,457",
+          bids: [{ bid: 1.5, countries: [1, 2] }],
+        },
+      }),
+    );
+
+    expect(api.setCreativeBids).toHaveBeenCalledWith([456, 457], [{ bid: 1.5, countries: [1, 2] }]);
+    expect(text).toContain("2/2 creatives re-priced");
+    expect(text).toContain("fall back to the campaign bid");
+  });
+
+  it("set_creative_bids surfaces a creative the backend refused", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCreativeBids.mockResolvedValue({
+      materials: [
+        { id: 456, success: true },
+        { id: 457, success: false },
+      ],
+      totalMaterials: 2,
+      processedMaterials: 1,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_creative_bids",
+        arguments: { creativeIds: "456,457", bids: [{ bid: 1.5, countries: [1] }] },
+      }),
+    );
+
+    expect(text).toContain("1/2 creatives re-priced");
+    expect(text).toContain("#457");
+  });
+
+  it("set_creative_bids rejects duplicate creative ids", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_creative_bids",
+        arguments: { creativeIds: "456,456", bids: [{ bid: 1.5, countries: [1] }] },
+      }),
+    );
+
+    expect(api.setCreativeBids).not.toHaveBeenCalled();
+    expect(text).toContain("Creative identifiers must be unique");
+  });
 });

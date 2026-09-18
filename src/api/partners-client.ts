@@ -281,6 +281,18 @@ export class PartnersClient {
     return materialBulkActionSchema.parse(raw);
   }
 
+  /**
+   * Список ставок заменяет собственные ставки материала целиком: страна, которой в нём
+   * нет, откатывается к ставке кампании.
+   */
+  async setCreativeBids(
+    ids: number[],
+    bids: Array<{ bid: number; countries: number[] }>,
+  ): Promise<MaterialBulkAction> {
+    const raw = await this.http.put("/materials/bids", { adsIds: ids, bids });
+    return materialBulkActionSchema.parse(raw);
+  }
+
   async deleteCreatives(ids: number[]): Promise<MaterialBulkAction> {
     const raw = await this.http.delete("/materials", { adsIds: ids });
     return materialBulkActionSchema.parse(raw);

@@ -112,5 +112,46 @@ export const creativeActionsModule: ToolModule = {
         ].join("\n");
       },
     );
+    wrapper.register(
+      {
+        name: "kadam_adv_set_creative_bids",
+        description:
+          "Set per-country bids on creatives. The list replaces the creatives' own bids entirely, " +
+          "so a country left out of it falls back to the campaign bid — send every country you want " +
+          "priced, not just the one you are changing. All creatives must belong to one campaign, " +
+          "every country must be targeted by that campaign, and a country may appear only once " +
+          "across the whole list. CPA campaigns are rejected: their bid is system-managed.",
+        product: "advertiser",
+        annotations: { title: "Set creative bids", readOnlyHint: false },
+      },
+      {
+        creativeIds: z
+          .string()
+          .describe("Comma-separated creative IDs. All must belong to the same campaign"),
+        bids: z
+          .array(
+            z.object({
+              bid: z.number().positive().describe("Bid in the account currency"),
+              countries: z
+                .array(z.number().int().positive())
+                .min(1)
+                .describe("Country IDs this bid applies to (kadam_adv_get_dictionary: countries)"),
+            }),
+          )
+          .min(1)
+          .describe("Bids grouped by country; together they replace the creatives' own bids"),
+      },
+      async (args, ctx) => {
+        const ids = parseCommaSeparatedIds(args.creativeIds);
+        requireUniqueIds(ids, "Creative");
+
+        const result = await ctx.adv.setCreativeBids(ids, args.bids);
+
+        return [
+          formatMaterialBulkResult(result, "re-priced"),
+          "Countries outside the list keep no creative bid of their own and fall back to the campaign bid.",
+        ].join("\n");
+      },
+    );
   },
 };
