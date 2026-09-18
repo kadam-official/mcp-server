@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
+import { formatBlockedSsps } from "../../utils/blocked-ssps.js";
 import { CAMPAIGN_TYPE_MAP, PRICING_MODEL_MAP } from "../../types/advertiser.js";
 import type {
-  CampaignBlockedSsps,
   CampaignCopyResult,
   CampaignForecastResult,
   CampaignUrlReplaceResult,
@@ -69,37 +69,6 @@ function formatForecastResult(result: CampaignForecastResult): string {
   const lines = ["Bid -> expected daily traffic (account currency):"];
   for (const point of result.forecast) {
     lines.push(`${point.bid} -> ${point.traffic}`);
-  }
-
-  return lines.join("\n");
-}
-
-function formatBlockedSsps(result: CampaignBlockedSsps): string {
-  const lines: string[] = [];
-  const unit = result.payModel === "cpm" ? "views" : "clicks";
-  const total = result.payModel === "cpm" ? result.totalViews : result.totalClicks;
-
-  lines.push(`Category of the campaign's creative: ${result.category ?? "unknown"}.`);
-  lines.push(`Traffic locked behind the blocks below: ${total ?? 0} ${unit}/day.`);
-
-  if (result.byCategory.length === 0 && result.byTags.length === 0) {
-    return "No traffic source blocks this campaign over its category or moderation tags.";
-  }
-
-  if (result.byCategory.length > 0) {
-    lines.push("", "Blocked by category (cannot be lifted without changing the category):");
-    for (const ssp of result.byCategory) {
-      lines.push(`- ${ssp.name} (id ${ssp.id}): ${ssp.clicks} clicks, ${ssp.views} views`);
-    }
-  }
-
-  for (const tag of result.byTags) {
-    lines.push("", `Blocked by moderation tag "${tag.name}" (id ${tag.id}):`);
-    if (tag.description) lines.push(`  ${tag.description}`);
-    for (const ssp of tag.ssps) {
-      lines.push(`- ${ssp.name} (id ${ssp.id}): ${ssp.clicks} clicks, ${ssp.views} views`);
-    }
-    lines.push("  Removing the tag from the creative unblocks these sources.");
   }
 
   return lines.join("\n");
@@ -438,7 +407,7 @@ export const campaignActionsModule: ToolModule = {
       },
       async (args, ctx) => {
         const result = await ctx.adv.getCampaignBlockedSsps(args.campaignId);
-        return formatBlockedSsps(result);
+        return formatBlockedSsps(result, "campaign");
       },
     );
   },

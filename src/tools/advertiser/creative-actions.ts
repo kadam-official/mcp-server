@@ -7,6 +7,7 @@ import {
   requireUniqueIds,
 } from "../../utils/status-actions.js";
 import type { CreativeCopyResult } from "../../api/schemas/advertiser.js";
+import { formatBlockedSsps } from "../../utils/blocked-ssps.js";
 
 function formatCopyResult(result: CreativeCopyResult, targetCount: number): string {
   const lines = [
@@ -151,6 +152,32 @@ export const creativeActionsModule: ToolModule = {
           formatMaterialBulkResult(result, "re-priced"),
           "Countries outside the list keep no creative bid of their own and fall back to the campaign bid.",
         ].join("\n");
+      },
+    );
+    wrapper.register(
+      {
+        name: "kadam_adv_get_creative_blocked_sources",
+        description:
+          "Explain why one creative is not reaching part of the inventory: which traffic sources reject it " +
+          "over its category, which over a moderation tag, and how much traffic each of them holds. " +
+          "Requires a token impersonating an administrator (plain client tokens get 403), because the cabinet " +
+          "does not show the source breakdown to advertisers. Use kadam_adv_get_blocked_traffic_sources for " +
+          "the campaign-wide picture.",
+        product: "advertiser",
+        annotations: { title: "Blocked sources of a creative", readOnlyHint: true },
+      },
+      {
+        creativeId: z
+          .number()
+          .int()
+          .positive()
+          .describe(
+            "Creative ID. It must be out of the archive and already categorised by moderation",
+          ),
+      },
+      async (args, ctx) => {
+        const result = await ctx.adv.getCreativeBlockedSsps(args.creativeId);
+        return formatBlockedSsps(result, "creative");
       },
     );
   },

@@ -156,6 +156,15 @@ export class PartnersClient {
     return campaignBlockedSspsSchema.parse(raw);
   }
 
+  /**
+   * Тот же конверт, что у кампанийной разбивки: сервис считает её по креативу, а кампания
+   * подставляет свой клик-андер.
+   */
+  async getCreativeBlockedSsps(creativeId: number): Promise<CampaignBlockedSsps> {
+    const raw = await this.http.get(`/materials/${creativeId}/blocked-ssps`);
+    return campaignBlockedSspsSchema.parse(raw);
+  }
+
   async getCampaignForecast(payload: Record<string, unknown>): Promise<CampaignForecastResult> {
     const raw = await this.http.post("/campaigns/forecast", payload);
     return campaignForecastResultSchema.parse(raw);

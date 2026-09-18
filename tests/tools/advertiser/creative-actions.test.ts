@@ -216,4 +216,60 @@ describe("creative actions", () => {
     expect(api.setCreativeBids).not.toHaveBeenCalled();
     expect(text).toContain("Creative identifiers must be unique");
   });
+
+  it("get_creative_blocked_sources splits the blocks by cause", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCreativeBlockedSsps.mockResolvedValue({
+      category: "Dating",
+      payModel: "cpc",
+      totalClicks: 1000,
+      totalViews: 5000,
+      byCategory: [{ id: 4, name: "Kadam SSP", visits: 10, clicks: 5, views: 50 }],
+      byTags: [
+        {
+          id: 17,
+          name: "Shock content",
+          description: "Blood or injuries",
+          ssps: [{ id: 5, name: "Other SSP", visits: 20, clicks: 8, views: 80 }],
+        },
+      ],
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_creative_blocked_sources",
+        arguments: { creativeId: 456 },
+      }),
+    );
+
+    expect(api.getCreativeBlockedSsps).toHaveBeenCalledWith(456);
+    expect(text).toContain("Category of the creative: Dating");
+    expect(text).toContain("1000 clicks/day");
+    expect(text).toContain("Kadam SSP");
+    expect(text).toContain('Blocked by moderation tag "Shock content"');
+    expect(text).toContain("Removing the tag");
+  });
+
+  it("get_creative_blocked_sources says plainly that nothing blocks the creative", async () => {
+    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCreativeBlockedSsps.mockResolvedValue({
+      category: "Dating",
+      payModel: "cpc",
+      totalClicks: 0,
+      totalViews: 0,
+      byCategory: [],
+      byTags: [],
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_creative_blocked_sources",
+        arguments: { creativeId: 456 },
+      }),
+    );
+
+    expect(text).toContain("No traffic source blocks this creative");
+  });
 });
