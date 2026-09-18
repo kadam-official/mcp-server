@@ -234,6 +234,74 @@ describe("campaigns tools", () => {
     expect(payload.status).toBeUndefined();
   });
 
+  it("update_campaign drops manager-only fields the token cannot see", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      proxies: null,
+      hasCorrectPostback: null,
+      isDirectTrafficPriority: null,
+      allowMultiAds: null,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, name: "Updated Name" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    for (const field of [
+      "proxies",
+      "hasCorrectPostback",
+      "isDirectTrafficPriority",
+      "allowMultiAds",
+    ]) {
+      expect(payload).not.toHaveProperty(field);
+    }
+  });
+
+  it("update_campaign keeps manager-only fields an impersonating token does see", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      proxies: [1, 4],
+      hasCorrectPostback: true,
+      isDirectTrafficPriority: false,
+      allowMultiAds: true,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, name: "Updated Name" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.proxies).toEqual([1, 4]);
+    expect(payload.hasCorrectPostback).toBe(true);
+    expect(payload.isDirectTrafficPriority).toBe(false);
+    expect(payload.allowMultiAds).toBe(true);
+  });
+
   it("update_campaign resolves ISO country codes for bids", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;

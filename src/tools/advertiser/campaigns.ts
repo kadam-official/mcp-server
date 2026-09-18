@@ -117,11 +117,27 @@ const CAMPAIGN_WRITABLE_FIELDS = new Set<string>([
   "postConversion",
 ]);
 
+/**
+ * Manager-level campaign settings. The API returns them as null for an ordinary bearer
+ * token and answers 422 ("unknown field") when such a token sends them, so a null value
+ * means "this token may not touch it" and the key has to be dropped from the payload —
+ * echoing it back would turn every read-modify-write into a validation error. Under
+ * impersonation the same read returns real values, which then round-trip normally.
+ */
+const MANAGER_ONLY_FIELDS = new Set<string>([
+  "proxies",
+  "hasCorrectPostback",
+  "isDirectTrafficPriority",
+  "allowMultiAds",
+]);
+
 /** Keep only writable fields from a GET campaign detail; drops read-only keys (id, status, state, ...). */
 function pickWritable(current: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of CAMPAIGN_WRITABLE_FIELDS) {
-    if (current[key] !== undefined) out[key] = current[key];
+    if (current[key] === undefined) continue;
+    if (current[key] === null && MANAGER_ONLY_FIELDS.has(key)) continue;
+    out[key] = current[key];
   }
   return out;
 }
@@ -221,6 +237,11 @@ const FULL_WEEK_SCHEDULE = {
   })),
 };
 
+/**
+ * Values the API expects on create but the tools do not ask the agent for. Nothing from
+ * {@link MANAGER_ONLY_FIELDS} belongs here: sending such a key — even with a falsy value —
+ * is a 422 for an ordinary token, and the API applies its own default when it is absent.
+ */
 const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   connectionType: 3,
   disableProxy: 1,
@@ -247,13 +268,11 @@ const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   dayClickLimit: 0,
   dayConversionsLimit: 0,
   isConversionFromPostback: 0,
-  allowMultiAds: 0,
   time: FULL_WEEK_SCHEDULE,
   timezone: 0,
   startDate: null,
   stopDate: null,
   autorules: [],
-  proxies: [],
   conversion: null,
   platformVersions: null,
   devices: null,
