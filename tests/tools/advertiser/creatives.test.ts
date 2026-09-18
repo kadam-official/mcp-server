@@ -112,6 +112,56 @@ describe("creatives tools", () => {
     expect(api.createCreative).toHaveBeenCalledWith(15, expect.any(FormData));
   });
 
+  /**
+   * Без флага формата бэкенд сохранит загруженный файл как обычный баннер, а VAST-тег —
+   * как ссылку на лендинг: формат теряется молча, поэтому он проверяется отдельно.
+   */
+  it("create_creative marks an uploaded video as a video creative", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 100 } as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(Buffer.from("fake-mp4"), { status: 200 })),
+    );
+
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 16,
+        url: "https://example.com/landing",
+        title: "Video",
+        videoUrl: "https://example.com/clip.mp4",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("isVideo")).toBe("1");
+    expect(fd.get("image")).toBeInstanceOf(Blob);
+    vi.unstubAllGlobals();
+  });
+
+  it("create_creative sends a VAST tag as the creative URL without uploading anything", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 101 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 16,
+        url: "https://example.com/landing",
+        title: "VAST",
+        vastTagUrl: "https://ads.example.com/vast",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("isVast")).toBe("1");
+    expect(fd.get("url")).toBe("https://ads.example.com/vast");
+    expect(fd.get("image")).toBeNull();
+  });
+
   it("set_creative_status with ids 5,6 and status paused calls api with action pause", async () => {
     const { client, mockApi } = await createToolClient(creativesModule);
     const api = mockApi as MockPartnersClient;

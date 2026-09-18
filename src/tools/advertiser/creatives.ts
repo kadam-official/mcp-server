@@ -105,7 +105,9 @@ export const creativesModule: ToolModule = {
 - Push / In-Page Push: title, text, url, imageUrl (icon), mainImageUrl
 - Native: title, url, imageUrl (icon), mainImageUrl
 - Banner: url, imageUrl, sizeId
-- Video: title, url, videoUrl (MP4)
+- Banner as an HTML5 archive: url, html5ArchiveUrl (.zip), sizeId — needs the HTML5 grant
+- Video: title, url, videoUrl (MP4) — uploading a video file is an internal grant; advertisers deliver video as a VAST tag
+- Video as a VAST tag: title, vastTagUrl (https) in a video campaign — needs the VAST grant, nothing is uploaded
 - Popunder: none (campaign URL is the ad)
 See kadam://reference/creative-formats for sizes and exact dimensions.`,
         product: "advertiser",
@@ -140,6 +142,16 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
           .string()
           .optional()
           .describe("Video source: URL or local file path to MP4 (video campaigns only)"),
+        vastTagUrl: z
+          .string()
+          .optional()
+          .describe(
+            "https VAST tag URL (video campaigns only). The tag is fetched and parsed on save, so a tag that does not answer with a usable VAST document is refused right away.",
+          ),
+        html5ArchiveUrl: z
+          .string()
+          .optional()
+          .describe("HTML5 archive (.zip): URL or local file path (banner campaigns only)"),
         sizeId: z
           .number()
           .optional()
@@ -208,6 +220,19 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
         if (args.videoUrl) {
           const file = await loadFile(args.videoUrl);
           fd.set("image", file.blob, file.filename);
+          // Без этого флага бэкенд сохранит загруженный файл как обычный баннер.
+          fd.set("isVideo", "1");
+        }
+
+        if (args.html5ArchiveUrl) {
+          const file = await loadFile(args.html5ArchiveUrl);
+          fd.set("image", file.blob, file.filename);
+          fd.set("isHtml5", "1");
+        }
+
+        if (args.vastTagUrl) {
+          fd.set("url", args.vastTagUrl);
+          fd.set("isVast", "1");
         }
 
         const c = await ctx.adv.createCreative(args.campaignId, fd);

@@ -186,7 +186,7 @@ Requires `KADAM_ADV_API_KEY`.
 | Tool                            | Description                                              | Annotations |
 | ------------------------------- | -------------------------------------------------------- | ----------- |
 | `kadam_adv_list_creatives`      | List creatives by campaign, status, or search query      | readOnly    |
-| `kadam_adv_create_creative`     | Create creative for a campaign (goes through moderation) | —           |
+| `kadam_adv_create_creative`     | Create creative for a campaign: image, HTML5 archive, video file or VAST tag (goes through moderation) | —           |
 | `kadam_adv_update_creative`     | Update creative fields                                   | —           |
 | `kadam_adv_set_creative_status` | Bulk status change for creatives: active/paused/archived/restored; returns per-creative result | idempotent  |
 | `kadam_adv_get_creative_test_conversion` | Signed links to test a creative's conversion tracking (test click + frame preview)                                            | —           |
