@@ -296,6 +296,34 @@ export const campaignCopyResultSchema = z
 
 export type CampaignCopyResult = z.infer<typeof campaignCopyResultSchema>;
 
+/**
+ * Bulk URL replace. Campaigns without a match are absent from `campaigns`, so the list is
+ * the result, not an echo of the request.
+ */
+export const campaignUrlReplaceResultSchema = z
+  .object({
+    mode: z.string(),
+    find: z.string(),
+    replace: z.string(),
+    campaigns: z.array(
+      z
+        .object({
+          campaignId: z.number(),
+          name: z.string(),
+          creativesCount: z.number(),
+          oldValue: z.string().nullable().default(null),
+          newValue: z.string().nullable().default(null),
+          source: z.string().nullable().default(null),
+        })
+        .passthrough(),
+    ),
+    totalCampaigns: z.number(),
+    totalCreatives: z.number(),
+  })
+  .passthrough();
+
+export type CampaignUrlReplaceResult = z.infer<typeof campaignUrlReplaceResultSchema>;
+
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
   .object({

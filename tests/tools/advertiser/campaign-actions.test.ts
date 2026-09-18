@@ -170,6 +170,103 @@ describe("campaign-actions tools", () => {
     expect(api.copyCampaign).not.toHaveBeenCalled();
   });
 
+  it("bulk_replace_urls sends the defaults the backend expects and previews on dryRun", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.bulkReplaceCampaignUrls.mockResolvedValue({
+      mode: "substring",
+      find: "old.com",
+      replace: "new.com",
+      campaigns: [
+        {
+          campaignId: 31,
+          name: "Push RU",
+          creativesCount: 4,
+          oldValue: "https://old.com/lp",
+          newValue: "https://new.com/lp",
+          source: "campaign",
+        },
+      ],
+      totalCampaigns: 1,
+      totalCreatives: 4,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_bulk_replace_urls",
+      arguments: { campaignIds: "31", find: "old.com", replace: "new.com", dryRun: true },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.bulkReplaceCampaignUrls).toHaveBeenCalledWith({
+      campaignsIds: [31],
+      find: "old.com",
+      replace: "new.com",
+      mode: "substring",
+      inCampaignSettings: true,
+      inCreatives: true,
+      creativesFilter: "active",
+      dryRun: true,
+    });
+    expect(text).toContain("Preview");
+    expect(text).toContain("Nothing was written");
+    expect(text).toContain('#31 "Push RU"');
+  });
+
+  it("bulk_replace_urls reports a real run as applied", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+    api.bulkReplaceCampaignUrls.mockResolvedValue({
+      mode: "substring",
+      find: "old.com",
+      replace: "new.com",
+      campaigns: [],
+      totalCampaigns: 0,
+      totalCreatives: 0,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_bulk_replace_urls",
+      arguments: { campaignIds: "31", find: "old.com", replace: "new.com", dryRun: false },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("Replaced");
+    expect(text).toContain("No campaign in the batch contains that fragment");
+  });
+
+  it("bulk_replace_urls refuses a request that would replace nothing", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_bulk_replace_urls",
+      arguments: {
+        campaignIds: "31",
+        find: "old.com",
+        replace: "new.com",
+        inCampaignSettings: false,
+        inCreatives: false,
+        dryRun: true,
+      },
+    });
+
+    expect(getTextFromResult(result)).toContain("Nothing would be replaced");
+    expect(api.bulkReplaceCampaignUrls).not.toHaveBeenCalled();
+  });
+
+  it("bulk_replace_urls rejects duplicate campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_bulk_replace_urls",
+      arguments: { campaignIds: "31,31", find: "old.com", replace: "new.com", dryRun: true },
+    });
+
+    expect(getTextFromResult(result)).toContain("unique");
+    expect(api.bulkReplaceCampaignUrls).not.toHaveBeenCalled();
+  });
+
   it("copy_campaign maps a cross-format copy to the target campaign type", async () => {
     const { client, mockApi } = await createToolClient(campaignActionsModule);
     const api = mockApi as MockPartnersClient;

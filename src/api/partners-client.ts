@@ -16,6 +16,7 @@ import {
   accountBalanceSchema,
   campaignBulkActionSchema,
   campaignCopyResultSchema,
+  campaignUrlReplaceResultSchema,
   materialBulkActionSchema,
   paymentSystemsSchema,
   dayMoneyLimitSchema,
@@ -34,6 +35,7 @@ import {
 import type {
   CampaignBulkAction,
   CampaignCopyResult,
+  CampaignUrlReplaceResult,
   MaterialBulkAction,
   CampaignRow,
   FolderRow,
@@ -126,6 +128,13 @@ export class PartnersClient {
   async copyCampaign(id: number, data: Record<string, unknown>): Promise<CampaignCopyResult> {
     const raw = await this.http.post(`/campaigns/${id}/copy`, data);
     return campaignCopyResultSchema.parse(raw);
+  }
+
+  async bulkReplaceCampaignUrls(
+    payload: Record<string, unknown>,
+  ): Promise<CampaignUrlReplaceResult> {
+    const raw = await this.http.post("/campaigns/bulk-url-replace", payload);
+    return campaignUrlReplaceResultSchema.parse(raw);
   }
 
   async moveCampaigns(ids: number[], folderId: number): Promise<CampaignBulkAction> {
