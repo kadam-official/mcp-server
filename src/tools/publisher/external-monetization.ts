@@ -89,6 +89,16 @@ async function resolveAccount(
 
   const hasCredentials = Boolean(args.apiKey ?? args.clientId ?? args.clientSecret);
   if (hasCredentials) {
+    // A second account under the default name collides with the network's unique name
+    // per owner, so say which of the two the publisher meant instead of provoking a 409.
+    if (accounts.length > 0 && args.accountName == null) {
+      return (
+        `${networkName} already has an account (${listAccounts(accounts)}). To replace its key ` +
+        `use kadam_pub_update_external_network_account; to add a second account repeat this ` +
+        `call with accountName.`
+      );
+    }
+
     return pub.createExternalNetworkAccount({
       networkId,
       name: args.accountName ?? `${networkName} account`,
@@ -304,7 +314,9 @@ export const externalMonetizationModule: ToolModule = {
           ...(args.uniqCap != null && { uniqCap: args.uniqCap }),
           ...(args.allowProxy != null && { allowProxy: args.allowProxy }),
           ...(args.tagTemplate != null && { tagTemplate: args.tagTemplate }),
-          ...(args.placement != null && { extBlockId: args.placement }),
+          // The stored name belongs to the previous zone; keeping it would label the new
+          // one wrongly, and the backend reads an empty name as "id entered by hand".
+          ...(args.placement != null && { extBlockId: args.placement, extBlockName: "" }),
           ...(args.accountId != null && { accountId: args.accountId }),
         });
 

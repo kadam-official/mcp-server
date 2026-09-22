@@ -167,6 +167,44 @@ describe("connect_external_network", () => {
     expect(api.createExternalConnection).toHaveBeenCalled();
   });
 
+  it("points at key rotation instead of minting a duplicate account name", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listExternalNetworkAccounts.mockResolvedValue([ACCOUNT]);
+
+    const text = await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+      apiKey: "another-key",
+    });
+
+    expect(text).toContain("already has an account");
+    expect(text).toContain("kadam_pub_update_external_network_account");
+    expect(api.createExternalNetworkAccount).not.toHaveBeenCalled();
+  });
+
+  it("still adds a second account when the publisher names it", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listExternalNetworkAccounts.mockResolvedValue([ACCOUNT]);
+    api.createExternalNetworkAccount.mockResolvedValue({ ...ACCOUNT, id: 12, name: "Second" });
+    api.listExternalPlacements.mockResolvedValue([PLACEMENT]);
+    api.createExternalConnection.mockResolvedValue(CONNECTION);
+
+    await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+      apiKey: "another-key",
+      accountName: "Second",
+    });
+
+    expect(api.createExternalNetworkAccount).toHaveBeenCalledWith({
+      networkId: 3,
+      name: "Second",
+      apiKey: "another-key",
+    });
+  });
+
   it("asks for the key instead of failing when there is no account", async () => {
     const { client, api } = await withApi();
     api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
@@ -264,6 +302,23 @@ describe("update_external_network", () => {
     expect(api.updateExternalConnection).toHaveBeenCalledWith(
       77,
       expect.objectContaining({ geo: [34], uniqCap: 5, testShare: 30, extBlockId: "00fcc7f5" }),
+    );
+  });
+
+  it("drops the previous zone's name when the placement changes", async () => {
+    const { client, api } = await withApi();
+    api.listExternalConnections.mockResolvedValue([CONNECTION]);
+    api.updateExternalConnection.mockResolvedValue({ ...CONNECTION, extBlockId: "deadbeef" });
+
+    await call(client, "kadam_pub_update_external_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      placement: "deadbeef",
+    });
+
+    expect(api.updateExternalConnection).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({ extBlockId: "deadbeef", extBlockName: "" }),
     );
   });
 
