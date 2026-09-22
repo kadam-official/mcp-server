@@ -134,8 +134,6 @@ export function createMockPubClient() {
     getUserInfo: vi.fn(),
     getReportConfig: vi.fn(),
     getReportData: vi.fn(),
-    getExternalMonetizationSummary: vi.fn(),
-    listExternalMonetizationAdUnits: vi.fn(),
     listExternalNetworks: vi.fn(),
     getExternalMonetizationOptions: vi.fn(),
     listExternalNetworkAccounts: vi.fn(),

@@ -8,20 +8,6 @@ import { z } from "zod";
  */
 
 // ---------------------------------------------------------------------------
-// GET /external-monetization/summary
-// ---------------------------------------------------------------------------
-
-export const externalMonetizationSummarySchema = z
-  .object({
-    sites: z.array(z.object({ id: z.number(), label: z.string() })).default([]),
-    formats: z.array(z.object({ typeId: z.number(), label: z.string() })).default([]),
-    currencySymbol: z.string().default(""),
-  })
-  .passthrough();
-
-export type ExternalMonetizationSummary = z.infer<typeof externalMonetizationSummarySchema>;
-
-// ---------------------------------------------------------------------------
 // GET /external-monetization/networks, .../options
 // ---------------------------------------------------------------------------
 
@@ -56,34 +42,6 @@ export const externalMonetizationOptionsSchema = z.object({
 });
 
 export type ExternalMonetizationOptions = z.infer<typeof externalMonetizationOptionsSchema>;
-
-// ---------------------------------------------------------------------------
-// POST /external-monetization/blocks
-// ---------------------------------------------------------------------------
-
-export const externalMonetizationAdUnitSchema = z
-  .object({
-    blockId: z.number(),
-    blockName: z.string().nullish(),
-    siteId: z.number(),
-    siteDomain: z.string().nullish(),
-    typeId: z.number(),
-    format: z.string(),
-    turnover: z.number().default(0),
-    activePlacements: z.number().default(0),
-  })
-  .passthrough();
-
-export type ExternalMonetizationAdUnit = z.infer<typeof externalMonetizationAdUnitSchema>;
-
-export const externalMonetizationAdUnitPageSchema = z.object({
-  items: z.array(externalMonetizationAdUnitSchema).default([]),
-  totalRows: z.number().default(0),
-  page: z.number().default(1),
-  perPage: z.number().default(25),
-});
-
-export type ExternalMonetizationAdUnitPage = z.infer<typeof externalMonetizationAdUnitPageSchema>;
 
 // ---------------------------------------------------------------------------
 // GET/POST/PUT/DELETE /external-monetization/accounts

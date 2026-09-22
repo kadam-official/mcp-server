@@ -12,9 +12,7 @@ import type { SourceDetail, SourceRow, AdUnitRow, PubUser } from "./schemas/publ
 import {
   externalConnectionListSchema,
   externalConnectionSchema,
-  externalMonetizationAdUnitPageSchema,
   externalMonetizationOptionsSchema,
-  externalMonetizationSummarySchema,
   externalNetworkAccountListSchema,
   externalNetworkAccountSchema,
   externalNetworkListSchema,
@@ -22,9 +20,7 @@ import {
 } from "./schemas/publisher-external-monetization.js";
 import type {
   ExternalConnection,
-  ExternalMonetizationAdUnitPage,
   ExternalMonetizationOptions,
-  ExternalMonetizationSummary,
   ExternalNetwork,
   ExternalNetworkAccount,
   ExternalPlacement,
@@ -198,18 +194,6 @@ export class PubClient {
   // -------------------------------------------------------------------------
   // External monetization (a.k.a. mediation)
   // -------------------------------------------------------------------------
-
-  async getExternalMonetizationSummary(): Promise<ExternalMonetizationSummary> {
-    const raw = await this.http.get(`${EXT_MON}/summary`);
-    return externalMonetizationSummarySchema.parse(raw);
-  }
-
-  async listExternalMonetizationAdUnits(
-    params: Record<string, unknown>,
-  ): Promise<ExternalMonetizationAdUnitPage> {
-    const raw = await this.http.post(`${EXT_MON}/blocks`, params);
-    return externalMonetizationAdUnitPageSchema.parse(raw);
-  }
 
   async listExternalNetworks(): Promise<ExternalNetwork[]> {
     const raw = await this.http.get(`${EXT_MON}/networks`);
