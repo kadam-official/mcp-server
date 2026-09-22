@@ -5,7 +5,7 @@ import { registerPricingModelsResource } from "./pricing-models.js";
 import { getCreativeFormatsContent } from "./creative-formats.js";
 import { SITE_STATES_CONTENT } from "./site-states.js";
 import { AD_UNIT_TYPES_CONTENT } from "./ad-unit-types.js";
-import { EXTERNAL_MONETIZATION_CONTENT } from "./external-monetization.js";
+import { MEDIATION_CONTENT } from "./mediation.js";
 import { buildReportDimensions } from "./report-dimensions.js";
 import { buildApiOverview } from "./api-overview.js";
 import type { OptionsRegistry } from "../api/options-registry.js";
@@ -49,7 +49,7 @@ export function registerResources(
   if (products.pub) {
     registerStaticResource(server, "site-states", SITE_STATES_CONTENT);
     registerStaticResource(server, "ad-unit-types", AD_UNIT_TYPES_CONTENT);
-    registerStaticResource(server, "external-monetization", EXTERNAL_MONETIZATION_CONTENT);
+    registerStaticResource(server, "mediation", MEDIATION_CONTENT);
   }
 
   // Mixed resources: register once with content for the active cabinet(s) (combined

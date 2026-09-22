@@ -48,10 +48,11 @@ export const METRIC_ALIASES: DimensionAliases = {
   unsubscriptions: "traffic_unsubscriptions",
   block_views: "traffic_blockViews",
   viewrate: "traffic_viewRate",
-  // External monetization (the cabinet calls it mediation): the split of the same income.
+  // Kadam Smart Mediation: the split of the same income. The first alias of an id is the
+  // one advertised to the model, so the current name leads and the old one still resolves.
   kadam_revenue: "finance_moneyInKadam",
-  external_revenue: "finance_moneyInMediation",
   mediation_revenue: "finance_moneyInMediation",
+  external_revenue: "finance_moneyInMediation",
 };
 
 const GROUP_ALIASES: DimensionAliases = {
@@ -97,12 +98,12 @@ const GROUP_ALIASES: DimensionAliases = {
   pid: "traffic_pid",
   sub_age: "traffic_subsAge",
   category: "traffic_pageCategory",
-  // External monetization (a.k.a. mediation); network 0 is Kadam's own demand.
+  // Kadam Smart Mediation; network 0 is Kadam's own demand.
   network: "mediation_network",
-  external_network: "mediation_network",
   mediation_network: "mediation_network",
-  external_placement: "mediation_block",
+  external_network: "mediation_network",
   mediation_placement: "mediation_block",
+  external_placement: "mediation_block",
 };
 
 function flattenConfig(

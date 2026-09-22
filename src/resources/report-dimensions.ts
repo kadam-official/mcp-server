@@ -19,12 +19,12 @@ const PUB_DIMENSIONS = `Publisher Groupings (groupBy):
   Time: day, hour, week, month
   Entities: site, ad_unit, format
   Geo: country, region
-  External monetization (a.k.a. mediation): network, external_placement
+  Kadam Smart Mediation: network, mediation_placement
 
 Publisher Metrics:
   Basic: revenue, impressions, clicks, ecpm
   Traffic: visits, blockViews, fillRate
-  Income split: kadam_revenue (Kadam demand), external_revenue (outside networks);
+  Income split: kadam_revenue (Kadam demand), mediation_revenue (outside networks);
     "revenue" is the two together. Network 0 in a "network" grouping is Kadam itself.`;
 
 const ADV_BLOCK = `Report Dimensions & Metrics for kadam_adv_get_stats:

@@ -113,7 +113,7 @@ describe("resource cabinet scoping", () => {
     expect(uris).toEqual([
       "kadam://reference/ad-unit-types",
       "kadam://reference/api-overview",
-      "kadam://reference/external-monetization",
+      "kadam://reference/mediation",
       "kadam://reference/report-dimensions",
       "kadam://reference/site-states",
     ]);

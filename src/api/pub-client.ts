@@ -10,21 +10,21 @@ import {
 } from "./schemas/publisher.js";
 import type { SourceDetail, SourceRow, AdUnitRow, PubUser } from "./schemas/publisher.js";
 import {
-  externalConnectionListSchema,
-  externalConnectionSchema,
-  externalMonetizationOptionsSchema,
-  externalNetworkAccountListSchema,
-  externalNetworkAccountSchema,
-  externalNetworkListSchema,
-  externalPlacementListSchema,
-} from "./schemas/publisher-external-monetization.js";
+  mediationConnectionListSchema,
+  mediationConnectionSchema,
+  mediationOptionsSchema,
+  mediationAccountListSchema,
+  mediationAccountSchema,
+  mediationNetworkListSchema,
+  mediationPlacementListSchema,
+} from "./schemas/publisher-mediation.js";
 import type {
-  ExternalConnection,
-  ExternalMonetizationOptions,
-  ExternalNetwork,
-  ExternalNetworkAccount,
-  ExternalPlacement,
-} from "./schemas/publisher-external-monetization.js";
+  MediationConnection,
+  MediationOptions,
+  MediationNetwork,
+  MediationAccount,
+  MediationPlacement,
+} from "./schemas/publisher-mediation.js";
 import { z } from "zod";
 
 // Raw table response shape returned by DataTable endpoints
@@ -57,7 +57,7 @@ export interface PubReportDataParams {
 const DEFAULT_REPORT_CONFIG_TTL_MS = 10 * 60 * 1000;
 
 /** Public name of the mediation contour; /mediation/* is the cabinet's own alias. */
-const EXT_MON = "/external-monetization";
+const MEDIATION = "/mediation";
 
 export class PubClient {
   private reportConfigCache: { data: ReportConfig; expiresAt: number } | null = null;
@@ -192,85 +192,83 @@ export class PubClient {
   }
 
   // -------------------------------------------------------------------------
-  // External monetization (a.k.a. mediation)
+  // Kadam Smart Mediation
   // -------------------------------------------------------------------------
 
-  async listExternalNetworks(): Promise<ExternalNetwork[]> {
-    const raw = await this.http.get(`${EXT_MON}/networks`);
-    return externalNetworkListSchema.parse(raw).networks;
+  async listMediationNetworks(): Promise<MediationNetwork[]> {
+    const raw = await this.http.get(`${MEDIATION}/networks`);
+    return mediationNetworkListSchema.parse(raw).networks;
   }
 
   /** Networks an ad unit's format is actually served by, plus the geo dictionary. */
-  async getExternalMonetizationOptions(adUnitId: number): Promise<ExternalMonetizationOptions> {
-    const raw = await this.http.get(`${EXT_MON}/options`, { blockId: String(adUnitId) });
-    return externalMonetizationOptionsSchema.parse(raw);
+  async getMediationOptions(adUnitId: number): Promise<MediationOptions> {
+    const raw = await this.http.get(`${MEDIATION}/options`, { blockId: String(adUnitId) });
+    return mediationOptionsSchema.parse(raw);
   }
 
-  async listExternalNetworkAccounts(networkId?: number): Promise<ExternalNetworkAccount[]> {
+  async listMediationAccounts(networkId?: number): Promise<MediationAccount[]> {
     const raw = await this.http.get(
-      `${EXT_MON}/accounts`,
+      `${MEDIATION}/accounts`,
       networkId != null ? { networkId: String(networkId) } : undefined,
     );
-    return externalNetworkAccountListSchema.parse(raw);
+    return mediationAccountListSchema.parse(raw);
   }
 
-  async createExternalNetworkAccount(
-    data: Record<string, unknown>,
-  ): Promise<ExternalNetworkAccount> {
-    const raw = await this.http.post(`${EXT_MON}/accounts`, data);
-    return externalNetworkAccountSchema.parse(raw);
+  async createMediationAccount(data: Record<string, unknown>): Promise<MediationAccount> {
+    const raw = await this.http.post(`${MEDIATION}/accounts`, data);
+    return mediationAccountSchema.parse(raw);
   }
 
-  async updateExternalNetworkAccount(
+  async updateMediationAccount(
     id: number,
     data: Record<string, unknown>,
-  ): Promise<ExternalNetworkAccount> {
-    const raw = await this.http.put(`${EXT_MON}/accounts/${id}`, data);
-    return externalNetworkAccountSchema.parse(raw);
+  ): Promise<MediationAccount> {
+    const raw = await this.http.put(`${MEDIATION}/accounts/${id}`, data);
+    return mediationAccountSchema.parse(raw);
   }
 
-  async deleteExternalNetworkAccount(id: number): Promise<unknown> {
-    return this.http.delete(`${EXT_MON}/accounts/${id}`);
+  async deleteMediationAccount(id: number): Promise<unknown> {
+    return this.http.delete(`${MEDIATION}/accounts/${id}`);
   }
 
   /** `fresh` skips the catalog cache: the publisher just created the zone at the network. */
-  async listExternalPlacements(
+  async listMediationPlacements(
     accountId: number,
     adUnitId?: number,
     fresh?: boolean,
-  ): Promise<ExternalPlacement[]> {
+  ): Promise<MediationPlacement[]> {
     const params: Record<string, string> = {};
     if (adUnitId != null) params.blockId = String(adUnitId);
     if (fresh) params.fresh = "1";
 
-    const raw = await this.http.get(`${EXT_MON}/accounts/${accountId}/placements`, params);
-    return externalPlacementListSchema.parse(raw).items;
+    const raw = await this.http.get(`${MEDIATION}/accounts/${accountId}/placements`, params);
+    return mediationPlacementListSchema.parse(raw).items;
   }
 
-  async listExternalConnections(adUnitId: number): Promise<ExternalConnection[]> {
-    const raw = await this.http.get(`${EXT_MON}/connections`, { blockId: String(adUnitId) });
-    return externalConnectionListSchema.parse(raw).items;
+  async listMediationConnections(adUnitId: number): Promise<MediationConnection[]> {
+    const raw = await this.http.get(`${MEDIATION}/connections`, { blockId: String(adUnitId) });
+    return mediationConnectionListSchema.parse(raw).items;
   }
 
-  async createExternalConnection(data: Record<string, unknown>): Promise<ExternalConnection> {
-    const raw = await this.http.post(`${EXT_MON}/connections`, data);
-    return externalConnectionSchema.parse(raw);
+  async createMediationConnection(data: Record<string, unknown>): Promise<MediationConnection> {
+    const raw = await this.http.post(`${MEDIATION}/connections`, data);
+    return mediationConnectionSchema.parse(raw);
   }
 
-  async updateExternalConnection(
+  async updateMediationConnection(
     id: number,
     data: Record<string, unknown>,
-  ): Promise<ExternalConnection> {
-    const raw = await this.http.put(`${EXT_MON}/connections/${id}`, data);
-    return externalConnectionSchema.parse(raw);
+  ): Promise<MediationConnection> {
+    const raw = await this.http.put(`${MEDIATION}/connections/${id}`, data);
+    return mediationConnectionSchema.parse(raw);
   }
 
-  async deleteExternalConnection(id: number): Promise<unknown> {
-    return this.http.delete(`${EXT_MON}/connections/${id}`);
+  async deleteMediationConnection(id: number): Promise<unknown> {
+    return this.http.delete(`${MEDIATION}/connections/${id}`);
   }
 
-  async retestExternalConnection(id: number, share: number): Promise<ExternalConnection> {
-    const raw = await this.http.post(`${EXT_MON}/connections/${id}/retest`, { share });
-    return externalConnectionSchema.parse(raw);
+  async retestMediationConnection(id: number, share: number): Promise<MediationConnection> {
+    const raw = await this.http.post(`${MEDIATION}/connections/${id}/retest`, { share });
+    return mediationConnectionSchema.parse(raw);
   }
 }

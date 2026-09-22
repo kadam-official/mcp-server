@@ -1,5 +1,8 @@
-export const EXTERNAL_MONETIZATION_CONTENT = `
-External Monetization (the Kadam cabinet calls it "Mediation" / "Медиация" — same thing).
+export const MEDIATION_CONTENT = `
+Kadam Smart Mediation — the publisher's monetization through outside ad networks.
+The same thing goes by: "mediation" (the API, the code and the report dimensions),
+"Медиация" in the Russian cabinet, and "external monetization" in anything written
+before the section was renamed.
 
 What it is:
 A publisher can sell an ad unit's traffic through outside ad networks alongside Kadam's
@@ -27,13 +30,13 @@ Money:
 Networks on the DIRECT payout model pay the publisher themselves, so their revenue is NOT
 part of the Kadam balance. In reports it is a separate measure:
 - kadam_revenue    — what Kadam paid (finance_moneyInKadam)
-- external_revenue — what the networks paid (finance_moneyInMediation)
+- mediation_revenue — what the networks paid (finance_moneyInMediation)
 - revenue          — the two together (finance_moneyIn)
 Group by "network" to compare them, or by "ad_unit" to see where the money is made.
 
-Formats: only popunder, banner and video ad units can be monetized externally.
+Formats: only popunder, banner and video ad units can take mediation.
 
 Access: the section is enabled per publisher account. When it is off, every call answers
-403 with "External monetization is not enabled for this account" — that is a feature flag,
+403 with "Kadam Smart Mediation is not enabled for this account" — that is a feature flag,
 not a bad API key.
 `;

@@ -189,13 +189,13 @@ describe("HttpClient", () => {
       mockResponse(200, {
         success: false,
         code: 403,
-        msg: { exception: "External monetization is not enabled for this account" },
+        msg: { exception: "Kadam Smart Mediation is not enabled for this account" },
       }),
     );
 
     await expect(client.get("/test")).rejects.toMatchObject({
       status: 403,
-      message: "External monetization is not enabled for this account",
+      message: "Kadam Smart Mediation is not enabled for this account",
     });
   });
 

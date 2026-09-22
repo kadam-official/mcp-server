@@ -1,14 +1,14 @@
 import { formatSingleEntity } from "../../output-formatter.js";
 import type { PubClient } from "../../api/pub-client.js";
 import type {
-  ExternalConnection,
-  ExternalNetwork,
-  ExternalNetworkAccount,
-  ExternalPlacement,
-} from "../../api/schemas/publisher-external-monetization.js";
+  MediationConnection,
+  MediationNetwork,
+  MediationAccount,
+  MediationPlacement,
+} from "../../api/schemas/publisher-mediation.js";
 
-/** The word the cabinet uses, kept in every description so the model maps the domain. */
-export const DOMAIN = "External monetization (a.k.a. mediation)";
+/** The product name, kept in every description so the model maps the domain. */
+export const DOMAIN = "Kadam Smart Mediation";
 
 /** The backend caps the forced share at 50%; say so before it rejects the call. */
 export const MAX_TEST_SHARE = 50;
@@ -31,7 +31,7 @@ export function credentialArgNames(fields: string[]): string {
   return named.length > 0 ? named.join(" + ") : "apiKey";
 }
 
-export function formatConnection(c: ExternalConnection): string {
+export function formatConnection(c: MediationConnection): string {
   const test =
     c.testShare > 0
       ? `${c.testShare}% (${c.testState}, ${c.testSlicesPending} of ${c.testSlicesTotal + c.testSlicesPending} slices pending)`
@@ -52,7 +52,7 @@ export function formatConnection(c: ExternalConnection): string {
   ]);
 }
 
-export function formatAccount(a: ExternalNetworkAccount): string {
+export function formatAccount(a: MediationAccount): string {
   return formatSingleEntity(`Account #${a.id}`, [
     ["Name", a.name],
     ["Network", String(a.networkId)],
@@ -65,8 +65,8 @@ export function formatAccount(a: ExternalNetworkAccount): string {
 }
 
 export function formatNetworkLine(
-  n: ExternalNetwork,
-  account: ExternalNetworkAccount | undefined,
+  n: MediationNetwork,
+  account: MediationAccount | undefined,
 ): string {
   const credentials = account
     ? `account #${account.id} "${account.name}"${account.mask ? ` (${account.mask})` : ""}${account.verifiedAt ? "" : ", never verified"}`
@@ -75,7 +75,7 @@ export function formatNetworkLine(
   return `- ${n.name} (slug: ${n.slug}, id: ${n.id}): ${credentials}`;
 }
 
-export function formatPlacementLine(p: ExternalPlacement): string {
+export function formatPlacementLine(p: MediationPlacement): string {
   const marks = [p.matchesFormat ? "format ok" : null, p.matchesSite ? "same site" : null].filter(
     Boolean,
   );
@@ -85,7 +85,7 @@ export function formatPlacementLine(p: ExternalPlacement): string {
   }`;
 }
 
-export function listAccounts(accounts: ExternalNetworkAccount[]): string {
+export function listAccounts(accounts: MediationAccount[]): string {
   return accounts.map((a) => `#${a.id} "${a.name}"${a.active ? "" : " (disabled)"}`).join(", ");
 }
 
@@ -97,8 +97,8 @@ export function listAccounts(accounts: ExternalNetworkAccount[]): string {
 export async function findAccount(
   pub: PubClient,
   accountId: number,
-): Promise<ExternalNetworkAccount | string> {
-  const accounts = await pub.listExternalNetworkAccounts();
+): Promise<MediationAccount | string> {
+  const accounts = await pub.listMediationAccounts();
   const found = accounts.find((a) => a.id === accountId);
   if (found) return found;
 
@@ -114,8 +114,8 @@ export async function findConnection(
   pub: PubClient,
   adUnitId: number,
   connectionId: number,
-): Promise<ExternalConnection | string> {
-  const connections = await pub.listExternalConnections(adUnitId);
+): Promise<MediationConnection | string> {
+  const connections = await pub.listMediationConnections(adUnitId);
   const found = connections.find((c) => c.id === connectionId);
   if (found) return found;
 
@@ -125,7 +125,7 @@ export async function findConnection(
   );
 }
 
-export function connectionPayload(c: ExternalConnection): Record<string, unknown> {
+export function connectionPayload(c: MediationConnection): Record<string, unknown> {
   return {
     blockId: c.blockId,
     networkId: c.networkId,
@@ -151,8 +151,8 @@ export async function resolvePlacement(
   adUnitId: number,
   wanted: string | undefined,
   fresh: boolean,
-): Promise<ExternalPlacement | string> {
-  const placements = await pub.listExternalPlacements(accountId, adUnitId, fresh);
+): Promise<MediationPlacement | string> {
+  const placements = await pub.listMediationPlacements(accountId, adUnitId, fresh);
 
   if (wanted != null) {
     const needle = wanted.trim().toLowerCase();

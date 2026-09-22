@@ -219,37 +219,38 @@ Requires `KADAM_PUB_API_KEY`.
 | `kadam_pub_get_user_info` | Get publisher account info and balance                            | readOnly    |
 | `kadam_pub_get_stats`     | Publisher statistics with human-readable dimension/metric mapping | readOnly    |
 
-#### External Monetization (a.k.a. Mediation)
+#### Kadam Smart Mediation
 
-Selling an ad unit's traffic through outside ad networks alongside Kadam demand.
-Read `kadam://reference/external-monetization` first; split the income in
-`kadam_pub_get_stats` with `groupBy=network` and the `kadam_revenue` /
-`external_revenue` metrics.
+Selling an ad unit's traffic through outside ad networks alongside Kadam demand. The API,
+the code and the report dimensions call it plain `mediation`. Read
+`kadam://reference/mediation` first; split the income in `kadam_pub_get_stats` with
+`groupBy=network` and the `kadam_revenue` / `mediation_revenue` metrics.
 
-| Tool                                        | Description                                                                  | Annotations |
-| ------------------------------------------- | ---------------------------------------------------------------------------- | ----------- |
-| `kadam_pub_list_external_networks`          | Catalog of networks, which have an account, and what an ad unit already runs | readOnly    |
-| `kadam_pub_connect_external_network`        | Attach a network to an ad unit (resolves account and placement itself)       | —           |
-| `kadam_pub_update_external_network`         | Change geo, unique cap, proxy policy, tag template, placement or account     | —           |
-| `kadam_pub_set_external_network_status`     | active / paused / retest (restart the forced test share, 1-50%)              | idempotent  |
-| `kadam_pub_disconnect_external_network`     | Remove a connection (requires `confirm`)                                     | destructive |
-| `kadam_pub_update_external_network_account` | Rotate the network API key, rename or disable the account                    | —           |
-| `kadam_pub_delete_external_network_account` | Remove a network account (requires `confirm`)                                | destructive |
+| Tool                                         | Description                                                                  | Annotations |
+| -------------------------------------------- | ---------------------------------------------------------------------------- | ----------- |
+| `kadam_pub_list_mediation_networks`          | Catalog of networks, which have an account, and what an ad unit already runs | readOnly    |
+| `kadam_pub_connect_mediation_network`        | Attach a network to an ad unit (resolves account and placement itself)       | —           |
+| `kadam_pub_update_mediation_network`         | Change geo, unique cap, proxy policy, tag template, placement or account     | —           |
+| `kadam_pub_set_mediation_network_status`     | active / paused for a connection                                             | idempotent  |
+| `kadam_pub_retest_mediation_network`         | Restart the forced test share (1-50%); starts a new measurement epoch        | —           |
+| `kadam_pub_disconnect_mediation_network`     | Remove a connection (requires `confirm`)                                     | destructive |
+| `kadam_pub_update_mediation_network_account` | Rotate the network API key, rename or disable the account                    | —           |
+| `kadam_pub_delete_mediation_network_account` | Remove a network account (requires `confirm`)                                | destructive |
 
 ## Resources (9)
 
 Static reference data the agent can read before calling tools:
 
-| URI                                       | Description                                                                      |
-| ----------------------------------------- | -------------------------------------------------------------------------------- |
-| `kadam://reference/campaign-types`        | All ad format types with IDs, features, pricing, and creative specs              |
-| `kadam://reference/pricing-models`        | CPC, CPM, CPV, CPA Target with IDs and descriptions                              |
-| `kadam://reference/creative-formats`      | Creative requirements per campaign type                                          |
-| `kadam://reference/ad-unit-types`         | Publisher ad unit formats with IDs                                               |
-| `kadam://reference/site-states`           | Publisher site lifecycle states                                                  |
-| `kadam://reference/external-monetization` | Outside ad networks: accounts, placements, connections, test share, income split |
-| `kadam://reference/report-dimensions`     | Available dimensions and metrics for statistics tools                            |
-| `kadam://reference/api-overview`          | General Kadam API capabilities overview                                          |
+| URI                                   | Description                                                                      |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| `kadam://reference/campaign-types`    | All ad format types with IDs, features, pricing, and creative specs              |
+| `kadam://reference/pricing-models`    | CPC, CPM, CPV, CPA Target with IDs and descriptions                              |
+| `kadam://reference/creative-formats`  | Creative requirements per campaign type                                          |
+| `kadam://reference/ad-unit-types`     | Publisher ad unit formats with IDs                                               |
+| `kadam://reference/site-states`       | Publisher site lifecycle states                                                  |
+| `kadam://reference/mediation`         | Outside ad networks: accounts, placements, connections, test share, income split |
+| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools                            |
+| `kadam://reference/api-overview`      | General Kadam API capabilities overview                                          |
 
 ## Prompts (4)
 

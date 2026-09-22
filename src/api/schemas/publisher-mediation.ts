@@ -1,17 +1,15 @@
 import { z } from "zod";
 
 /**
- * External monetization (the cabinet calls it "mediation"): the publisher's own
- * accounts in outside ad networks, attached to their ad units.
- *
- * Endpoints live under /external-monetization/* and mirror /mediation/* one to one.
+ * Kadam Smart Mediation (plain "mediation" in the API): the publisher's own accounts
+ * in outside ad networks, attached to their ad units. Endpoints live under /mediation/*.
  */
 
 // ---------------------------------------------------------------------------
-// GET /external-monetization/networks, .../options
+// GET /mediation/networks, .../options
 // ---------------------------------------------------------------------------
 
-export const externalNetworkSchema = z
+export const mediationNetworkSchema = z
   .object({
     id: z.number(),
     slug: z.string(),
@@ -25,15 +23,15 @@ export const externalNetworkSchema = z
   })
   .passthrough();
 
-export type ExternalNetwork = z.infer<typeof externalNetworkSchema>;
+export type MediationNetwork = z.infer<typeof mediationNetworkSchema>;
 
-export const externalNetworkListSchema = z.object({
-  networks: z.array(externalNetworkSchema).default([]),
+export const mediationNetworkListSchema = z.object({
+  networks: z.array(mediationNetworkSchema).default([]),
 });
 
 /** Geo ids come from `geo.geoID`, a different space than /api/countries. */
-export const externalMonetizationOptionsSchema = z.object({
-  networks: z.array(externalNetworkSchema).default([]),
+export const mediationOptionsSchema = z.object({
+  networks: z.array(mediationNetworkSchema).default([]),
   geo: z
     .array(
       z.object({ id: z.number(), label: z.string(), tier: z.number().nullish() }).passthrough(),
@@ -41,14 +39,14 @@ export const externalMonetizationOptionsSchema = z.object({
     .default([]),
 });
 
-export type ExternalMonetizationOptions = z.infer<typeof externalMonetizationOptionsSchema>;
+export type MediationOptions = z.infer<typeof mediationOptionsSchema>;
 
 // ---------------------------------------------------------------------------
-// GET/POST/PUT/DELETE /external-monetization/accounts
+// GET/POST/PUT/DELETE /mediation/accounts
 // ---------------------------------------------------------------------------
 
 /** Credentials never come back — only a mask of what was stored. */
-export const externalNetworkAccountSchema = z
+export const mediationAccountSchema = z
   .object({
     id: z.number(),
     networkId: z.number(),
@@ -62,16 +60,16 @@ export const externalNetworkAccountSchema = z
   })
   .passthrough();
 
-export type ExternalNetworkAccount = z.infer<typeof externalNetworkAccountSchema>;
+export type MediationAccount = z.infer<typeof mediationAccountSchema>;
 
-export const externalNetworkAccountListSchema = z.array(externalNetworkAccountSchema);
+export const mediationAccountListSchema = z.array(mediationAccountSchema);
 
 // ---------------------------------------------------------------------------
-// GET /external-monetization/accounts/{id}/placements
+// GET /mediation/accounts/{id}/placements
 // ---------------------------------------------------------------------------
 
 /** The zone id at the network: a codename as often as a number, so always a string. */
-export const externalPlacementSchema = z
+export const mediationPlacementSchema = z
   .object({
     id: z.string(),
     name: z.string(),
@@ -83,17 +81,17 @@ export const externalPlacementSchema = z
   })
   .passthrough();
 
-export type ExternalPlacement = z.infer<typeof externalPlacementSchema>;
+export type MediationPlacement = z.infer<typeof mediationPlacementSchema>;
 
-export const externalPlacementListSchema = z.object({
-  items: z.array(externalPlacementSchema).default([]),
+export const mediationPlacementListSchema = z.object({
+  items: z.array(mediationPlacementSchema).default([]),
 });
 
 // ---------------------------------------------------------------------------
-// /external-monetization/connections
+// /mediation/connections
 // ---------------------------------------------------------------------------
 
-export const externalConnectionSchema = z
+export const mediationConnectionSchema = z
   .object({
     id: z.number(),
     blockId: z.number(),
@@ -115,8 +113,8 @@ export const externalConnectionSchema = z
   })
   .passthrough();
 
-export type ExternalConnection = z.infer<typeof externalConnectionSchema>;
+export type MediationConnection = z.infer<typeof mediationConnectionSchema>;
 
-export const externalConnectionListSchema = z.object({
-  items: z.array(externalConnectionSchema).default([]),
+export const mediationConnectionListSchema = z.object({
+  items: z.array(mediationConnectionSchema).default([]),
 });

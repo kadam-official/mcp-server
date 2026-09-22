@@ -4,9 +4,9 @@ import type { ToolModule } from "../../types/tool-module.js";
 import { truncateOutput } from "../../output-formatter.js";
 import type { PubClient } from "../../api/pub-client.js";
 import type {
-  ExternalNetworkAccount,
-  ExternalPlacement,
-} from "../../api/schemas/publisher-external-monetization.js";
+  MediationAccount,
+  MediationPlacement,
+} from "../../api/schemas/publisher-mediation.js";
 import {
   DEFAULT_RETEST_SHARE,
   DOMAIN,
@@ -18,7 +18,7 @@ import {
   formatNetworkLine,
   listAccounts,
   resolvePlacement,
-} from "./external-monetization-shared.js";
+} from "./mediation-shared.js";
 
 /**
  * The publisher names a network; everything the API needs to create a connection is
@@ -37,8 +37,8 @@ async function resolveAccount(
     accountName?: string;
   },
   credentialFields: string[],
-): Promise<ExternalNetworkAccount | string> {
-  const accounts = await pub.listExternalNetworkAccounts(networkId);
+): Promise<MediationAccount | string> {
+  const accounts = await pub.listMediationAccounts(networkId);
 
   if (args.accountId != null) {
     const picked = accounts.find((a) => a.id === args.accountId);
@@ -46,7 +46,7 @@ async function resolveAccount(
       return `No account #${args.accountId} in ${networkName}. Accounts: ${listAccounts(accounts) || "none"}`;
     }
     if (!picked.active) {
-      return `Account #${picked.id} "${picked.name}" is disabled — enable it with kadam_pub_update_external_network_account(active: true).`;
+      return `Account #${picked.id} "${picked.name}" is disabled — enable it with kadam_pub_update_mediation_network_account(active: true).`;
     }
 
     return picked;
@@ -59,12 +59,12 @@ async function resolveAccount(
     if (accounts.length > 0 && args.accountName == null) {
       return (
         `${networkName} already has an account (${listAccounts(accounts)}). To replace its key ` +
-        `use kadam_pub_update_external_network_account; to add a second account repeat this ` +
+        `use kadam_pub_update_mediation_network_account; to add a second account repeat this ` +
         `call with accountName.`
       );
     }
 
-    return pub.createExternalNetworkAccount({
+    return pub.createMediationAccount({
       networkId,
       name: args.accountName ?? `${networkName} account`,
       ...(args.apiKey != null && { apiKey: args.apiKey }),
@@ -83,74 +83,74 @@ async function resolveAccount(
   if (accounts.length > 0) {
     return (
       `Every ${networkName} account is disabled (${listAccounts(accounts)}). Enable one with ` +
-      `kadam_pub_update_external_network_account(active: true), or pass accountId to pick it.`
+      `kadam_pub_update_mediation_network_account(active: true), or pass accountId to pick it.`
     );
   }
 
   return (
     `No account in ${networkName} yet. Repeat this call with the network credentials ` +
     `(${credentialArgNames(credentialFields)}); the publisher can dictate them here, ` +
-    `or add the account in the cabinet under External monetization.`
+    `or add the account in the cabinet under Kadam Smart Mediation.`
   );
 }
 
 /** Zones of some networks carry their own code; an empty tag falls back to the network default. */
-function tagOf(placement: ExternalPlacement): Record<string, unknown> {
+function tagOf(placement: MediationPlacement): Record<string, unknown> {
   const tag = placement.tag?.trim();
 
   return tag ? { tagTemplate: tag } : {};
 }
 
-function siteNote(placement: ExternalPlacement): string {
+function siteNote(placement: MediationPlacement): string {
   return placement.matchesSite || !placement.site
     ? ""
     : ` The zone is registered at the network under ${placement.site}; check it is this ad unit's site.`;
 }
 
-export const externalMonetizationModule: ToolModule = {
+export const mediationModule: ToolModule = {
   product: "publisher",
   register(wrapper: ToolWrapper) {
     wrapper.register(
       {
-        name: "kadam_pub_list_external_networks",
+        name: "kadam_pub_list_mediation_networks",
         description:
           `${DOMAIN}: outside ad networks the publisher can sell through. Without adUnitId — the ` +
           `whole catalog and which networks already have an account. With adUnitId — only the ` +
           `networks serving that ad unit's format, plus what is already connected to it.`,
         product: "publisher",
-        annotations: { title: "List external monetization networks", readOnlyHint: true },
+        annotations: { title: "List Kadam Smart Mediation networks", readOnlyHint: true },
       },
       {
         adUnitId: z.number().optional(),
       },
       async (args, ctx) => {
-        const accounts = await ctx.pub.listExternalNetworkAccounts();
-        const byNetwork = new Map<number, ExternalNetworkAccount>();
+        const accounts = await ctx.pub.listMediationAccounts();
+        const byNetwork = new Map<number, MediationAccount>();
         for (const a of accounts) {
           if (!byNetwork.has(a.networkId) || a.active) byNetwork.set(a.networkId, a);
         }
 
         if (args.adUnitId == null) {
-          const networks = await ctx.pub.listExternalNetworks();
+          const networks = await ctx.pub.listMediationNetworks();
 
           return truncateOutput(
             [
-              "External monetization networks",
+              "Kadam Smart Mediation networks",
               "",
               ...networks.map((n) => formatNetworkLine(n, byNetwork.get(n.id))),
               "",
-              "Connect one with kadam_pub_connect_external_network(adUnitId, network).",
+              "Connect one with kadam_pub_connect_mediation_network(adUnitId, network).",
             ].join("\n"),
           );
         }
 
         const [options, connections] = await Promise.all([
-          ctx.pub.getExternalMonetizationOptions(args.adUnitId),
-          ctx.pub.listExternalConnections(args.adUnitId),
+          ctx.pub.getMediationOptions(args.adUnitId),
+          ctx.pub.listMediationConnections(args.adUnitId),
         ]);
 
         const lines = [
-          `External monetization for ad unit #${args.adUnitId}`,
+          `Kadam Smart Mediation for ad unit #${args.adUnitId}`,
           "",
           "Networks serving this format:",
           ...options.networks.map((n) => formatNetworkLine(n, byNetwork.get(n.id))),
@@ -170,7 +170,7 @@ export const externalMonetizationModule: ToolModule = {
 
     wrapper.register(
       {
-        name: "kadam_pub_connect_external_network",
+        name: "kadam_pub_connect_mediation_network",
         description:
           `${DOMAIN}: attach an outside network to an ad unit in one call. Resolves the network, ` +
           `the publisher's account in it and the placement (zone) on its own; when a choice is ` +
@@ -178,7 +178,7 @@ export const externalMonetizationModule: ToolModule = {
           `yet, pass the network credentials the publisher gives you — never ask them to reveal ` +
           `a key that already exists, the API only ever returns a mask.`,
         product: "publisher",
-        annotations: { title: "Connect an external network", readOnlyHint: false },
+        annotations: { title: "Connect a mediation network", readOnlyHint: false },
       },
       {
         adUnitId: z.number(),
@@ -193,7 +193,7 @@ export const externalMonetizationModule: ToolModule = {
         fresh: z.boolean().optional().default(false),
       },
       async (args, ctx) => {
-        const options = await ctx.pub.getExternalMonetizationOptions(args.adUnitId);
+        const options = await ctx.pub.getMediationOptions(args.adUnitId);
         const needle = args.network.trim().toLowerCase();
         const network = options.networks.find(
           (n) => n.slug.toLowerCase() === needle || n.name.toLowerCase() === needle,
@@ -223,7 +223,7 @@ export const externalMonetizationModule: ToolModule = {
         );
         if (typeof placement === "string") return placement;
 
-        const created = await ctx.pub.createExternalConnection({
+        const created = await ctx.pub.createMediationConnection({
           blockId: args.adUnitId,
           networkId: network.id,
           accountId: account.id,
@@ -244,12 +244,12 @@ export const externalMonetizationModule: ToolModule = {
 
     wrapper.register(
       {
-        name: "kadam_pub_update_external_network",
+        name: "kadam_pub_update_mediation_network",
         description:
           `${DOMAIN}: change an existing connection — geo, unique cap, proxy traffic, tag ` +
           `template, placement or account. Only the fields you pass change.`,
         product: "publisher",
-        annotations: { title: "Update an external network connection", readOnlyHint: false },
+        annotations: { title: "Update a mediation connection", readOnlyHint: false },
       },
       {
         adUnitId: z.number(),
@@ -267,7 +267,7 @@ export const externalMonetizationModule: ToolModule = {
 
         // A zone is identified by its id; the catalog also prints a name, so what the
         // publisher says has to be resolved the same way as on connect.
-        let placement: ExternalPlacement | undefined;
+        let placement: MediationPlacement | undefined;
         if (args.placement != null) {
           const resolved = await resolvePlacement(
             ctx.pub,
@@ -280,7 +280,7 @@ export const externalMonetizationModule: ToolModule = {
           placement = resolved;
         }
 
-        const updated = await ctx.pub.updateExternalConnection(args.connectionId, {
+        const updated = await ctx.pub.updateMediationConnection(args.connectionId, {
           ...connectionPayload(current),
           ...(args.geo != null && { geo: args.geo }),
           ...(args.uniqCap != null && { uniqCap: args.uniqCap }),
@@ -300,12 +300,12 @@ export const externalMonetizationModule: ToolModule = {
 
     wrapper.register(
       {
-        name: "kadam_pub_set_external_network_status",
+        name: "kadam_pub_set_mediation_network_status",
         description:
           `${DOMAIN}: active=serve the network again, paused=stop serving it. To re-measure a ` +
-          `network use kadam_pub_retest_external_network.`,
+          `network use kadam_pub_retest_mediation_network.`,
         product: "publisher",
-        annotations: { title: "Set external network connection status", idempotentHint: true },
+        annotations: { title: "Set mediation connection status", idempotentHint: true },
       },
       {
         adUnitId: z.number(),
@@ -316,7 +316,7 @@ export const externalMonetizationModule: ToolModule = {
         const current = await findConnection(ctx.pub, args.adUnitId, args.connectionId);
         if (typeof current === "string") return current;
 
-        const updated = await ctx.pub.updateExternalConnection(args.connectionId, {
+        const updated = await ctx.pub.updateMediationConnection(args.connectionId, {
           ...connectionPayload(current),
           active: args.status === "active",
         });
@@ -327,13 +327,13 @@ export const externalMonetizationModule: ToolModule = {
 
     wrapper.register(
       {
-        name: "kadam_pub_retest_external_network",
+        name: "kadam_pub_retest_mediation_network",
         description:
           `${DOMAIN}: restart the forced test share (1-${MAX_TEST_SHARE}%) so the predictor can ` +
           `measure what the network really pays. Every call starts a new measurement epoch, so ` +
           `it is not a repeatable no-op; the previous test's progress is discarded.`,
         product: "publisher",
-        annotations: { title: "Restart an external network test", readOnlyHint: false },
+        annotations: { title: "Restart a mediation network test", readOnlyHint: false },
       },
       {
         adUnitId: z.number(),
@@ -346,7 +346,7 @@ export const externalMonetizationModule: ToolModule = {
 
         const share =
           args.testShare ?? (current.testShare > 0 ? current.testShare : DEFAULT_RETEST_SHARE);
-        const retested = await ctx.pub.retestExternalConnection(args.connectionId, share);
+        const retested = await ctx.pub.retestMediationConnection(args.connectionId, share);
 
         return `Test restarted at ${share}%.\n\n${formatConnection(retested)}`;
       },
@@ -354,19 +354,19 @@ export const externalMonetizationModule: ToolModule = {
 
     wrapper.register(
       {
-        name: "kadam_pub_disconnect_external_network",
+        name: "kadam_pub_disconnect_mediation_network",
         description:
           `${DOMAIN}: permanently remove a connection between an ad unit and a network. The ad ` +
           `unit keeps serving Kadam demand. Requires confirm=true.`,
         product: "publisher",
-        annotations: { title: "Disconnect an external network", destructiveHint: true },
+        annotations: { title: "Disconnect a mediation network", destructiveHint: true },
       },
       {
         connectionId: z.number(),
         confirm: z.literal(true),
       },
       async (args, ctx) => {
-        await ctx.pub.deleteExternalConnection(args.connectionId);
+        await ctx.pub.deleteMediationConnection(args.connectionId);
 
         return `Connection #${args.connectionId} removed.`;
       },

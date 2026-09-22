@@ -290,7 +290,7 @@ describe("ToolWrapper", () => {
       { name: "fail_403", description: "Fails with 403", product: "publisher" },
       { input: z.string() },
       async () => {
-        throw new ApiError("External monetization is not enabled for this account", 403);
+        throw new ApiError("Kadam Smart Mediation is not enabled for this account", 403);
       },
     );
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -301,7 +301,7 @@ describe("ToolWrapper", () => {
 
     expect(result.isError).toBe(true);
     const textContent = result.content![0] as { text: string };
-    expect(textContent.text).toBe("External monetization is not enabled for this account");
+    expect(textContent.text).toBe("Kadam Smart Mediation is not enabled for this account");
   });
 
   it("handler that throws a bare ApiError(403) still explains both causes", async () => {
