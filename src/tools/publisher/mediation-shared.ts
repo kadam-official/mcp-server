@@ -59,7 +59,8 @@ export function formatAccount(a: MediationAccount): string {
     ["Key", a.mask ?? "—"],
     ["Active", a.active ? "Yes" : "No"],
     ["Verified", a.verifiedAt ? "Yes" : "No"],
-    ["Last error", a.lastError ?? undefined],
+    // Бэкенд присылает пустую строку, а не null, у аккаунта без ошибок.
+    ["Last error", a.lastError || undefined],
     ["Connections using it", String(a.placementsInUse)],
   ]);
 }
@@ -142,6 +143,20 @@ export function connectionPayload(c: MediationConnection): Record<string, unknow
 }
 
 /**
+ * A network account can hold thousands of zones (TrafficStars caches ~1500), and the whole
+ * catalog is neither readable nor under the 50KB output cap. A page is enough to choose
+ * from; narrowing by name is the way to the rest.
+ */
+const CATALOG_PREVIEW = 30;
+
+function previewLines(placements: MediationPlacement[]): string {
+  const shown = placements.slice(0, CATALOG_PREVIEW).map(formatPlacementLine).join("\n");
+  const hidden = placements.length - CATALOG_PREVIEW;
+
+  return hidden > 0 ? `${shown}\n… and ${hidden} more — name the zone to skip the list.` : shown;
+}
+
+/**
  * The zone id, or its name as the catalog prints it. Storing a name as `extBlockID` gives
  * a connection the collector can never match, so a name is resolved, never passed through.
  */
@@ -162,7 +177,7 @@ export async function resolvePlacement(
 
     return (
       picked ??
-      `No placement "${wanted}" on account #${accountId}. Available:\n${placements.map(formatPlacementLine).join("\n")}`
+      `No placement "${wanted}" on account #${accountId}. Available:\n${previewLines(placements)}`
     );
   }
 
@@ -173,9 +188,9 @@ export async function resolvePlacement(
   if (fitting.length === 0) {
     return (
       `Account #${accountId} has no placement of this ad unit's format. Create the zone at the ` +
-      `network, then repeat with fresh=true. Seen:\n${placements.map(formatPlacementLine).join("\n")}`
+      `network, then repeat with fresh=true. Seen:\n${previewLines(placements)}`
     );
   }
 
-  return `Several placements fit — repeat with the placement id:\n${fitting.map(formatPlacementLine).join("\n")}`;
+  return `Several placements fit — repeat with the placement id:\n${previewLines(fitting)}`;
 }

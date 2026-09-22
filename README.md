@@ -288,15 +288,15 @@ src/
 │   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
-│   ├── advertiser/           # 21 tools across 6 modules
-│   └── publisher/            # 9 tools across 4 modules
-├── resources/                # 7 static reference resources
+│   ├── advertiser/           # 30 tools across 9 modules
+│   └── publisher/            # 17 tools across 6 modules
+├── resources/                # 9 reference resources
 └── prompts/                  # 4 workflow prompts
 ```
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 30 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 47 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON

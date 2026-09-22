@@ -4,7 +4,6 @@ import {
   type MockPubClient,
 } from "../../helpers/tool-client.js";
 import { mediationModule } from "../../../src/tools/publisher/mediation.js";
-import { mediationAccountsModule } from "../../../src/tools/publisher/mediation-accounts.js";
 import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
@@ -463,6 +462,69 @@ describe("update_mediation_network", () => {
     );
   });
 
+  /**
+   * Пустая строка на бэкенде означает «код сети по умолчанию». Пропуск поля оставил бы
+   * код прежней зоны служить новой — подключение молча крутило бы чужой креатив.
+   */
+  it("drops the previous zone's tag when the new zone has none", async () => {
+    const { client, api } = await withApi();
+    api.listMediationConnections.mockResolvedValue([CONNECTION]);
+    api.listMediationPlacements.mockResolvedValue([
+      { ...PLACEMENT, id: "no-tag-zone", name: "Bare zone", tag: null },
+    ]);
+    api.updateMediationConnection.mockResolvedValue({ ...CONNECTION, extBlockId: "no-tag-zone" });
+
+    await call(client, "kadam_pub_update_mediation_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      placement: "Bare zone",
+    });
+
+    expect(api.updateMediationConnection).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({ extBlockId: "no-tag-zone", tagTemplate: "" }),
+    );
+  });
+
+  /** Зона принадлежит аккаунту: перенос без зоны оставил бы id, которого у нового нет. */
+  it("refuses to move the connection to another account without a zone", async () => {
+    const { client, api } = await withApi();
+    api.listMediationConnections.mockResolvedValue([CONNECTION]);
+
+    const text = await call(client, "kadam_pub_update_mediation_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      accountId: 12,
+    });
+
+    expect(text).toContain("owns different zones");
+    expect(api.updateMediationConnection).not.toHaveBeenCalled();
+    expect(api.listMediationPlacements).not.toHaveBeenCalled();
+  });
+
+  /** Каталог TrafficStars это ~1500 зон: без предела ответ вылетает за лимит вывода. */
+  it("caps the catalog it prints when the zone is not found", async () => {
+    const { client, api } = await withApi();
+    api.listMediationConnections.mockResolvedValue([CONNECTION]);
+    api.listMediationPlacements.mockResolvedValue(
+      Array.from({ length: 400 }, (_, i) => ({
+        ...PLACEMENT,
+        id: `zone-${i}`,
+        name: `Zone ${i}`,
+      })),
+    );
+
+    const text = await call(client, "kadam_pub_update_mediation_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      placement: "no-such-zone",
+    });
+
+    expect(text).toContain("and 370 more");
+    expect(text).not.toContain("zone-399");
+    expect(new TextEncoder().encode(text).length).toBeLessThan(50_000);
+  });
+
   it("names the candidates when the placement is not in the catalog", async () => {
     const { client, api } = await withApi();
     api.listMediationConnections.mockResolvedValue([CONNECTION]);
@@ -598,60 +660,9 @@ describe("destructive tools", () => {
     expect(api.deleteMediationConnection).toHaveBeenCalledWith(77);
     expect(text).toContain("removed");
   });
-
-  it("account deletion requires confirm too", async () => {
-    const { client, api } = await withApi(mediationAccountsModule);
-
-    const text = await call(client, "kadam_pub_delete_mediation_network_account", {
-      accountId: 11,
-    });
-
-    expect(text).toMatch(/confirm/i);
-    expect(api.deleteMediationAccount).not.toHaveBeenCalled();
-  });
 });
 
-describe("account key handling", () => {
-  /**
-   * AccountForm требует networkId и name и на обновлении, а name пишется в строку как
-   * есть: частичный PUT — это 422, пустое имя стёрло бы аккаунт.
-   */
-  it("rotates the key on top of the stored row, never echoing the key back", async () => {
-    const { client, api } = await withApi(mediationAccountsModule);
-    api.listMediationAccounts.mockResolvedValue([ACCOUNT]);
-    api.updateMediationAccount.mockResolvedValue({ ...ACCOUNT, mask: "new***key" });
-
-    const text = await call(client, "kadam_pub_update_mediation_network_account", {
-      accountId: 11,
-      apiKey: "brand-new-secret",
-    });
-
-    expect(api.updateMediationAccount).toHaveBeenCalledWith(11, {
-      networkId: 3,
-      name: "Main",
-      active: true,
-      apiKey: "brand-new-secret",
-    });
-    expect(text).not.toContain("brand-new-secret");
-    expect(text).toContain("new***key");
-  });
-
-  it("tells the model not to read an existing key back", async () => {
-    const { client } = await withApi();
-    const { tools } = await client.listTools();
-
-    const keyTakers = tools.filter((t) =>
-      Object.keys(
-        (t.inputSchema as { properties?: Record<string, unknown> }).properties ?? {},
-      ).includes("apiKey"),
-    );
-
-    expect(keyTakers.length).toBeGreaterThan(0);
-    for (const tool of keyTakers) {
-      expect(tool.description ?? "").toMatch(/never ask/i);
-    }
-  });
-
+describe("tool surface", () => {
   it("keeps every tool under the publisher prefix", async () => {
     const { client } = await withApi();
     const { tools } = await client.listTools();

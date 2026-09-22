@@ -265,6 +265,20 @@ export const mediationModule: ToolModule = {
         const current = await findConnection(ctx.pub, args.adUnitId, args.connectionId);
         if (typeof current === "string") return current;
 
+        // A zone belongs to one account, so moving the connection to another account
+        // without naming a zone would keep an id the new account does not own.
+        if (
+          args.accountId != null &&
+          args.accountId !== current.accountId &&
+          args.placement == null
+        ) {
+          return (
+            `Account #${args.accountId} owns different zones than #${current.accountId}. ` +
+            `Repeat with placement=<zone id or name> from the new account, or call ` +
+            `kadam_pub_list_mediation_networks to see what it has.`
+          );
+        }
+
         // A zone is identified by its id; the catalog also prints a name, so what the
         // publisher says has to be resolved the same way as on connect.
         let placement: MediationPlacement | undefined;
@@ -289,7 +303,9 @@ export const mediationModule: ToolModule = {
           ...(placement != null && {
             extBlockId: placement.id,
             extBlockName: placement.name,
-            ...(args.tagTemplate == null ? tagOf(placement) : {}),
+            // Шаблон перезаписывается всегда: пустая строка на бэкенде означает «код сети
+            // по умолчанию», а пропуск поля оставил бы код прежней зоны служить новой.
+            ...(args.tagTemplate == null && { tagTemplate: placement.tag?.trim() ?? "" }),
           }),
           ...(args.accountId != null && { accountId: args.accountId }),
         });
