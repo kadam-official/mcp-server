@@ -16,7 +16,9 @@ const PUB_SECTION = `Publishers:
   - Register websites (sources) and verify domain ownership
   - Create ad units (placements) for different ad formats
   - Monitor revenue, impressions, clicks via reports
-  - Manage site status (active, paused, archived)`;
+  - Manage site status (active, paused, archived)
+  - Sell traffic through outside ad networks alongside Kadam demand — external
+    monetization, called "mediation" in the cabinet (kadam://reference/external-monetization)`;
 
 const ADV_AUTH = "  - Advertiser API key: partners.kadam.net -> Profile -> API";
 const PUB_AUTH = "  - Publisher API key: pub.kadam.net -> Profile -> API";

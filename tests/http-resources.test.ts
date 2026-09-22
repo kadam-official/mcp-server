@@ -108,11 +108,12 @@ describe("resource cabinet scoping", () => {
     ]);
   });
 
-  it("pub session lists exactly the 4 publisher resources and no advertiser ones", async () => {
+  it("pub session lists exactly the 5 publisher resources and no advertiser ones", async () => {
     const uris = await listUris("pub", { pubKey: "b" });
     expect(uris).toEqual([
       "kadam://reference/ad-unit-types",
       "kadam://reference/api-overview",
+      "kadam://reference/external-monetization",
       "kadam://reference/report-dimensions",
       "kadam://reference/site-states",
     ]);

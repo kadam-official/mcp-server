@@ -1,7 +1,10 @@
 import type { ReportConfig } from "../api/schemas/common.js";
 import type { ReportConfigGroup, ReportConfigMetric } from "../api/schemas/common.js";
 
-export const METRIC_ALIASES: Record<string, string> = {
+/** A friendly name maps to one id, or to candidates ranked by cabinet (see resolveAlias). */
+export type DimensionAliases = Record<string, string | string[]>;
+
+export const METRIC_ALIASES: DimensionAliases = {
   // Advertiser metrics
   spend: "finance_moneyOut",
   spending: "finance_moneyOut",
@@ -45,9 +48,13 @@ export const METRIC_ALIASES: Record<string, string> = {
   unsubscriptions: "traffic_unsubscriptions",
   block_views: "traffic_blockViews",
   viewrate: "traffic_viewRate",
+  // External monetization (the cabinet calls it mediation): the split of the same income.
+  kadam_revenue: "finance_moneyInKadam",
+  external_revenue: "finance_moneyInMediation",
+  mediation_revenue: "finance_moneyInMediation",
 };
 
-const GROUP_ALIASES: Record<string, string> = {
+const GROUP_ALIASES: DimensionAliases = {
   day: "time_day",
   hour: "time_hour",
   week: "time_week",
@@ -76,7 +83,7 @@ const GROUP_ALIASES: Record<string, string> = {
   format: "traffic_format",
   block_format: "traffic_blockFormat",
   block_size: "traffic_blockSize",
-  site: "traffic_macros",
+  site: ["webmaster_source", "traffic_macros"],
   isp: "traffic_isp",
   city: "traffic_city",
   connection: "traffic_connectionType",
@@ -84,11 +91,18 @@ const GROUP_ALIASES: Record<string, string> = {
   // Publisher-specific groups
   source: "webmaster_source",
   block: "webmaster_block",
+  ad_unit: "webmaster_block",
   subid: "webmaster_subId",
   domain: "traffic_domain",
   pid: "traffic_pid",
   sub_age: "traffic_subsAge",
   category: "traffic_pageCategory",
+  // External monetization (a.k.a. mediation); network 0 is Kadam's own demand.
+  network: "mediation_network",
+  external_network: "mediation_network",
+  mediation_network: "mediation_network",
+  external_placement: "mediation_block",
+  mediation_placement: "mediation_block",
 };
 
 function flattenConfig(
@@ -101,8 +115,22 @@ function flattenConfig(
   return ids;
 }
 
-export function resolveAlias(name: string, aliases: Record<string, string>): string {
-  return aliases[name.trim().toLowerCase()] ?? name;
+/**
+ * Both cabinets share these maps, and a few friendly names mean different ids in each:
+ * for a publisher "site" is their own website, for an advertiser it is the placement the
+ * ad ran on. Such a name lists candidates; the first id this cabinet's report config
+ * actually has wins, and `available` is exactly that config.
+ */
+export function resolveAlias(
+  name: string,
+  aliases: DimensionAliases,
+  available?: Set<string>,
+): string {
+  const target = aliases[name.trim().toLowerCase()];
+  if (target === undefined) return name;
+  if (typeof target === "string") return target;
+
+  return available ? (target.find((id) => available.has(id)) ?? target[0]!) : target[0]!;
 }
 
 export interface ResolvedDimensions {
@@ -114,7 +142,7 @@ export interface ResolvedDimensions {
 
 function resolveDimensions(
   names: string | undefined,
-  aliases: Record<string, string>,
+  aliases: DimensionAliases,
   available: Set<string>,
 ): ResolvedDimensions {
   if (!names?.trim()) return { ids: [], unknown: [] };
@@ -123,7 +151,7 @@ function resolveDimensions(
   for (const raw of names.split(",")) {
     const name = raw.trim();
     if (!name) continue;
-    const id = resolveAlias(name, aliases);
+    const id = resolveAlias(name, aliases, available);
     if (available.has(id)) ids.push(id);
     else unknown.push(name);
   }
@@ -157,13 +185,14 @@ export function resolveGroupIds(names: string | undefined, config: ReportConfig)
  */
 function describeDimensions(
   config: Record<string, (ReportConfigGroup | ReportConfigMetric)[]>,
-  aliases: Record<string, string>,
+  aliases: DimensionAliases,
 ): string {
   const available = flattenConfig(config);
-  const aliasTargets = new Set(Object.values(aliases));
+  const aliasTargets = new Set(Object.values(aliases).flat());
   const seenTargets = new Set<string>();
   const friendly: string[] = [];
-  for (const [name, id] of Object.entries(aliases)) {
+  for (const name of Object.keys(aliases)) {
+    const id = resolveAlias(name, aliases, available);
     if (!available.has(id) || seenTargets.has(id)) continue;
     seenTargets.add(id);
     friendly.push(name);

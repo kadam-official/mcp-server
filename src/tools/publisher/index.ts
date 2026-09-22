@@ -3,10 +3,12 @@ import { sourcesModule } from "./sources.js";
 import { adUnitsModule } from "./ad-units.js";
 import { usersModule } from "./users.js";
 import { pubStatsModule } from "./stats.js";
+import { externalMonetizationModule } from "./external-monetization.js";
 
 export const pubToolModules: ToolModule[] = [
   sourcesModule,
   adUnitsModule,
   usersModule,
   pubStatsModule,
+  externalMonetizationModule,
 ];

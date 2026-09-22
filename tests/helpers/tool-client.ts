@@ -134,6 +134,20 @@ export function createMockPubClient() {
     getUserInfo: vi.fn(),
     getReportConfig: vi.fn(),
     getReportData: vi.fn(),
+    getExternalMonetizationSummary: vi.fn(),
+    listExternalMonetizationAdUnits: vi.fn(),
+    listExternalNetworks: vi.fn(),
+    getExternalMonetizationOptions: vi.fn(),
+    listExternalNetworkAccounts: vi.fn(),
+    createExternalNetworkAccount: vi.fn(),
+    updateExternalNetworkAccount: vi.fn(),
+    deleteExternalNetworkAccount: vi.fn(),
+    listExternalPlacements: vi.fn(),
+    listExternalConnections: vi.fn(),
+    createExternalConnection: vi.fn(),
+    updateExternalConnection: vi.fn(),
+    deleteExternalConnection: vi.fn(),
+    retestExternalConnection: vi.fn(),
   };
 }
 
