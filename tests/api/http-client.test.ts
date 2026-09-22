@@ -178,6 +178,27 @@ describe("HttpClient", () => {
     );
   });
 
+  /**
+   * Кабинет паба отвечает HTTP 200 и кладёт отказ в конверт, поэтому путь через
+   * response.ok сюда не заходит: код и текст обязан донести unwrapApiResponse. По этому
+   * тексту клиент отличает выключенную фичу от чужого ключа — оба приезжают 403.
+   */
+  it("403 envelope on HTTP 200: keeps the server's reason and the code", async () => {
+    const client = createClient();
+    fetchMock.mockResolvedValue(
+      mockResponse(200, {
+        success: false,
+        code: 403,
+        msg: { exception: "External monetization is not enabled for this account" },
+      }),
+    );
+
+    await expect(client.get("/test")).rejects.toMatchObject({
+      status: 403,
+      message: "External monetization is not enabled for this account",
+    });
+  });
+
   it("422 with a JSON-encoded errors string in message: parses and flattens it", async () => {
     const client = createClient();
     fetchMock.mockResolvedValue(

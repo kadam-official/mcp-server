@@ -133,7 +133,7 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (46)
+## Tools (47)
 
 ### Advertiser Tools (30)
 
@@ -191,7 +191,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_list_finance_operations` | Transaction history (deposits, charges, refunds)                                                                                                                                 | readOnly    |
 | `kadam_adv_get_stats`               | Unified statistics — 3 report types via `reportType` param: `custom` (report builder with dimension/metric mapping), `sites` (per-site breakdown), `postbacks` (conversion logs) | readOnly    |
 
-### Publisher Tools (16)
+### Publisher Tools (17)
 
 Requires `KADAM_PUB_API_KEY`.
 

@@ -4,6 +4,7 @@ import {
   type MockPubClient,
 } from "../../helpers/tool-client.js";
 import { externalMonetizationModule } from "../../../src/tools/publisher/external-monetization.js";
+import { externalMonetizationAccountsModule } from "../../../src/tools/publisher/external-monetization-accounts.js";
 import { resetConfig } from "../../../src/config.js";
 
 vi.mock("../../../src/logger.js", () => ({
@@ -73,11 +74,11 @@ const CONNECTION = {
   testSlicesPending: 0,
 };
 
-async function withApi(): Promise<{
+async function withApi(module = externalMonetizationModule): Promise<{
   client: Awaited<ReturnType<typeof createToolClient>>["client"];
   api: MockPubClient;
 }> {
-  const { client, mockApi } = await createToolClient(externalMonetizationModule);
+  const { client, mockApi } = await createToolClient(module);
   return { client, api: mockApi as MockPubClient };
 }
 
@@ -140,6 +141,9 @@ describe("connect_external_network", () => {
       accountId: 11,
       extBlockId: "00fcc7f5",
       extBlockName: "Popunder RU",
+      // Сети, которые выдают свой код зоны, обязаны донести его до подключения: пустой
+      // тег означает «дефолт сети», а у зоны он свой.
+      tagTemplate: "https://tsyndicate.com/x",
     });
     expect(text).toContain("TrafficStars connected to ad unit #4242");
     expect(text).toContain("Connection #77");
@@ -216,7 +220,7 @@ describe("connect_external_network", () => {
     });
 
     expect(text).toContain("No account in TrafficStars yet");
-    expect(text).toContain("api_key");
+    expect(text).toContain("apiKey");
     expect(api.createExternalConnection).not.toHaveBeenCalled();
   });
 
@@ -270,6 +274,134 @@ describe("connect_external_network", () => {
     expect(text).toContain("TrafficStars (trafficstars)");
   });
 
+  it("does not read an account as missing just because it is disabled", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listExternalNetworkAccounts.mockResolvedValue([{ ...ACCOUNT, active: false }]);
+
+    const text = await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+    });
+
+    expect(text).toContain("disabled");
+    expect(text).toContain("active: true");
+    expect(api.createExternalNetworkAccount).not.toHaveBeenCalled();
+  });
+
+  it("refuses a disabled account named explicitly instead of letting the API reject it", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listExternalNetworkAccounts.mockResolvedValue([{ ...ACCOUNT, active: false }]);
+
+    const text = await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+      accountId: 11,
+    });
+
+    expect(text).toContain("is disabled");
+    expect(api.createExternalConnection).not.toHaveBeenCalled();
+  });
+
+  it("reports an accountId that belongs to another network", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listExternalNetworkAccounts.mockResolvedValue([ACCOUNT]);
+
+    const text = await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+      accountId: 999,
+    });
+
+    expect(text).toContain("No account #999 in TrafficStars");
+    expect(api.createExternalConnection).not.toHaveBeenCalled();
+  });
+
+  it("asks for the OAuth pair on a network that needs one", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({
+      networks: [
+        {
+          ...NETWORK,
+          id: 4,
+          slug: "twinred",
+          name: "TwinRed",
+          authType: "oauth2_client_credentials",
+          credentialFields: ["client_id", "client_secret"],
+        },
+      ],
+      geo: [],
+    });
+    api.listExternalNetworkAccounts.mockResolvedValue([]);
+
+    const text = await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "twinred",
+    });
+
+    expect(text).toContain("clientId + clientSecret");
+    expect(text).not.toContain("client_id");
+  });
+
+  it("creates an OAuth account from the pair the publisher dictates", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({
+      networks: [
+        {
+          ...NETWORK,
+          id: 4,
+          slug: "twinred",
+          name: "TwinRed",
+          authType: "oauth2_client_credentials",
+          credentialFields: ["client_id", "client_secret"],
+        },
+      ],
+      geo: [],
+    });
+    api.listExternalNetworkAccounts.mockResolvedValue([]);
+    api.createExternalNetworkAccount.mockResolvedValue({ ...ACCOUNT, id: 20, networkId: 4 });
+    api.listExternalPlacements.mockResolvedValue([{ ...PLACEMENT, tag: null }]);
+    api.createExternalConnection.mockResolvedValue(CONNECTION);
+
+    await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "TwinRed",
+      clientId: "id-1",
+      clientSecret: "secret-1",
+    });
+
+    expect(api.createExternalNetworkAccount).toHaveBeenCalledWith({
+      networkId: 4,
+      name: "TwinRed account",
+      clientId: "id-1",
+      clientSecret: "secret-1",
+    });
+    // Зона без своего кода — тег не передаём, подключение возьмёт дефолт сети.
+    expect(api.createExternalConnection).toHaveBeenCalledWith(
+      expect.not.objectContaining({ tagTemplate: expect.anything() }),
+    );
+  });
+
+  it("warns when the only fitting zone belongs to another site", async () => {
+    const { client, api } = await withApi();
+    api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listExternalNetworkAccounts.mockResolvedValue([ACCOUNT]);
+    api.listExternalPlacements.mockResolvedValue([
+      { ...PLACEMENT, matchesSite: false, site: "other.example" },
+    ]);
+    api.createExternalConnection.mockResolvedValue(CONNECTION);
+
+    const text = await call(client, "kadam_pub_connect_external_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+    });
+
+    expect(text).toContain("other.example");
+    expect(api.createExternalConnection).toHaveBeenCalled();
+  });
+
   it("passes fresh through so a zone created a minute ago is visible", async () => {
     const { client, api } = await withApi();
     api.getExternalMonetizationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
@@ -305,21 +437,48 @@ describe("update_external_network", () => {
     );
   });
 
-  it("drops the previous zone's name when the placement changes", async () => {
+  /**
+   * Каталог печатает и id зоны, и её имя. Имя, записанное в extBlockID, даёт подключение,
+   * которое коллектор никогда не сопоставит, поэтому оно разрешается так же, как на
+   * подключении.
+   */
+  it("resolves a placement named by the publisher into its zone id", async () => {
     const { client, api } = await withApi();
     api.listExternalConnections.mockResolvedValue([CONNECTION]);
+    api.listExternalPlacements.mockResolvedValue([
+      { ...PLACEMENT, id: "deadbeef", name: "Popunder US", tag: "https://tsyndicate.com/us" },
+    ]);
     api.updateExternalConnection.mockResolvedValue({ ...CONNECTION, extBlockId: "deadbeef" });
 
     await call(client, "kadam_pub_update_external_network", {
       adUnitId: 4242,
       connectionId: 77,
-      placement: "deadbeef",
+      placement: "Popunder US",
     });
 
     expect(api.updateExternalConnection).toHaveBeenCalledWith(
       77,
-      expect.objectContaining({ extBlockId: "deadbeef", extBlockName: "" }),
+      expect.objectContaining({
+        extBlockId: "deadbeef",
+        extBlockName: "Popunder US",
+        tagTemplate: "https://tsyndicate.com/us",
+      }),
     );
+  });
+
+  it("names the candidates when the placement is not in the catalog", async () => {
+    const { client, api } = await withApi();
+    api.listExternalConnections.mockResolvedValue([CONNECTION]);
+    api.listExternalPlacements.mockResolvedValue([PLACEMENT]);
+
+    const text = await call(client, "kadam_pub_update_external_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      placement: "no-such-zone",
+    });
+
+    expect(text).toContain('No placement "no-such-zone"');
+    expect(api.updateExternalConnection).not.toHaveBeenCalled();
   });
 
   it("reports the ids that do exist when the connection is not on that ad unit", async () => {
@@ -357,6 +516,23 @@ describe("set_external_network_status", () => {
     expect(text).toContain("is now paused");
   });
 
+  it("activates through an update that preserves the rest of the row", async () => {
+    const { client, api } = await withApi();
+    api.listExternalConnections.mockResolvedValue([{ ...CONNECTION, active: false, uniqCap: 7 }]);
+    api.updateExternalConnection.mockResolvedValue({ ...CONNECTION, uniqCap: 7 });
+
+    await call(client, "kadam_pub_set_external_network_status", {
+      adUnitId: 4242,
+      connectionId: 77,
+      status: "active",
+    });
+
+    expect(api.updateExternalConnection).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({ active: true, uniqCap: 7 }),
+    );
+  });
+
   it("retests through the dedicated endpoint, reusing the current share", async () => {
     const { client, api } = await withApi();
     api.listExternalConnections.mockResolvedValue([{ ...CONNECTION, testShare: 25 }]);
@@ -366,10 +542,9 @@ describe("set_external_network_status", () => {
       testState: "running",
     });
 
-    const text = await call(client, "kadam_pub_set_external_network_status", {
+    const text = await call(client, "kadam_pub_retest_external_network", {
       adUnitId: 4242,
       connectionId: 77,
-      status: "retest",
     });
 
     expect(api.retestExternalConnection).toHaveBeenCalledWith(77, 25);
@@ -382,10 +557,9 @@ describe("set_external_network_status", () => {
     api.listExternalConnections.mockResolvedValue([CONNECTION]);
     api.retestExternalConnection.mockResolvedValue({ ...CONNECTION, testShare: 10 });
 
-    await call(client, "kadam_pub_set_external_network_status", {
+    await call(client, "kadam_pub_retest_external_network", {
       adUnitId: 4242,
       connectionId: 77,
-      status: "retest",
     });
 
     expect(api.retestExternalConnection).toHaveBeenCalledWith(77, 10);
@@ -394,10 +568,9 @@ describe("set_external_network_status", () => {
   it("refuses a share above the backend cap before calling the API", async () => {
     const { client, api } = await withApi();
 
-    const text = await call(client, "kadam_pub_set_external_network_status", {
+    const text = await call(client, "kadam_pub_retest_external_network", {
       adUnitId: 4242,
       connectionId: 77,
-      status: "retest",
       testShare: 80,
     });
 
@@ -430,17 +603,23 @@ describe("destructive tools", () => {
   });
 
   it("account deletion requires confirm too", async () => {
-    const { client, api } = await withApi();
+    const { client, api } = await withApi(externalMonetizationAccountsModule);
 
-    await call(client, "kadam_pub_delete_external_network_account", { accountId: 11 });
+    const text = await call(client, "kadam_pub_delete_external_network_account", { accountId: 11 });
 
+    expect(text).toMatch(/confirm/i);
     expect(api.deleteExternalNetworkAccount).not.toHaveBeenCalled();
   });
 });
 
 describe("account key handling", () => {
-  it("rotates the key and never echoes it back", async () => {
-    const { client, api } = await withApi();
+  /**
+   * AccountForm требует networkId и name и на обновлении, а name пишется в строку как
+   * есть: частичный PUT — это 422, пустое имя стёрло бы аккаунт.
+   */
+  it("rotates the key on top of the stored row, never echoing the key back", async () => {
+    const { client, api } = await withApi(externalMonetizationAccountsModule);
+    api.listExternalNetworkAccounts.mockResolvedValue([ACCOUNT]);
     api.updateExternalNetworkAccount.mockResolvedValue({ ...ACCOUNT, mask: "new***key" });
 
     const text = await call(client, "kadam_pub_update_external_network_account", {
@@ -449,6 +628,9 @@ describe("account key handling", () => {
     });
 
     expect(api.updateExternalNetworkAccount).toHaveBeenCalledWith(11, {
+      networkId: 3,
+      name: "Main",
+      active: true,
       apiKey: "brand-new-secret",
     });
     expect(text).not.toContain("brand-new-secret");
@@ -475,7 +657,7 @@ describe("account key handling", () => {
     const { client } = await withApi();
     const { tools } = await client.listTools();
 
-    expect(tools.length).toBe(7);
+    expect(tools.length).toBe(6);
     for (const tool of tools) expect(tool.name).toMatch(/^kadam_pub_/);
   });
 });
