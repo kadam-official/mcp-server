@@ -10,7 +10,8 @@ own demand. Kadam predicts what each network pays and gives the impression to wh
 worth more, so the publisher runs one ad unit, not several.
 
 Vocabulary:
-- Network  — the outside ad network (Monetag, ExoClick, TrafficStars, TwinRed, ...).
+- Network  — the outside ad network (Monetag, ExoClick, TrafficStars, TwinRed, ClickAdilla,
+             Trafficshop, HilltopAds, ...).
              Network id 0 is Kadam itself, so reports show "Kadam" as one of the networks.
 - Account  — the publisher's own account at that network, stored as an API key. One
              account per network serves every ad unit. The API returns only a mask of the

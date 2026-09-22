@@ -171,14 +171,17 @@ export async function resolvePlacement(
 
   if (wanted != null) {
     const needle = wanted.trim().toLowerCase();
-    const picked = placements.find(
-      (p) => p.id.toLowerCase() === needle || p.name.toLowerCase() === needle,
-    );
+    const byId = placements.find((p) => p.id.toLowerCase() === needle);
+    if (byId) return byId;
 
-    return (
-      picked ??
-      `No placement "${wanted}" on account #${accountId}. Available:\n${previewLines(placements)}`
-    );
+    // Zone names are not unique at a network (HilltopAds repeats "Popunder desktop" per site).
+    const byName = placements.filter((p) => p.name.toLowerCase() === needle);
+    if (byName.length === 1) return byName[0]!;
+    if (byName.length > 1) {
+      return `Several placements are named "${wanted}" — repeat with the placement id:\n${previewLines(byName)}`;
+    }
+
+    return `No placement "${wanted}" on account #${accountId}. Available:\n${previewLines(placements)}`;
   }
 
   // Format first, site second: the backend ranks them that way because the same site is

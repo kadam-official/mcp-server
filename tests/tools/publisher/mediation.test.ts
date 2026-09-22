@@ -413,6 +413,74 @@ describe("connect_mediation_network", () => {
 
     expect(api.listMediationPlacements).toHaveBeenCalledWith(11, 4242, true);
   });
+
+  /**
+   * У HilltopAds зона — число или пара desktop+mobile, а шаблона у сети нет: тег есть только
+   * у строки каталога. Составной id обязан доехать до подключения как есть, вместе с тегом.
+   */
+  it("connects a HilltopAds zone by its desktop+mobile pair id and carries its tag", async () => {
+    const { client, api } = await withApi();
+    const hilltop = { ...NETWORK, id: 7, slug: "hilltopads", name: "HilltopAds" };
+    const zone = {
+      ...PLACEMENT,
+      id: "7438273-7438277",
+      name: "up_kad_pop",
+      site: "upornia.com",
+      tag: "https://idlerelief.com/bU3.Vm0?sId={sub_id}",
+    };
+    api.getMediationOptions.mockResolvedValue({ networks: [hilltop], geo: [] });
+    api.listMediationAccounts.mockResolvedValue([{ ...ACCOUNT, networkId: 7 }]);
+    api.listMediationPlacements.mockResolvedValue([
+      { ...PLACEMENT, id: "7438273", name: "desktop half", tag: "https://idlerelief.com/x" },
+      zone,
+    ]);
+    api.createMediationConnection.mockResolvedValue({
+      ...CONNECTION,
+      networkId: 7,
+      extBlockId: zone.id,
+    });
+
+    await call(client, "kadam_pub_connect_mediation_network", {
+      adUnitId: 4242,
+      network: "hilltopads",
+      placement: "7438273-7438277",
+    });
+
+    expect(api.createMediationConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        networkId: 7,
+        extBlockId: "7438273-7438277",
+        extBlockName: "up_kad_pop",
+        tagTemplate: "https://idlerelief.com/bU3.Vm0?sId={sub_id}",
+      }),
+    );
+  });
+
+  /**
+   * Имена зон у сети не уникальны: у HilltopAds «Popunder desktop» стоит на десятках сайтов.
+   * Первая попавшаяся по имени — это чужой сайт и чужие деньги, поэтому неоднозначное имя
+   * возвращает кандидатов с их id, а не подключает.
+   */
+  it("lists the candidates instead of picking one when several zones share the name", async () => {
+    const { client, api } = await withApi();
+    api.getMediationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listMediationAccounts.mockResolvedValue([ACCOUNT]);
+    api.listMediationPlacements.mockResolvedValue([
+      { ...PLACEMENT, id: "906", name: "Popunder desktop", site: "voyeurhit.com" },
+      { ...PLACEMENT, id: "932", name: "Popunder desktop", site: "hdzog.com" },
+    ]);
+
+    const text = await call(client, "kadam_pub_connect_mediation_network", {
+      adUnitId: 4242,
+      network: "trafficstars",
+      placement: "popunder desktop",
+    });
+
+    expect(api.createMediationConnection).not.toHaveBeenCalled();
+    expect(text).toContain("906");
+    expect(text).toContain("932");
+    expect(text).toContain("hdzog.com");
+  });
 });
 
 describe("update_mediation_network", () => {
