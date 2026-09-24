@@ -245,8 +245,8 @@ export const mediationModule: ToolModule = {
           `${DOMAIN}: change an existing connection — geo, unique cap, proxy traffic, tag ` +
           `template, placement or account. Only the fields you pass change; the rest is read ` +
           `from the stored connection and written back, so an edit made elsewhere in between ` +
-          `is overwritten (last write wins). fresh=true skips the catalog cache when placement ` +
-          `names a zone created at the network a moment ago.`,
+          `is overwritten (last write wins). An empty tagTemplate is ignored. fresh=true skips ` +
+          `the catalog cache when placement names a zone created at the network a moment ago.`,
         product: "publisher",
         annotations: { title: "Update a mediation connection", readOnlyHint: false },
       },
@@ -264,6 +264,9 @@ export const mediationModule: ToolModule = {
       async (args, ctx) => {
         const current = await findConnection(ctx.pub, args.adUnitId, args.connectionId);
         if (typeof current === "string") return current;
+
+        // Agents send "" for optional strings they do not use; that must not wipe the stored code.
+        const ownTag = args.tagTemplate?.trim();
 
         // A zone belongs to one account, so moving the connection to another account
         // without naming a zone would keep an id the new account does not own.
@@ -308,7 +311,7 @@ export const mediationModule: ToolModule = {
           ...(args.geo != null && { geo: args.geo }),
           ...(args.uniqCap != null && { uniqCap: args.uniqCap }),
           ...(args.allowProxy != null && { allowProxy: args.allowProxy }),
-          ...(args.tagTemplate != null && { tagTemplate: args.tagTemplate }),
+          ...(ownTag ? { tagTemplate: ownTag } : {}),
           ...zone,
           ...(args.accountId != null && { accountId: args.accountId }),
         });

@@ -217,7 +217,7 @@ export async function zoneCode(
   own: string | undefined,
 ): Promise<{ tagTemplate: string } | string> {
   // Agents send "" for optional strings they do not use; that is not a code.
-  if (own?.trim()) return { tagTemplate: own };
+  if (own?.trim()) return { tagTemplate: own.trim() };
 
   const listed = placement.tag?.trim();
   if (listed) return { tagTemplate: listed };

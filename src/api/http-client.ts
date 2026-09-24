@@ -183,6 +183,7 @@ export class HttpClient {
         if (error instanceof DOMException && error.name === "AbortError") {
           lastError = new Error(`Request timed out after ${this.timeout}ms: ${url}`);
           if (attempt < maxRetries) continue;
+          throw lastError;
         }
 
         lastError = error instanceof Error ? error : new Error(String(error));

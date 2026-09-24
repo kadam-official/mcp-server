@@ -287,6 +287,28 @@ describe("HttpClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("POST with retry:false: a timeout says it timed out", async () => {
+    const client = createClient({ maxRetries: 3 });
+    fetchMock.mockRejectedValue(new DOMException("The operation was aborted.", "AbortError"));
+
+    await expect(client.post("/write", {}, { retry: false })).rejects.toThrow(/timed out after/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("429 on every attempt: reported as rate limited once retries run out", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 1 });
+    fetchMock.mockResolvedValue(mockResponse(429, {}, { "Retry-After": "1" }));
+
+    const promise = client.get("/test");
+    const settled = expect(promise).rejects.toMatchObject({ status: 429 });
+    await vi.advanceTimersByTimeAsync(2000);
+    await settled;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
   it("POST without options keeps retrying as before", async () => {
     vi.useFakeTimers();
     const client = createClient({ maxRetries: 1 });

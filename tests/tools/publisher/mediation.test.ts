@@ -5,6 +5,7 @@ import {
 } from "../../helpers/tool-client.js";
 import { mediationModule } from "../../../src/tools/publisher/mediation.js";
 import { resetConfig } from "../../../src/config.js";
+import { ApiError } from "../../../src/api/http-client.js";
 
 vi.mock("../../../src/logger.js", () => ({
   logger: { child: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
@@ -503,6 +504,24 @@ describe("connect_mediation_network", () => {
       );
     });
 
+    it.each([
+      [404, "Resource not found"],
+      [503, "API error (503)"],
+    ])("does not connect when the zone code request fails with %i", async (status, shown) => {
+      const { client, api } = await hilltopApi();
+      api.getMediationPlacementTag.mockRejectedValue(new ApiError("nope", status));
+
+      const text = await call(client, "kadam_pub_connect_mediation_network", {
+        adUnitId: 4242,
+        network: "hilltopads",
+        placement: "7438273-7438277",
+      });
+
+      expect(api.getMediationPlacementTag).toHaveBeenCalledTimes(1);
+      expect(api.createMediationConnection).not.toHaveBeenCalled();
+      expect(text).toContain(shown);
+    });
+
     /** Агенты шлют "" в неиспользуемые строковые аргументы — это не свой код. */
     it("treats a blank tagTemplate as none and still fetches the zone code", async () => {
       const { client, api } = await hilltopApi();
@@ -616,6 +635,25 @@ describe("update_mediation_network", () => {
     expect(api.updateMediationConnection).toHaveBeenCalledWith(
       77,
       expect.objectContaining({ geo: [34], uniqCap: 5, testShare: 30, extBlockId: "00fcc7f5" }),
+    );
+  });
+
+  /** Агенты шлют "" в неиспользуемые строковые аргументы: это не должно стирать код зоны. */
+  it("keeps the stored code when tagTemplate comes blank", async () => {
+    const { client, api } = await withApi();
+    api.listMediationConnections.mockResolvedValue([CONNECTION]);
+    api.updateMediationConnection.mockResolvedValue(CONNECTION);
+
+    await call(client, "kadam_pub_update_mediation_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      geo: [34],
+      tagTemplate: " ",
+    });
+
+    expect(api.updateMediationConnection).toHaveBeenCalledWith(
+      77,
+      expect.objectContaining({ geo: [34], tagTemplate: "https://tsyndicate.com/x" }),
     );
   });
 
