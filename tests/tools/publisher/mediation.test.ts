@@ -503,6 +503,24 @@ describe("connect_mediation_network", () => {
       );
     });
 
+    /** Агенты шлют "" в неиспользуемые строковые аргументы — это не свой код. */
+    it("treats a blank tagTemplate as none and still fetches the zone code", async () => {
+      const { client, api } = await hilltopApi();
+      api.getMediationPlacementTag.mockResolvedValue(CODE);
+
+      await call(client, "kadam_pub_connect_mediation_network", {
+        adUnitId: 4242,
+        network: "hilltopads",
+        placement: "7438273-7438277",
+        tagTemplate: "  ",
+      });
+
+      expect(api.getMediationPlacementTag).toHaveBeenCalledTimes(1);
+      expect(api.createMediationConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ tagTemplate: CODE }),
+      );
+    });
+
     it("fetches the code of the new zone when an update moves the connection to it", async () => {
       const { client, api } = await hilltopApi();
       api.listMediationConnections.mockResolvedValue([{ ...CONNECTION, networkId: 7 }]);

@@ -216,7 +216,8 @@ export async function zoneCode(
   network: MediationNetwork | undefined,
   own: string | undefined,
 ): Promise<{ tagTemplate: string } | string> {
-  if (own != null) return { tagTemplate: own };
+  // Agents send "" for optional strings they do not use; that is not a code.
+  if (own?.trim()) return { tagTemplate: own };
 
   const listed = placement.tag?.trim();
   if (listed) return { tagTemplate: listed };
