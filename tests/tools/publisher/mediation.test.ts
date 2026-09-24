@@ -352,6 +352,7 @@ describe("connect_mediation_network", () => {
           name: "TwinRed",
           authType: "oauth2_client_credentials",
           credentialFields: ["client_id", "client_secret"],
+          defaultTag: "https://ad.twinrdengine.com/adraw?zone={ext_block_id}",
         },
       ],
       geo: [],
@@ -415,45 +416,144 @@ describe("connect_mediation_network", () => {
   });
 
   /**
-   * У HilltopAds зона — число или пара desktop+mobile, а шаблона у сети нет: тег есть только
-   * у строки каталога. Составной id обязан доехать до подключения как есть, вместе с тегом.
+   * У HilltopAds зона — число или пара desktop+mobile, а шаблона у сети нет. Каталог — только
+   * список: код выбранной зоны берётся отдельным запросом. Составной id обязан доехать до
+   * подключения как есть, вместе с этим кодом.
    */
-  it("connects a HilltopAds zone by its desktop+mobile pair id and carries its tag", async () => {
-    const { client, api } = await withApi();
-    const hilltop = { ...NETWORK, id: 7, slug: "hilltopads", name: "HilltopAds" };
-    const zone = {
+  describe("a network whose catalog lists zones without their code", () => {
+    const HILLTOP = { ...NETWORK, id: 7, slug: "hilltopads", name: "HilltopAds", defaultTag: "" };
+    const ZONE = {
       ...PLACEMENT,
       id: "7438273-7438277",
       name: "up_kad_pop",
       site: "upornia.com",
-      tag: "https://idlerelief.com/bU3.Vm0?sId={sub_id}",
+      tag: null,
     };
-    api.getMediationOptions.mockResolvedValue({ networks: [hilltop], geo: [] });
-    api.listMediationAccounts.mockResolvedValue([{ ...ACCOUNT, networkId: 7 }]);
-    api.listMediationPlacements.mockResolvedValue([
-      { ...PLACEMENT, id: "7438273", name: "desktop half", tag: "https://idlerelief.com/x" },
-      zone,
-    ]);
-    api.createMediationConnection.mockResolvedValue({
-      ...CONNECTION,
-      networkId: 7,
-      extBlockId: zone.id,
+    const CODE = "https://idlerelief.com/bU3.Vm0?sId={sub_id}";
+
+    async function hilltopApi() {
+      const { client, api } = await withApi();
+      api.getMediationOptions.mockResolvedValue({ networks: [HILLTOP], geo: [] });
+      api.listMediationAccounts.mockResolvedValue([{ ...ACCOUNT, networkId: 7 }]);
+      api.listMediationPlacements.mockResolvedValue([
+        { ...PLACEMENT, id: "7438273", name: "desktop half", tag: null },
+        ZONE,
+      ]);
+      api.createMediationConnection.mockResolvedValue({
+        ...CONNECTION,
+        networkId: 7,
+        extBlockId: ZONE.id,
+      });
+
+      return { client, api };
+    }
+
+    it("fetches the code of the picked zone once and connects with it", async () => {
+      const { client, api } = await hilltopApi();
+      api.getMediationPlacementTag.mockResolvedValue(CODE);
+
+      await call(client, "kadam_pub_connect_mediation_network", {
+        adUnitId: 4242,
+        network: "hilltopads",
+        placement: "7438273-7438277",
+      });
+
+      expect(api.getMediationPlacementTag).toHaveBeenCalledTimes(1);
+      expect(api.getMediationPlacementTag).toHaveBeenCalledWith(11, "7438273-7438277");
+      expect(api.createMediationConnection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          networkId: 7,
+          extBlockId: "7438273-7438277",
+          extBlockName: "up_kad_pop",
+          tagTemplate: CODE,
+        }),
+      );
     });
+
+    /** Подключение без кода ничего не отдаст, а сохранилось бы молча. */
+    it("refuses clearly when the network has no code for the zone", async () => {
+      const { client, api } = await hilltopApi();
+      api.getMediationPlacementTag.mockResolvedValue(null);
+
+      const text = await call(client, "kadam_pub_connect_mediation_network", {
+        adUnitId: 4242,
+        network: "hilltopads",
+        placement: "7438273-7438277",
+      });
+
+      expect(api.createMediationConnection).not.toHaveBeenCalled();
+      expect(text).toContain("HilltopAds returns no code for zone 7438273-7438277");
+      expect(text).toContain("tagTemplate");
+    });
+
+    it("takes the publisher's own code without asking the network", async () => {
+      const { client, api } = await hilltopApi();
+      const own = '<script src="https://own.example/914.js?sId={sub_id}"></script>';
+
+      await call(client, "kadam_pub_connect_mediation_network", {
+        adUnitId: 4242,
+        network: "hilltopads",
+        placement: "7438273-7438277",
+        tagTemplate: own,
+      });
+
+      expect(api.getMediationPlacementTag).not.toHaveBeenCalled();
+      expect(api.createMediationConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ tagTemplate: own }),
+      );
+    });
+
+    it("fetches the code of the new zone when an update moves the connection to it", async () => {
+      const { client, api } = await hilltopApi();
+      api.listMediationConnections.mockResolvedValue([{ ...CONNECTION, networkId: 7 }]);
+      api.getMediationPlacementTag.mockResolvedValue(CODE);
+      api.updateMediationConnection.mockResolvedValue({ ...CONNECTION, extBlockId: ZONE.id });
+
+      await call(client, "kadam_pub_update_mediation_network", {
+        adUnitId: 4242,
+        connectionId: 77,
+        placement: "7438273-7438277",
+      });
+
+      expect(api.getMediationPlacementTag).toHaveBeenCalledWith(11, "7438273-7438277");
+      expect(api.updateMediationConnection).toHaveBeenCalledWith(
+        77,
+        expect.objectContaining({ extBlockId: "7438273-7438277", tagTemplate: CODE }),
+      );
+    });
+  });
+
+  it("never asks for a zone code where the row or the network default already has it", async () => {
+    const { client, api } = await withApi();
+    const monetag = {
+      ...NETWORK,
+      id: 1,
+      slug: "monetag",
+      name: "Monetag",
+      defaultTag: "https://tbyh5.com/afu.php?zoneid={ext_block_id}&var={sub_id}",
+    };
+    api.getMediationOptions.mockResolvedValue({ networks: [NETWORK, monetag], geo: [] });
+    api.listMediationAccounts.mockResolvedValue([ACCOUNT]);
+    api.listMediationPlacements
+      .mockResolvedValueOnce([PLACEMENT])
+      .mockResolvedValueOnce([{ ...PLACEMENT, id: "11745046", tag: null }]);
+    api.createMediationConnection.mockResolvedValue(CONNECTION);
 
     await call(client, "kadam_pub_connect_mediation_network", {
       adUnitId: 4242,
-      network: "hilltopads",
-      placement: "7438273-7438277",
+      network: "trafficstars",
+    });
+    await call(client, "kadam_pub_connect_mediation_network", {
+      adUnitId: 4242,
+      network: "monetag",
     });
 
-    expect(api.createMediationConnection).toHaveBeenCalledWith(
-      expect.objectContaining({
-        networkId: 7,
-        extBlockId: "7438273-7438277",
-        extBlockName: "up_kad_pop",
-        tagTemplate: "https://idlerelief.com/bU3.Vm0?sId={sub_id}",
-      }),
-    );
+    expect(api.createMediationConnection).toHaveBeenCalledTimes(2);
+    expect(api.createMediationConnection.mock.calls[0]![0]).toMatchObject({
+      tagTemplate: "https://tsyndicate.com/x",
+    });
+    expect(api.createMediationConnection.mock.calls[1]![0]).not.toHaveProperty("tagTemplate");
+    expect(api.getMediationPlacementTag).not.toHaveBeenCalled();
   });
 
   /**
@@ -508,6 +608,7 @@ describe("update_mediation_network", () => {
    */
   it("resolves a placement named by the publisher into its zone id", async () => {
     const { client, api } = await withApi();
+    api.getMediationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
     api.listMediationConnections.mockResolvedValue([CONNECTION]);
     api.listMediationPlacements.mockResolvedValue([
       { ...PLACEMENT, id: "deadbeef", name: "Popunder US", tag: "https://tsyndicate.com/us" },
@@ -536,6 +637,10 @@ describe("update_mediation_network", () => {
    */
   it("drops the previous zone's tag when the new zone has none", async () => {
     const { client, api } = await withApi();
+    api.getMediationOptions.mockResolvedValue({
+      networks: [{ ...NETWORK, defaultTag: "https://tsyndicate.com/{ext_block_id}" }],
+      geo: [],
+    });
     api.listMediationConnections.mockResolvedValue([CONNECTION]);
     api.listMediationPlacements.mockResolvedValue([
       { ...PLACEMENT, id: "no-tag-zone", name: "Bare zone", tag: null },
@@ -548,10 +653,37 @@ describe("update_mediation_network", () => {
       placement: "Bare zone",
     });
 
+    expect(api.getMediationPlacementTag).not.toHaveBeenCalled();
     expect(api.updateMediationConnection).toHaveBeenCalledWith(
       77,
       expect.objectContaining({ extBlockId: "no-tag-zone", tagTemplate: "" }),
     );
+  });
+
+  /** Зону только что завели в сети: без fresh её нет в закешированном на 120 с каталоге. */
+  it("passes fresh through to the catalog when moving to a new zone", async () => {
+    const { client, api } = await withApi();
+    api.getMediationOptions.mockResolvedValue({ networks: [NETWORK], geo: [] });
+    api.listMediationConnections.mockResolvedValue([CONNECTION]);
+    api.listMediationPlacements.mockResolvedValue([{ ...PLACEMENT, id: "just-made" }]);
+    api.updateMediationConnection.mockResolvedValue({ ...CONNECTION, extBlockId: "just-made" });
+
+    await call(client, "kadam_pub_update_mediation_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      placement: "just-made",
+      fresh: true,
+    });
+    await call(client, "kadam_pub_update_mediation_network", {
+      adUnitId: 4242,
+      connectionId: 77,
+      placement: "just-made",
+    });
+
+    expect(api.listMediationPlacements.mock.calls).toEqual([
+      [11, 4242, true],
+      [11, 4242, false],
+    ]);
   });
 
   /** Зона принадлежит аккаунту: перенос без зоны оставил бы id, которого у нового нет. */

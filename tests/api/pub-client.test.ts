@@ -85,6 +85,36 @@ describe("PubClient mediation paths", () => {
     expect(http.delete.mock.calls[1][0]).toBe("/mediation/connections/77");
   });
 
+  /** Каждый retest открывает новую эпоху замера: повтор после потерянного ответа — второй тест. */
+  it("sends retest once, without transport retries", async () => {
+    http.post.mockResolvedValue(connection);
+
+    await pub.retestMediationConnection(77, 10);
+
+    expect(http.post.mock.calls[0]).toEqual([
+      "/mediation/connections/77/retest",
+      { share: 10 },
+      { retry: false },
+    ]);
+  });
+
+  /** Id зоны — строка сети: пара через дефис, `s71969c5796`, а в теории и что угодно ещё. */
+  it("reads the code of one zone with the zone id escaped into the path", async () => {
+    http.get
+      .mockResolvedValueOnce({ tag: "https://idlerelief.com/x?sId={sub_id}" })
+      .mockResolvedValueOnce({ tag: null });
+
+    expect(await pub.getMediationPlacementTag(11, "7438273-7438277")).toBe(
+      "https://idlerelief.com/x?sId={sub_id}",
+    );
+    expect(await pub.getMediationPlacementTag(11, "a/b c")).toBeNull();
+
+    expect(http.get.mock.calls.map((c) => c[0])).toEqual([
+      "/mediation/accounts/11/placements/7438273-7438277/tag",
+      "/mediation/accounts/11/placements/a%2Fb%20c/tag",
+    ]);
+  });
+
   it("lists connections of one ad unit", async () => {
     http.get.mockResolvedValue({ items: [connection] });
 

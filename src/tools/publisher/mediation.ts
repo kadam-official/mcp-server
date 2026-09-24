@@ -18,6 +18,7 @@ import {
   formatNetworkLine,
   listAccounts,
   resolvePlacement,
+  zoneCode,
 } from "./mediation-shared.js";
 
 /**
@@ -94,17 +95,10 @@ async function resolveAccount(
   );
 }
 
-/** Zones of some networks carry their own code; an empty tag falls back to the network default. */
-function tagOf(placement: MediationPlacement): Record<string, unknown> {
-  const tag = placement.tag?.trim();
-
-  return tag ? { tagTemplate: tag } : {};
-}
-
 function siteNote(placement: MediationPlacement): string {
-  return placement.matchesSite || !placement.site
-    ? ""
-    : ` The zone is registered at the network under ${placement.site}; check it is this ad unit's site.`;
+  if (placement.matchesSite || !placement.site) return "";
+
+  return ` The zone is registered at the network under ${placement.site}; check it is this ad unit's site.`;
 }
 
 export const mediationModule: ToolModule = {
@@ -189,6 +183,7 @@ export const mediationModule: ToolModule = {
         clientId: z.string().optional(),
         clientSecret: z.string().optional(),
         accountName: z.string().max(64).optional(),
+        tagTemplate: z.string().max(2048).optional(),
         testShare: z.number().min(0).max(MAX_TEST_SHARE).optional(),
         fresh: z.boolean().optional().default(false),
       },
@@ -223,15 +218,16 @@ export const mediationModule: ToolModule = {
         );
         if (typeof placement === "string") return placement;
 
+        const code = await zoneCode(ctx.pub, account.id, placement, network, args.tagTemplate);
+        if (typeof code === "string") return code;
+
         const created = await ctx.pub.createMediationConnection({
           blockId: args.adUnitId,
           networkId: network.id,
           accountId: account.id,
           extBlockId: placement.id,
           extBlockName: placement.name,
-          // Networks that mint a per-zone code report it here; without it the connection
-          // would either be refused or serve the network's generic default.
-          ...tagOf(placement),
+          ...(code.tagTemplate !== "" && code),
           ...(args.testShare != null && { testShare: args.testShare }),
         });
 
@@ -247,7 +243,10 @@ export const mediationModule: ToolModule = {
         name: "kadam_pub_update_mediation_network",
         description:
           `${DOMAIN}: change an existing connection — geo, unique cap, proxy traffic, tag ` +
-          `template, placement or account. Only the fields you pass change.`,
+          `template, placement or account. Only the fields you pass change; the rest is read ` +
+          `from the stored connection and written back, so an edit made elsewhere in between ` +
+          `is overwritten (last write wins). fresh=true skips the catalog cache when placement ` +
+          `names a zone created at the network a moment ago.`,
         product: "publisher",
         annotations: { title: "Update a mediation connection", readOnlyHint: false },
       },
@@ -260,6 +259,7 @@ export const mediationModule: ToolModule = {
         tagTemplate: z.string().max(2048).optional(),
         placement: z.string().optional(),
         accountId: z.number().optional(),
+        fresh: z.boolean().optional().default(false),
       },
       async (args, ctx) => {
         const current = await findConnection(ctx.pub, args.adUnitId, args.connectionId);
@@ -281,17 +281,26 @@ export const mediationModule: ToolModule = {
 
         // A zone is identified by its id; the catalog also prints a name, so what the
         // publisher says has to be resolved the same way as on connect.
-        let placement: MediationPlacement | undefined;
+        // Шаблон при смене зоны перезаписывается всегда: пустая строка на бэкенде означает
+        // «код сети по умолчанию», а пропуск поля оставил бы код прежней зоны служить новой.
+        let zone: Record<string, unknown> = {};
         if (args.placement != null) {
-          const resolved = await resolvePlacement(
+          const accountId = args.accountId ?? current.accountId;
+          const placement = await resolvePlacement(
             ctx.pub,
-            args.accountId ?? current.accountId,
+            accountId,
             args.adUnitId,
             args.placement,
-            false,
+            args.fresh,
           );
-          if (typeof resolved === "string") return resolved;
-          placement = resolved;
+          if (typeof placement === "string") return placement;
+
+          const options = await ctx.pub.getMediationOptions(args.adUnitId);
+          const network = options.networks.find((n) => n.id === current.networkId);
+          const code = await zoneCode(ctx.pub, accountId, placement, network, args.tagTemplate);
+          if (typeof code === "string") return code;
+
+          zone = { extBlockId: placement.id, extBlockName: placement.name, ...code };
         }
 
         const updated = await ctx.pub.updateMediationConnection(args.connectionId, {
@@ -300,13 +309,7 @@ export const mediationModule: ToolModule = {
           ...(args.uniqCap != null && { uniqCap: args.uniqCap }),
           ...(args.allowProxy != null && { allowProxy: args.allowProxy }),
           ...(args.tagTemplate != null && { tagTemplate: args.tagTemplate }),
-          ...(placement != null && {
-            extBlockId: placement.id,
-            extBlockName: placement.name,
-            // Шаблон перезаписывается всегда: пустая строка на бэкенде означает «код сети
-            // по умолчанию», а пропуск поля оставил бы код прежней зоны служить новой.
-            ...(args.tagTemplate == null && { tagTemplate: placement.tag?.trim() ?? "" }),
-          }),
+          ...zone,
           ...(args.accountId != null && { accountId: args.accountId }),
         });
 

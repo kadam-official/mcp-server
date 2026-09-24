@@ -141,6 +141,7 @@ export function createMockPubClient() {
     updateMediationAccount: vi.fn(),
     deleteMediationAccount: vi.fn(),
     listMediationPlacements: vi.fn(),
+    getMediationPlacementTag: vi.fn(),
     listMediationConnections: vi.fn(),
     createMediationConnection: vi.fn(),
     updateMediationConnection: vi.fn(),

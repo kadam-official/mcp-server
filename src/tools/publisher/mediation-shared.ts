@@ -32,10 +32,11 @@ export function credentialArgNames(fields: string[]): string {
 }
 
 export function formatConnection(c: MediationConnection): string {
-  const test =
-    c.testShare > 0
-      ? `${c.testShare}% (${c.testState}, ${c.testSlicesPending} of ${c.testSlicesTotal + c.testSlicesPending} slices pending)`
-      : "off";
+  let test = "off";
+  if (c.testShare > 0) {
+    const slices = c.testSlicesTotal + c.testSlicesPending;
+    test = `${c.testShare}% (${c.testState}, ${c.testSlicesPending} of ${slices} slices pending)`;
+  }
 
   return formatSingleEntity(`Connection #${c.id}`, [
     ["Ad unit", String(c.blockId)],
@@ -69,11 +70,14 @@ export function formatNetworkLine(
   n: MediationNetwork,
   account: MediationAccount | undefined,
 ): string {
-  const credentials = account
-    ? `account #${account.id} "${account.name}"${account.mask ? ` (${account.mask})` : ""}${account.verifiedAt ? "" : ", never verified"}`
-    : `no account yet — pass the network API key to connect`;
+  if (!account) {
+    return `- ${n.name} (slug: ${n.slug}, id: ${n.id}): no account yet — pass the network API key to connect`;
+  }
 
-  return `- ${n.name} (slug: ${n.slug}, id: ${n.id}): ${credentials}`;
+  const mask = account.mask ? ` (${account.mask})` : "";
+  const verified = account.verifiedAt ? "" : ", never verified";
+
+  return `- ${n.name} (slug: ${n.slug}, id: ${n.id}): account #${account.id} "${account.name}"${mask}${verified}`;
 }
 
 export function formatPlacementLine(p: MediationPlacement): string {
@@ -196,4 +200,34 @@ export async function resolvePlacement(
   }
 
   return `Several placements fit — repeat with the placement id:\n${previewLines(fitting)}`;
+}
+
+/**
+ * The code a connection to this zone is saved with. The publisher's own code wins; a catalog
+ * row may carry one (ClickAdilla); a network with a default needs none (an empty template
+ * means "the default"); otherwise the code is minted for the zone on request (HilltopAds,
+ * Trafficshop). With no code at all the connection would never serve, so that is an answer
+ * to the agent, not a save.
+ */
+export async function zoneCode(
+  pub: PubClient,
+  accountId: number,
+  placement: MediationPlacement,
+  network: MediationNetwork | undefined,
+  own: string | undefined,
+): Promise<{ tagTemplate: string } | string> {
+  if (own != null) return { tagTemplate: own };
+
+  const listed = placement.tag?.trim();
+  if (listed) return { tagTemplate: listed };
+  if (network?.defaultTag?.trim()) return { tagTemplate: "" };
+
+  const minted = (await pub.getMediationPlacementTag(accountId, placement.id))?.trim();
+  if (minted) return { tagTemplate: minted };
+
+  return (
+    `${network?.name ?? "The network"} returns no code for zone ${placement.id}, and a ` +
+    `connection without one would not serve. Pick another zone, or paste the zone's code ` +
+    `from the network cabinet as tagTemplate.`
+  );
 }

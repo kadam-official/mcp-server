@@ -87,6 +87,11 @@ export const mediationPlacementListSchema = z.object({
   items: z.array(mediationPlacementSchema).default([]),
 });
 
+/** GET .../placements/{zone}/tag: null when the network has no code for the zone. */
+export const mediationPlacementTagSchema = z.object({
+  tag: z.string().nullish(),
+});
+
 // ---------------------------------------------------------------------------
 // /mediation/connections
 // ---------------------------------------------------------------------------

@@ -17,6 +17,7 @@ import {
   mediationAccountSchema,
   mediationNetworkListSchema,
   mediationPlacementListSchema,
+  mediationPlacementTagSchema,
 } from "./schemas/publisher-mediation.js";
 import type {
   MediationConnection,
@@ -245,6 +246,14 @@ export class PubClient {
     return mediationPlacementListSchema.parse(raw).items;
   }
 
+  /** Code of one zone, for networks whose catalog lists zones without one (HilltopAds). */
+  async getMediationPlacementTag(accountId: number, zone: string): Promise<string | null> {
+    const raw = await this.http.get(
+      `${MEDIATION}/accounts/${accountId}/placements/${encodeURIComponent(zone)}/tag`,
+    );
+    return mediationPlacementTagSchema.parse(raw).tag ?? null;
+  }
+
   async listMediationConnections(adUnitId: number): Promise<MediationConnection[]> {
     const raw = await this.http.get(`${MEDIATION}/connections`, { blockId: String(adUnitId) });
     return mediationConnectionListSchema.parse(raw).items;
@@ -267,8 +276,13 @@ export class PubClient {
     return this.http.delete(`${MEDIATION}/connections/${id}`);
   }
 
+  /** Each retest opens a new measurement epoch, so a repeat after a lost response is not a no-op. */
   async retestMediationConnection(id: number, share: number): Promise<MediationConnection> {
-    const raw = await this.http.post(`${MEDIATION}/connections/${id}/retest`, { share });
+    const raw = await this.http.post(
+      `${MEDIATION}/connections/${id}/retest`,
+      { share },
+      { retry: false },
+    );
     return mediationConnectionSchema.parse(raw);
   }
 }
