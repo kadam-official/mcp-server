@@ -178,6 +178,27 @@ describe("HttpClient", () => {
     );
   });
 
+  /**
+   * Кабинет паба отвечает HTTP 200 и кладёт отказ в конверт, поэтому путь через
+   * response.ok сюда не заходит: код и текст обязан донести unwrapApiResponse. По этому
+   * тексту клиент отличает выключенную фичу от чужого ключа — оба приезжают 403.
+   */
+  it("403 envelope on HTTP 200: keeps the server's reason and the code", async () => {
+    const client = createClient();
+    fetchMock.mockResolvedValue(
+      mockResponse(200, {
+        success: false,
+        code: 403,
+        msg: { exception: "Kadam Smart Mediation is not enabled for this account" },
+      }),
+    );
+
+    await expect(client.get("/test")).rejects.toMatchObject({
+      status: 403,
+      message: "Kadam Smart Mediation is not enabled for this account",
+    });
+  });
+
   it("422 with a JSON-encoded errors string in message: parses and flattens it", async () => {
     const client = createClient();
     fetchMock.mockResolvedValue(
@@ -229,6 +250,77 @@ describe("HttpClient", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ ok: true });
+    vi.useRealTimers();
+  });
+
+  /**
+   * «Применилось, ответ потерялся»: соединение рвётся после записи. Повтор такого POST
+   * записал бы второй раз, поэтому вызов с retry:false уходит ровно один раз.
+   */
+  it("POST with retry:false: a lost response is not repeated", async () => {
+    const client = createClient({ maxRetries: 3 });
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(client.post("/write", { share: 10 }, { retry: false })).rejects.toThrow(
+      "fetch failed",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST with retry:false: a retryable status surfaces at once", async () => {
+    const client = createClient({ maxRetries: 3 });
+    fetchMock.mockResolvedValue(mockResponse(503, { message: "busy" }));
+
+    await expect(client.post("/write", {}, { retry: false })).rejects.toMatchObject({
+      status: 503,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST with retry:false: a 429 is reported, not slept on", async () => {
+    const client = createClient({ maxRetries: 3 });
+    fetchMock.mockResolvedValue(mockResponse(429, {}, { "Retry-After": "60" }));
+
+    await expect(client.post("/write", {}, { retry: false })).rejects.toMatchObject({
+      status: 429,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("POST with retry:false: a timeout says it timed out", async () => {
+    const client = createClient({ maxRetries: 3 });
+    fetchMock.mockRejectedValue(new DOMException("The operation was aborted.", "AbortError"));
+
+    await expect(client.post("/write", {}, { retry: false })).rejects.toThrow(/timed out after/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("429 on every attempt: reported as rate limited once retries run out", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 1 });
+    fetchMock.mockResolvedValue(mockResponse(429, {}, { "Retry-After": "1" }));
+
+    const promise = client.get("/test");
+    const settled = expect(promise).rejects.toMatchObject({ status: 429 });
+    await vi.advanceTimersByTimeAsync(2000);
+    await settled;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("POST without options keeps retrying as before", async () => {
+    vi.useFakeTimers();
+    const client = createClient({ maxRetries: 1 });
+    fetchMock
+      .mockResolvedValueOnce(mockResponse(503, {}))
+      .mockResolvedValueOnce(mockResponse(200, { ok: true }));
+
+    const promise = client.post("/write", {});
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(await promise).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
 });

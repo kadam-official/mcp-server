@@ -18,6 +18,11 @@ export class ApiError extends Error {
   }
 }
 
+export interface RequestOptions {
+  /** false for a call that must not repeat: a lost response may hide an applied write. */
+  retry?: boolean;
+}
+
 const RETRY_DELAYS = [1000, 2000, 4000];
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
@@ -40,9 +45,9 @@ export class HttpClient {
     return this.request<T>("GET", url);
   }
 
-  async post<T = unknown>(path: string, body?: unknown): Promise<T> {
+  async post<T = unknown>(path: string, body?: unknown, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(path);
-    return this.request<T>("POST", url, body);
+    return this.request<T>("POST", url, body, options);
   }
 
   async put<T = unknown>(path: string, body?: unknown): Promise<T> {
@@ -77,18 +82,26 @@ export class HttpClient {
     return url.toString();
   }
 
-  private async request<T>(method: string, url: string, body?: unknown): Promise<T> {
-    return this.executeWithRetry<T>(url, (signal) =>
-      fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal,
-      }),
+  private async request<T>(
+    method: string,
+    url: string,
+    body?: unknown,
+    options?: RequestOptions,
+  ): Promise<T> {
+    return this.executeWithRetry<T>(
+      url,
+      (signal) =>
+        fetch(url, {
+          method,
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+          signal,
+        }),
+      options?.retry === false ? 0 : this.maxRetries,
     );
   }
 
@@ -109,10 +122,11 @@ export class HttpClient {
   private async executeWithRetry<T>(
     url: string,
     doFetch: (signal: AbortSignal) => Promise<Response>,
+    maxRetries: number = this.maxRetries,
   ): Promise<T> {
     let lastError: Error | null = null;
 
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
         const delay = RETRY_DELAYS[attempt - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]!;
         this.log.debug({ attempt, delay, url }, "Retrying request");
@@ -133,6 +147,7 @@ export class HttpClient {
         this.log.debug({ url, status: response.status, elapsed }, "API response");
 
         if (response.status === 429) {
+          if (attempt >= maxRetries) throw new ApiError("API rate limit exceeded", 429);
           const retryAfter = response.headers.get("Retry-After");
           const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : RETRY_DELAYS[attempt]!;
           this.log.warn({ waitMs }, "Rate limited, backing off");
@@ -144,7 +159,7 @@ export class HttpClient {
           const responseBody = await response.text().catch(() => "");
           const parsed = tryParseJson(responseBody);
 
-          if (RETRYABLE_STATUSES.has(response.status) && attempt < this.maxRetries) {
+          if (RETRYABLE_STATUSES.has(response.status) && attempt < maxRetries) {
             lastError = new ApiError(
               `API returned ${response.status}: ${responseBody.slice(0, 200)}`,
               response.status,
@@ -167,11 +182,12 @@ export class HttpClient {
 
         if (error instanceof DOMException && error.name === "AbortError") {
           lastError = new Error(`Request timed out after ${this.timeout}ms: ${url}`);
-          if (attempt < this.maxRetries) continue;
+          if (attempt < maxRetries) continue;
+          throw lastError;
         }
 
         lastError = error instanceof Error ? error : new Error(String(error));
-        if (attempt < this.maxRetries) continue;
+        if (attempt < maxRetries) continue;
       }
     }
 
