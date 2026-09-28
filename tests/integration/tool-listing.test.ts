@@ -47,11 +47,11 @@ describe("Tool listing integration", () => {
     resetConfig();
   });
 
-  it("all 39 tools are listed", async () => {
+  it("all 47 tools are listed", async () => {
     const { client } = await createFullServer();
     const result = await client.listTools();
     expect(result.tools).toBeDefined();
-    expect(result.tools!.length).toBe(39);
+    expect(result.tools!.length).toBe(47);
   });
 
   it("all advertiser tools have names starting with kadam_adv_", async () => {
@@ -93,11 +93,11 @@ describe("Tool listing integration", () => {
     });
   });
 
-  it("8 resources listed", async () => {
+  it("9 resources listed", async () => {
     const { client } = await createFullServer();
     const result = await client.listResources();
     expect(result.resources).toBeDefined();
-    expect(result.resources!.length).toBe(8);
+    expect(result.resources!.length).toBe(9);
   });
 
   it("resource kadam://reference/campaign-types content contains Push (id: 30)", async () => {

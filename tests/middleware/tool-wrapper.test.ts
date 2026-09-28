@@ -278,6 +278,53 @@ describe("ToolWrapper", () => {
     expect(textContent.text).toBe("API error (500): Internal Server Error");
   });
 
+  /**
+   * 403 приезжает и на чужой ключ, и на выключенную фичу. Раньше обе превращались в
+   * «invalid API key», и паб шёл менять исправный ключ вместо того, чтобы включить раздел.
+   */
+  it("handler that throws ApiError(403) passes the server's own reason through", async () => {
+    process.env.KADAM_PUB_API_KEY = "test-key";
+    const server = new McpServer({ name: "test", version: "0.0.1" });
+    const wrapper = new ToolWrapper(server, createPool(), { pubKey: "test-key" });
+    wrapper.register(
+      { name: "fail_403", description: "Fails with 403", product: "publisher" },
+      { input: z.string() },
+      async () => {
+        throw new ApiError("Kadam Smart Mediation is not enabled for this account", 403);
+      },
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.1" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+
+    const result = await client.callTool({ name: "fail_403", arguments: { input: "x" } });
+
+    expect(result.isError).toBe(true);
+    const textContent = result.content![0] as { text: string };
+    expect(textContent.text).toBe("Kadam Smart Mediation is not enabled for this account");
+  });
+
+  it("handler that throws a bare ApiError(403) still explains both causes", async () => {
+    process.env.KADAM_PUB_API_KEY = "test-key";
+    const server = new McpServer({ name: "test", version: "0.0.1" });
+    const wrapper = new ToolWrapper(server, createPool(), { pubKey: "test-key" });
+    wrapper.register(
+      { name: "fail_403_bare", description: "Fails with 403", product: "publisher" },
+      { input: z.string() },
+      async () => {
+        throw new ApiError("", 403);
+      },
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.1" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+
+    const result = await client.callTool({ name: "fail_403_bare", arguments: { input: "x" } });
+
+    const textContent = result.content![0] as { text: string };
+    expect(textContent.text).toMatch(/API key|not enabled/i);
+  });
+
   it("invalid input args are rejected by MCP SDK", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });

@@ -137,6 +137,19 @@ export function createMockPubClient() {
     getUserInfo: vi.fn(),
     getReportConfig: vi.fn(),
     getReportData: vi.fn(),
+    listMediationNetworks: vi.fn(),
+    getMediationOptions: vi.fn(),
+    listMediationAccounts: vi.fn(),
+    createMediationAccount: vi.fn(),
+    updateMediationAccount: vi.fn(),
+    deleteMediationAccount: vi.fn(),
+    listMediationPlacements: vi.fn(),
+    getMediationPlacementTag: vi.fn(),
+    listMediationConnections: vi.fn(),
+    createMediationConnection: vi.fn(),
+    updateMediationConnection: vi.fn(),
+    deleteMediationConnection: vi.fn(),
+    retestMediationConnection: vi.fn(),
   };
 }
 
