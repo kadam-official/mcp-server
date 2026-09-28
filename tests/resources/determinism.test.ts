@@ -99,7 +99,8 @@ describe("categories resource static-mode fallback", () => {
   it("returns an ID-focused hint when no registry is available", async () => {
     const text = await buildCategoriesContent(null);
     expect(text).toContain("static mode");
-    expect(text).toContain("numeric category IDs");
+    expect(text).toContain("'adult' (1001)");
+    expect(text).toContain("mainstream");
     expect(text).not.toContain("resolve server-side");
   });
 });

@@ -32,8 +32,11 @@ function createMockOptionsRegistry() {
     platformVersions: [{ id: 10, label: "Android" }],
     languages: [{ id: 2, label: "English" }],
     categories: [
-      { id: 1001, label: "Adult content (IAB25-3)" },
-      { id: 122, label: "News (IAB12)", children: [{ id: 1567, label: "News general" }] },
+      {
+        id: 1001,
+        label: "Adult content (IAB25-3)",
+        children: [{ id: 1560, label: "Adult general" }],
+      },
       { id: "mainstream", label: "Mainstream" },
     ],
     ages: [],

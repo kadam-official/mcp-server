@@ -251,13 +251,12 @@ export class OptionsRegistry {
   }
 }
 
+/**
+ * Targeting ids for campaign create: top-level option nodes only (KUI-6658).
+ * Adult parent 1001 expands server-side; `mainstream` is a token, not a subtree.
+ */
 export function flattenCategoryIds(categories: CategoryItem[]): (number | string)[] {
-  const result: (number | string)[] = [];
-  for (const cat of categories) {
-    result.push(cat.id);
-    if (cat.children) result.push(...flattenCategoryIds(cat.children));
-  }
-  return result;
+  return categories.map((cat) => cat.id);
 }
 
 function flattenDevices(devices: DeviceItem[]): DictItem[] {

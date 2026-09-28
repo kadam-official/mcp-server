@@ -148,6 +148,37 @@ describe("campaigns tools", () => {
         type: 30,
         cpType: 0,
         bids: [{ bid: 0.5, leadCost: 0, countries: [34] }],
+        categories: [1001, "mainstream"],
+      }),
+    );
+  });
+
+  it("create_campaign maps the adult keyword to parent 1001", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({
+      id: 99,
+      name: "Adult only",
+    } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "Adult only",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.5,
+        dailyBudget: 100,
+        countries: "US",
+        categories: "adult",
+      },
+    });
+
+    expect(api.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        categories: [1001],
       }),
     );
   });
