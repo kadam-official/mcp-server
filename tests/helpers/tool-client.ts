@@ -32,8 +32,11 @@ function createMockOptionsRegistry() {
     platformVersions: [{ id: 10, label: "Android" }],
     languages: [{ id: 2, label: "English" }],
     categories: [
-      { id: 1001, label: "Adult content (IAB25-3)" },
-      { id: 122, label: "News (IAB12)", children: [{ id: 1567, label: "News general" }] },
+      {
+        id: 1001,
+        label: "Adult content (IAB25-3)",
+        children: [{ id: 1560, label: "Adult general" }],
+      },
       { id: "mainstream", label: "Mainstream" },
     ],
     ages: [],
@@ -134,6 +137,19 @@ export function createMockPubClient() {
     getUserInfo: vi.fn(),
     getReportConfig: vi.fn(),
     getReportData: vi.fn(),
+    listMediationNetworks: vi.fn(),
+    getMediationOptions: vi.fn(),
+    listMediationAccounts: vi.fn(),
+    createMediationAccount: vi.fn(),
+    updateMediationAccount: vi.fn(),
+    deleteMediationAccount: vi.fn(),
+    listMediationPlacements: vi.fn(),
+    getMediationPlacementTag: vi.fn(),
+    listMediationConnections: vi.fn(),
+    createMediationConnection: vi.fn(),
+    updateMediationConnection: vi.fn(),
+    deleteMediationConnection: vi.fn(),
+    retestMediationConnection: vi.fn(),
   };
 }
 

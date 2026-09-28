@@ -25,6 +25,19 @@ const CONNECTION_TYPE_MAP: Record<string, number> = {
   all: 3,
 };
 
+const ADULT_ROOT_CATEGORY_ID = 1001;
+
+function parseCategoryInput(raw: string): Array<number | string> {
+  return raw.split(",").map((item) => {
+    const token = item.trim();
+    if (token.toLowerCase() === "adult") {
+      return ADULT_ROOT_CATEGORY_ID;
+    }
+    const asNumber = parseInt(token, 10);
+    return Number.isNaN(asNumber) ? token : asNumber;
+  });
+}
+
 /**
  * Writable campaign fields, mirroring the backend create/update form
  * (adv/modules/campaigns/forms/campaigns/CampaignCreateForm.php — CampaignUpdateForm
@@ -521,7 +534,7 @@ const campaignBudgetFields = {
     .string()
     .optional()
     .describe(
-      "Comma-separated category IDs from kadam://reference/categories (or the 'mainstream'/'adult' keyword)",
+      "Comma-separated targeting from kadam://reference/categories: 'mainstream', 'adult' (parent 1001), and/or adult subcategory IDs. Do not pass other numeric category IDs on create.",
     ),
   secondPush: z
     .boolean()
@@ -697,10 +710,7 @@ export const campaignsModule: ToolModule = {
       async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
         if (args.categories) {
-          mappedArgs.categories = args.categories.split(",").map((s: string) => {
-            const n = parseInt(s.trim(), 10);
-            return isNaN(n) ? s.trim() : n;
-          });
+          mappedArgs.categories = parseCategoryInput(args.categories);
         }
         const mappedData = await mapCampaignFields(mappedArgs, ctx.adv.options);
         const result = await ctx.adv.createCampaign(mappedData);
@@ -789,10 +799,7 @@ export const campaignsModule: ToolModule = {
           merged.languages = await registry.resolveIds("language", changes.languages);
 
         if (changes.categories != null) {
-          merged.categories = changes.categories.split(",").map((s: string) => {
-            const n = parseInt(s.trim(), 10);
-            return isNaN(n) ? s.trim() : n;
-          });
+          merged.categories = parseCategoryInput(changes.categories);
         }
 
         if (changes.audienceIncludeIds != null || changes.audienceExcludeIds != null) {

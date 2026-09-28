@@ -133,9 +133,9 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (31)
+## Tools (47)
 
-### Advertiser Tools (22)
+### Advertiser Tools (30)
 
 Requires `KADAM_ADV_API_KEY`.
 
@@ -191,7 +191,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_list_finance_operations` | Transaction history (deposits, charges, refunds)                                                                                                                                 | readOnly    |
 | `kadam_adv_get_stats`               | Unified statistics — 3 report types via `reportType` param: `custom` (report builder with dimension/metric mapping), `sites` (per-site breakdown), `postbacks` (conversion logs) | readOnly    |
 
-### Publisher Tools (9)
+### Publisher Tools (17)
 
 Requires `KADAM_PUB_API_KEY`.
 
@@ -219,19 +219,38 @@ Requires `KADAM_PUB_API_KEY`.
 | `kadam_pub_get_user_info` | Get publisher account info and balance                            | readOnly    |
 | `kadam_pub_get_stats`     | Publisher statistics with human-readable dimension/metric mapping | readOnly    |
 
-## Resources (7)
+#### Kadam Smart Mediation
+
+Selling an ad unit's traffic through outside ad networks alongside Kadam demand. The API,
+the code and the report dimensions call it plain `mediation`. Read
+`kadam://reference/mediation` first; split the income in `kadam_pub_get_stats` with
+`groupBy=network` and the `kadam_revenue` / `mediation_revenue` metrics.
+
+| Tool                                         | Description                                                                  | Annotations |
+| -------------------------------------------- | ---------------------------------------------------------------------------- | ----------- |
+| `kadam_pub_list_mediation_networks`          | Catalog of networks, which have an account, and what an ad unit already runs | readOnly    |
+| `kadam_pub_connect_mediation_network`        | Attach a network to an ad unit (resolves account and placement itself)       | —           |
+| `kadam_pub_update_mediation_network`         | Change geo, unique cap, proxy policy, tag template, placement or account     | —           |
+| `kadam_pub_set_mediation_network_status`     | active / paused for a connection                                             | idempotent  |
+| `kadam_pub_retest_mediation_network`         | Restart the forced test share (1-50%); starts a new measurement epoch        | —           |
+| `kadam_pub_disconnect_mediation_network`     | Remove a connection (requires `confirm`)                                     | destructive |
+| `kadam_pub_update_mediation_network_account` | Rotate the network API key, rename or disable the account                    | —           |
+| `kadam_pub_delete_mediation_network_account` | Remove a network account (requires `confirm`)                                | destructive |
+
+## Resources (9)
 
 Static reference data the agent can read before calling tools:
 
-| URI                                   | Description                                                         |
-| ------------------------------------- | ------------------------------------------------------------------- |
-| `kadam://reference/campaign-types`    | All ad format types with IDs, features, pricing, and creative specs |
-| `kadam://reference/pricing-models`    | CPC, CPM, CPV, CPA Target with IDs and descriptions                 |
-| `kadam://reference/creative-formats`  | Creative requirements per campaign type                             |
-| `kadam://reference/ad-unit-types`     | Publisher ad unit formats with IDs                                  |
-| `kadam://reference/site-states`       | Publisher site lifecycle states                                     |
-| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools               |
-| `kadam://reference/api-overview`      | General Kadam API capabilities overview                             |
+| URI                                   | Description                                                                      |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| `kadam://reference/campaign-types`    | All ad format types with IDs, features, pricing, and creative specs              |
+| `kadam://reference/pricing-models`    | CPC, CPM, CPV, CPA Target with IDs and descriptions                              |
+| `kadam://reference/creative-formats`  | Creative requirements per campaign type                                          |
+| `kadam://reference/ad-unit-types`     | Publisher ad unit formats with IDs                                               |
+| `kadam://reference/site-states`       | Publisher site lifecycle states                                                  |
+| `kadam://reference/mediation`         | Outside ad networks: accounts, placements, connections, test share, income split |
+| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools                            |
+| `kadam://reference/api-overview`      | General Kadam API capabilities overview                                          |
 
 ## Prompts (4)
 
@@ -269,15 +288,15 @@ src/
 │   ├── publisher.ts          # Source, AdUnit, PubUser types + maps
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
-│   ├── advertiser/           # 21 tools across 6 modules
-│   └── publisher/            # 9 tools across 4 modules
-├── resources/                # 7 static reference resources
+│   ├── advertiser/           # 30 tools across 9 modules
+│   └── publisher/            # 17 tools across 6 modules
+├── resources/                # 9 reference resources
 └── prompts/                  # 4 workflow prompts
 ```
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 30 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 47 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON
