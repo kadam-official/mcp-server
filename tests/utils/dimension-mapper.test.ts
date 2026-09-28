@@ -190,3 +190,70 @@ describe("describeMetrics / describeGroups (config-derived)", () => {
     expect(s).not.toContain("source"); // webmaster_source (publisher) absent
   });
 });
+
+/**
+ * Обе витрины делят одну карту алиасов, и «site» в них значит разное: у паба это его
+ * сайт, у рекламодателя — площадка показа. Кандидатов перебирает resolveAlias, поэтому
+ * проверяются оба кабинета, иначе починка одного молча ломает другой.
+ */
+describe("cabinet-specific aliases", () => {
+  const advConfig: ReportConfig = {
+    groups: { traffic: [{ id: "traffic_macros" }, { id: "traffic_region" }] },
+    metrics: { finance: [{ id: "finance_moneyOut" }] },
+  };
+
+  const pubConfig: ReportConfig = {
+    groups: {
+      webmaster: [{ id: "webmaster_source" }, { id: "webmaster_block" }],
+      traffic: [{ id: "traffic_macros" }],
+      mediation: [{ id: "mediation_network" }, { id: "mediation_block" }],
+    },
+    metrics: {
+      finance: [
+        { id: "finance_moneyIn" },
+        { id: "finance_moneyInKadam" },
+        { id: "finance_moneyInMediation" },
+      ],
+    },
+  };
+
+  it('advertiser "site" stays the placement macros', () => {
+    expect(resolveGroupIds("site", advConfig)).toEqual(["traffic_macros"]);
+  });
+
+  it('publisher "site" is their own website, not the macros', () => {
+    expect(resolveGroupIds("site", pubConfig)).toEqual(["webmaster_source"]);
+  });
+
+  it('"ad_unit" resolves for a publisher, as the reference promises', () => {
+    expect(resolveGroupIds("ad_unit", pubConfig)).toEqual(["webmaster_block"]);
+  });
+
+  it("external monetization groupings answer to both names", () => {
+    expect(resolveGroupIds("network,external_placement", pubConfig)).toEqual([
+      "mediation_network",
+      "mediation_block",
+    ]);
+    expect(resolveGroupIds("mediation_network,mediation_placement", pubConfig)).toEqual([
+      "mediation_network",
+      "mediation_block",
+    ]);
+  });
+
+  it("the income split has its own metrics", () => {
+    expect(resolveMetricIds("kadam_revenue,external_revenue,revenue", pubConfig)).toEqual([
+      "finance_moneyInKadam",
+      "finance_moneyInMediation",
+      "finance_moneyIn",
+    ]);
+  });
+
+  it("a name whose candidates this cabinet lacks is reported, not guessed", () => {
+    expect(resolveGroups("ad_unit", advConfig).unknown).toEqual(["ad_unit"]);
+  });
+
+  it("describeGroups names each id once, using this cabinet's candidate", () => {
+    expect(describeGroups(pubConfig)).toContain("site");
+    expect(describeGroups(advConfig)).toContain("site");
+  });
+});

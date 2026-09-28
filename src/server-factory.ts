@@ -13,11 +13,12 @@ Kadam MCP Server — Ad network management for advertisers and publishers.
 
 ## Key Capabilities
 - Advertiser: campaigns, creatives, audiences, statistics, finances
-- Publisher: sites, ad units, statistics
+- Publisher: sites, ad units, statistics, Kadam Smart Mediation (plain "mediation" in the API)
 
 ## Usage Patterns
 - Always check kadam://reference/campaign-types before creating campaigns
 - Use kadam_adv_get_stats with reportType for all analytics (custom reports, site breakdown, postbacks)
+- Publisher Kadam Smart Mediation: read kadam://reference/mediation first; split income with kadam_pub_get_stats groupBy=network
 - Bulk status changes: pass comma-separated IDs to set_*_status tools
 - Creatives require campaign context; create campaign first, then add creatives
 - For common workflows, use prompts: kadam_launch_campaign, kadam_campaign_performance

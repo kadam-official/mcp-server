@@ -133,7 +133,7 @@ docker run -d --name kadam-mcp \
 
 Add `https://partners.kadam.net/mcp` (advertiser) or `https://pub.kadam.net/mcp` (publisher) as Server URL in ChatGPT settings. OAuth discovery, registration, and login happen automatically.
 
-## Tools (72)
+## Tools (80)
 
 ### Advertiser Tools (63)
 
@@ -141,27 +141,27 @@ Requires `KADAM_ADV_API_KEY`.
 
 #### Dictionaries
 
-| Tool                       | Description                                                                                                                                   | Annotations |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kadam_adv_get_dictionary`                | Reference dictionary: campaign types, browsers, platforms, devices, connections, categories, isps, conversion templates, countries, regions, cities | readOnly    |
+| Tool                       | Description                                                                                                                                         | Annotations |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_get_dictionary` | Reference dictionary: campaign types, browsers, platforms, devices, connections, categories, isps, conversion templates, countries, regions, cities | readOnly    |
 
 #### Campaigns
 
-| Tool                            | Description                                                                                                                                  | Annotations |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `kadam_adv_list_campaigns`      | List campaigns with filters (folder, status, type, date, search) and pagination                                                              | readOnly    |
-| `kadam_adv_get_campaign`        | Get full campaign configuration by ID: landing page URL, bids per country, budgets, targeting, frequency caps, schedule, conversion settings | readOnly    |
-| `kadam_adv_create_campaign`     | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences); `dryRun: true` validates only                 | —           |
-| `kadam_adv_update_campaign`     | Update any campaign fields by ID                                                                                                             | —           |
-| `kadam_adv_set_campaign_status` | Bulk status change (active/paused/archived/restored) for comma-separated IDs; reports per-ID result                                          | idempotent  |
-| `kadam_adv_delete_campaigns`    | Bulk delete of archived campaigns by comma-separated IDs; requires `confirm: true`, reports per-ID result                                    | destructive |
-| `kadam_adv_move_campaigns`      | Move campaigns to a campaign group by comma-separated campaign IDs and target group ID                                                       | idempotent  |
-| `kadam_adv_copy_campaign`       | Copy a campaign into a campaign group: settings and bids are cloned, the copy starts paused and re-enters moderation. Optional pricing-model switch, push <-> in-page push cross-format copy, autorules and per-site bids | —           |
-| `kadam_adv_bulk_replace_urls`   | Find and replace a landing-URL fragment across campaigns and their creatives. Requires a token impersonating an administrator (plain client tokens get 403); supports `dryRun` | destructive |
-| `kadam_adv_set_campaign_rss`    | Point a native campaign at an RSS feed to import creatives, or stop the import with an empty link | idempotent  |
-| `kadam_adv_set_easy_start`      | Turn Easy Start (curated site set) on or off for a campaign. Requires a token impersonating an administrator | idempotent  |
-| `kadam_adv_get_blocked_traffic_sources` | Traffic sources rejecting a campaign, split into category blocks and moderation-tag blocks. Requires a token impersonating an administrator (plain client tokens get 403) | readOnly    |
-| `kadam_adv_get_traffic_forecast` | Bid-to-traffic curve for a targeting set from yesterday's auction. An empty curve means the forecast could not be built, not that traffic is zero | readOnly    |
+| Tool                                    | Description                                                                                                                                                                                                               | Annotations |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_list_campaigns`              | List campaigns with filters (folder, status, type, date, search) and pagination                                                                                                                                           | readOnly    |
+| `kadam_adv_get_campaign`                | Get full campaign configuration by ID: landing page URL, bids per country, budgets, targeting, frequency caps, schedule, conversion settings                                                                              | readOnly    |
+| `kadam_adv_create_campaign`             | Create campaign with full targeting (countries, devices, OS, browsers, age, gender, audiences); `dryRun: true` validates only                                                                                             | —           |
+| `kadam_adv_update_campaign`             | Update any campaign fields by ID                                                                                                                                                                                          | —           |
+| `kadam_adv_set_campaign_status`         | Bulk status change (active/paused/archived/restored) for comma-separated IDs; reports per-ID result                                                                                                                       | idempotent  |
+| `kadam_adv_delete_campaigns`            | Bulk delete of archived campaigns by comma-separated IDs; requires `confirm: true`, reports per-ID result                                                                                                                 | destructive |
+| `kadam_adv_move_campaigns`              | Move campaigns to a campaign group by comma-separated campaign IDs and target group ID                                                                                                                                    | idempotent  |
+| `kadam_adv_copy_campaign`               | Copy a campaign into a campaign group: settings and bids are cloned, the copy starts paused and re-enters moderation. Optional pricing-model switch, push <-> in-page push cross-format copy, autorules and per-site bids | —           |
+| `kadam_adv_bulk_replace_urls`           | Find and replace a landing-URL fragment across campaigns and their creatives. Requires a token impersonating an administrator (plain client tokens get 403); supports `dryRun`                                            | destructive |
+| `kadam_adv_set_campaign_rss`            | Point a native campaign at an RSS feed to import creatives, or stop the import with an empty link                                                                                                                         | idempotent  |
+| `kadam_adv_set_easy_start`              | Turn Easy Start (curated site set) on or off for a campaign. Requires a token impersonating an administrator                                                                                                              | idempotent  |
+| `kadam_adv_get_blocked_traffic_sources` | Traffic sources rejecting a campaign, split into category blocks and moderation-tag blocks. Requires a token impersonating an administrator (plain client tokens get 403)                                                 | readOnly    |
+| `kadam_adv_get_traffic_forecast`        | Bid-to-traffic curve for a targeting set from yesterday's auction. An empty curve means the forecast could not be built, not that traffic is zero                                                                         | readOnly    |
 
 #### Bid Management
 
@@ -169,49 +169,49 @@ Requires `KADAM_ADV_API_KEY`.
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------- |
 | `kadam_adv_update_campaign_bid` | Update bid for a single campaign (lightweight, no full payload). Falls back to current countries if omitted | idempotent  |
 | `kadam_adv_bulk_update_bids`    | Update bids for multiple campaigns at once (all must share the same pricing model)                          | idempotent  |
-| `kadam_adv_block_sites`                   | Stop or resume buying sites (zones) in campaigns                                                                    | —           |
+| `kadam_adv_block_sites`         | Stop or resume buying sites (zones) in campaigns                                                            | —           |
 | `kadam_adv_update_site_bids`    | Set per-site (zone) bids: static (`0.05`), multiplier (`x1.5`), or remove (`0`)                             | idempotent  |
 
 #### Campaign Folders
 
-| Tool                                   | Description                                                                                               | Annotations |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------- |
-| `kadam_adv_list_campaign_folders`      | List folders with campaign counts and budgets                                                             | readOnly    |
-| `kadam_adv_get_campaign_folder`        | Get a single folder: name, archived state, budgets                                                        | readOnly    |
-| `kadam_adv_create_campaign_folder`     | Create a new folder (name 1-50 chars)                                                                     | —           |
-| `kadam_adv_update_campaign_folder`     | Partial update: rename and/or change budgets and distribution                                             | —           |
+| Tool                                   | Description                                                                                                                               | Annotations |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `kadam_adv_list_campaign_folders`      | List folders with campaign counts and budgets                                                                                             | readOnly    |
+| `kadam_adv_get_campaign_folder`        | Get a single folder: name, archived state, budgets                                                                                        | readOnly    |
+| `kadam_adv_create_campaign_folder`     | Create a new folder (name 1-50 chars)                                                                                                     | —           |
+| `kadam_adv_update_campaign_folder`     | Partial update: rename and/or change budgets and distribution                                                                             | —           |
 | `kadam_adv_set_campaign_folder_status` | Bulk action for comma-separated IDs: activate/pause campaigns, archive or restore folders with their campaigns; returns per-folder result | idempotent  |
 
 #### Creatives
 
-| Tool                            | Description                                              | Annotations |
-| ------------------------------- | -------------------------------------------------------- | ----------- |
-| `kadam_adv_list_creatives`      | List creatives by campaign, status, or search query      | readOnly    |
-| `kadam_adv_create_creative`     | Create creative for a campaign: image, HTML5 archive, video file or VAST tag (goes through moderation) | —           |
-| `kadam_adv_update_creative`     | Update creative fields                                   | —           |
-| `kadam_adv_set_creative_status` | Bulk status change for creatives: active/paused/archived/restored; returns per-creative result | idempotent  |
-| `kadam_adv_get_creative_test_conversion` | Signed links to test a creative's conversion tracking (test click + frame preview)                                            | —           |
-| `kadam_adv_upload_bulk_images`  | Stage images for a bulk creative batch (async, returns a job)                                                                               | —           |
-| `kadam_adv_create_bulk_creatives` | Turn staged images into creatives in several campaigns at once (async, returns a job)                                                     | —           |
-| `kadam_adv_get_bulk_job`        | State of a bulk batch: staged images, refusals, per-row outcome                                                                             | —           |
-| `kadam_adv_copy_creatives`      | Copy creatives into other campaigns (creatives × targets copies), originals untouched                                                       | —           |
-| `kadam_adv_move_creatives`      | Move creatives to another campaign of the same format and pricing model; they lose per-geo bids and return to moderation                     | —           |
-| `kadam_adv_get_creative_blocked_sources` | Traffic sources that reject one creative, split by category and moderation tag (impersonation only)                                    | —           |
-| `kadam_adv_set_creative_bids`   | Replace the creatives' own per-country bids; countries left out fall back to the campaign bid                                               | —           |
-| `kadam_adv_delete_creatives`    | Bulk delete of archived creatives by comma-separated IDs; requires `confirm: true`, reports per-ID result | destructive |
+| Tool                                     | Description                                                                                                              | Annotations |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| `kadam_adv_list_creatives`               | List creatives by campaign, status, or search query                                                                      | readOnly    |
+| `kadam_adv_create_creative`              | Create creative for a campaign: image, HTML5 archive, video file or VAST tag (goes through moderation)                   | —           |
+| `kadam_adv_update_creative`              | Update creative fields                                                                                                   | —           |
+| `kadam_adv_set_creative_status`          | Bulk status change for creatives: active/paused/archived/restored; returns per-creative result                           | idempotent  |
+| `kadam_adv_get_creative_test_conversion` | Signed links to test a creative's conversion tracking (test click + frame preview)                                       | —           |
+| `kadam_adv_upload_bulk_images`           | Stage images for a bulk creative batch (async, returns a job)                                                            | —           |
+| `kadam_adv_create_bulk_creatives`        | Turn staged images into creatives in several campaigns at once (async, returns a job)                                    | —           |
+| `kadam_adv_get_bulk_job`                 | State of a bulk batch: staged images, refusals, per-row outcome                                                          | —           |
+| `kadam_adv_copy_creatives`               | Copy creatives into other campaigns (creatives × targets copies), originals untouched                                    | —           |
+| `kadam_adv_move_creatives`               | Move creatives to another campaign of the same format and pricing model; they lose per-geo bids and return to moderation | —           |
+| `kadam_adv_get_creative_blocked_sources` | Traffic sources that reject one creative, split by category and moderation tag (impersonation only)                      | —           |
+| `kadam_adv_set_creative_bids`            | Replace the creatives' own per-country bids; countries left out fall back to the campaign bid                            | —           |
+| `kadam_adv_delete_creatives`             | Bulk delete of archived creatives by comma-separated IDs; requires `confirm: true`, reports per-ID result                | destructive |
 
 #### Audiences
 
-| Tool                        | Description                                            | Annotations |
-| --------------------------- | ------------------------------------------------------ | ----------- |
-| `kadam_adv_list_audiences`  | List audiences with search and sorting                 | readOnly    |
-| `kadam_adv_get_audience`    | Get detailed audience info by ID                       | readOnly    |
-| `kadam_adv_create_audience` | Create audience (pixel, code, fingerprint, or S2S)     | —           |
-| `kadam_adv_update_audience` | Update audience settings                               | —           |
-| `kadam_adv_get_filtered_audience_sources` | Audiences usable as sources of a filtered audience (impersonation only)                                              | —           |
-| `kadam_adv_get_audience_params`  | Hardcoded parameters a pixel/S2S audience substitutes into its code                                                        | —           |
-| `kadam_adv_set_audience_params`  | Replace the hardcoded parameters of a pixel/S2S audience                                                                   | —           |
-| `kadam_adv_delete_audience` | Delete audience permanently (requires `confirm: true`) | destructive |
+| Tool                                      | Description                                                             | Annotations |
+| ----------------------------------------- | ----------------------------------------------------------------------- | ----------- |
+| `kadam_adv_list_audiences`                | List audiences with search and sorting                                  | readOnly    |
+| `kadam_adv_get_audience`                  | Get detailed audience info by ID                                        | readOnly    |
+| `kadam_adv_create_audience`               | Create audience (pixel, code, fingerprint, or S2S)                      | —           |
+| `kadam_adv_update_audience`               | Update audience settings                                                | —           |
+| `kadam_adv_get_filtered_audience_sources` | Audiences usable as sources of a filtered audience (impersonation only) | —           |
+| `kadam_adv_get_audience_params`           | Hardcoded parameters a pixel/S2S audience substitutes into its code     | —           |
+| `kadam_adv_set_audience_params`           | Replace the hardcoded parameters of a pixel/S2S audience                | —           |
+| `kadam_adv_delete_audience`               | Delete audience permanently (requires `confirm: true`)                  | destructive |
 
 #### Finance & Statistics
 
@@ -220,7 +220,7 @@ Requires `KADAM_ADV_API_KEY`.
 | `kadam_adv_list_finance_operations` | Transaction history (deposits, charges, refunds)                                                                                                                                 | readOnly    |
 | `kadam_adv_get_stats`               | Unified statistics — 3 report types via `reportType` param: `custom` (report builder with dimension/metric mapping), `sites` (per-site breakdown), `postbacks` (conversion logs) | readOnly    |
 
-### Publisher Tools (9)
+### Publisher Tools (17)
 
 Requires `KADAM_PUB_API_KEY`.
 
@@ -248,19 +248,38 @@ Requires `KADAM_PUB_API_KEY`.
 | `kadam_pub_get_user_info` | Get publisher account info and balance                            | readOnly    |
 | `kadam_pub_get_stats`     | Publisher statistics with human-readable dimension/metric mapping | readOnly    |
 
-## Resources (7)
+#### Kadam Smart Mediation
+
+Selling an ad unit's traffic through outside ad networks alongside Kadam demand. The API,
+the code and the report dimensions call it plain `mediation`. Read
+`kadam://reference/mediation` first; split the income in `kadam_pub_get_stats` with
+`groupBy=network` and the `kadam_revenue` / `mediation_revenue` metrics.
+
+| Tool                                         | Description                                                                  | Annotations |
+| -------------------------------------------- | ---------------------------------------------------------------------------- | ----------- |
+| `kadam_pub_list_mediation_networks`          | Catalog of networks, which have an account, and what an ad unit already runs | readOnly    |
+| `kadam_pub_connect_mediation_network`        | Attach a network to an ad unit (resolves account and placement itself)       | —           |
+| `kadam_pub_update_mediation_network`         | Change geo, unique cap, proxy policy, tag template, placement or account     | —           |
+| `kadam_pub_set_mediation_network_status`     | active / paused for a connection                                             | idempotent  |
+| `kadam_pub_retest_mediation_network`         | Restart the forced test share (1-50%); starts a new measurement epoch        | —           |
+| `kadam_pub_disconnect_mediation_network`     | Remove a connection (requires `confirm`)                                     | destructive |
+| `kadam_pub_update_mediation_network_account` | Rotate the network API key, rename or disable the account                    | —           |
+| `kadam_pub_delete_mediation_network_account` | Remove a network account (requires `confirm`)                                | destructive |
+
+## Resources (9)
 
 Static reference data the agent can read before calling tools:
 
-| URI                                   | Description                                                         |
-| ------------------------------------- | ------------------------------------------------------------------- |
-| `kadam://reference/campaign-types`    | All ad format types with IDs, features, pricing, and creative specs |
-| `kadam://reference/pricing-models`    | CPC, CPM, CPV, CPA Target with IDs and descriptions                 |
-| `kadam://reference/creative-formats`  | Creative requirements per campaign type                             |
-| `kadam://reference/ad-unit-types`     | Publisher ad unit formats with IDs                                  |
-| `kadam://reference/site-states`       | Publisher site lifecycle states                                     |
-| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools               |
-| `kadam://reference/api-overview`      | General Kadam API capabilities overview                             |
+| URI                                   | Description                                                                      |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| `kadam://reference/campaign-types`    | All ad format types with IDs, features, pricing, and creative specs              |
+| `kadam://reference/pricing-models`    | CPC, CPM, CPV, CPA Target with IDs and descriptions                              |
+| `kadam://reference/creative-formats`  | Creative requirements per campaign type                                          |
+| `kadam://reference/ad-unit-types`     | Publisher ad unit formats with IDs                                               |
+| `kadam://reference/site-states`       | Publisher site lifecycle states                                                  |
+| `kadam://reference/mediation`         | Outside ad networks: accounts, placements, connections, test share, income split |
+| `kadam://reference/report-dimensions` | Available dimensions and metrics for statistics tools                            |
+| `kadam://reference/api-overview`      | General Kadam API capabilities overview                                          |
 
 ## Prompts (4)
 
@@ -299,14 +318,14 @@ src/
 │   └── tool-module.ts        # ToolModule interface
 ├── tools/
 │   ├── advertiser/           # 63 tools across 14 modules
-│   └── publisher/            # 9 tools across 4 modules
-├── resources/                # 7 static reference resources
+│   └── publisher/            # 17 tools across 6 modules
+├── resources/                # 9 reference resources
 └── prompts/                  # 4 workflow prompts
 ```
 
 ### Key Design Decisions
 
-- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 72 tools
+- **ToolWrapper middleware** — centralized auth validation, error formatting, and logging for all 80 tools
 - **Lazy singleton API clients** — one `HttpClient` instance per product, created on first use
 - **Output truncation** — hard 50KB limit per response with `maxResults` (default 25, max 100) to prevent LLM context overflow
 - **Human-readable output** — formatted tables, aligned entities, pagination metadata instead of raw JSON

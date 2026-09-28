@@ -117,8 +117,15 @@ export class ToolWrapper {
     }
 
     if (error instanceof ApiError) {
-      if (error.status === 401 || error.status === 403) {
+      if (error.status === 401) {
         return "API key is invalid or expired. Check your API key configuration.";
+      }
+      // 403 is the server's own verdict — a disabled feature reads the same as a bad key
+      // unless its message survives.
+      if (error.status === 403) {
+        if (error.message.length > 0) return error.message;
+
+        return "Access denied. The API key may be invalid or the feature is not enabled for this account.";
       }
       if (error.status === 404) {
         return "Resource not found. Verify the ID is correct.";
