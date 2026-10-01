@@ -92,11 +92,9 @@ export const campaignActionsModule: ToolModule = {
         name: z.string().min(1).max(255).describe("Name for the new campaign"),
         folderId: z.number().int().positive().describe("Campaign group the copy is created in"),
         creatives: z
-          .enum(["all", "active", "none"])
+          .enum(["all", "active"])
           .optional()
-          .describe(
-            "Which creatives to copy: all of them, only the active ones, or none (campaign settings only). Default: all",
-          ),
+          .describe("Which creatives to copy: all of them, or only the active ones. Default: all"),
         pauseAfterModeration: z
           .boolean()
           .optional()
@@ -153,11 +151,8 @@ export const campaignActionsModule: ToolModule = {
           isPauseAfterModer: args.pauseAfterModeration ?? true,
         };
 
-        // The backend copies every creative unless `mode` narrows it down, and skips them
-        // entirely when the field is absent — so "none" is the missing field, not a value.
-        if (args.creatives !== "none") {
-          payload.mode = args.creatives ?? "all";
-        }
+        // CampaignCopyForm treats a missing mode as `all`, so always send the chosen mode.
+        payload.mode = args.creatives ?? "all";
         if (args.copyAutorules != null) payload.copyAutorules = args.copyAutorules;
         if (args.copySiteBids != null) payload.copyBids = args.copySiteBids;
         if (args.targetType != null)

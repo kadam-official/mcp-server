@@ -48,12 +48,12 @@ describe("campaign-actions tools", () => {
     expect(text).toContain("4 copied");
   });
 
-  it("copy_campaign with creatives=none omits mode so the campaign is copied alone", async () => {
+  it("copy_campaign with creatives=active sends mode active", async () => {
     const { client, mockApi } = await createToolClient(campaignActionsModule);
     const api = mockApi as MockPartnersClient;
     api.copyCampaign.mockResolvedValue({
       id: 319,
-      successful: 0,
+      successful: 1,
       failed: 0,
       errors: [],
       bidsJobId: null,
@@ -61,14 +61,28 @@ describe("campaign-actions tools", () => {
 
     await client.callTool({
       name: "kadam_adv_copy_campaign",
-      arguments: { id: 31, name: "Settings only", folderId: 100, creatives: "none" },
+      arguments: { id: 31, name: "Active only", folderId: 100, creatives: "active" },
     });
 
     expect(api.copyCampaign).toHaveBeenCalledWith(31, {
-      name: "Settings only",
+      name: "Active only",
       folderId: 100,
       isPauseAfterModer: true,
+      mode: "active",
     });
+  });
+
+  it("copy_campaign rejects creatives=none instead of copying every creative", async () => {
+    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_copy_campaign",
+      arguments: { id: 31, name: "Settings only", folderId: 100, creatives: "none" },
+    });
+
+    expect(getTextFromResult(result)).toContain("received 'none'");
+    expect(api.copyCampaign).not.toHaveBeenCalled();
   });
 
   it("copy_campaign surfaces skipped creatives instead of reporting a clean copy", async () => {
