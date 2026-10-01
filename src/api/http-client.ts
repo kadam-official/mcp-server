@@ -232,7 +232,9 @@ function tryParseJson(text: string): unknown {
  * - string                         -> the string
  * - array (of strings/{message})   -> "a; b"
  * - field map {field: [msgs]|str}  -> "field: a, b; field2: c" (bare string vals
- *   are emitted as-is, so e.g. {exception:"..."} keeps the BearerValidator signal)
+ *   are emitted as-is, so e.g. {exception:"..."} keeps the BearerValidator signal).
+ *   Array items that are objects are flattened too: {limitException:"..."} must
+ *   not collapse to "[object Object]" via Array.join.
  * Returns undefined when there is nothing meaningful to show.
  */
 function flattenFieldErrors(value: unknown): string | undefined {
@@ -258,8 +260,12 @@ function flattenFieldErrors(value: unknown): string | undefined {
   if (typeof value === "object") {
     const parts: string[] = [];
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      if (Array.isArray(val)) parts.push(`${key}: ${val.join(", ")}`);
-      else if (typeof val === "string") parts.push(val);
+      if (Array.isArray(val)) {
+        const rendered = val
+          .map((item) => flattenFieldErrors(item))
+          .filter((item): item is string => Boolean(item));
+        if (rendered.length) parts.push(`${key}: ${rendered.join(", ")}`);
+      } else if (typeof val === "string") parts.push(val);
       else parts.push(`${key}: ${JSON.stringify(val)}`);
     }
     return parts.length ? parts.join("; ") : undefined;

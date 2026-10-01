@@ -178,6 +178,23 @@ describe("HttpClient", () => {
     );
   });
 
+  it("422 envelope: prints a nested limit object instead of [object Object]", async () => {
+    const client = createClient();
+    fetchMock.mockResolvedValue(
+      mockResponse(200, {
+        success: false,
+        code: 422,
+        msg: {
+          autorules: [{ limitException: "Достигнут лимит: максимум 5 автоправил на кампанию" }],
+        },
+      }),
+    );
+
+    await expect(client.get("/test")).rejects.toThrow(
+      "autorules: Достигнут лимит: максимум 5 автоправил на кампанию",
+    );
+  });
+
   /**
    * Кабинет паба отвечает HTTP 200 и кладёт отказ в конверт, поэтому путь через
    * response.ok сюда не заходит: код и текст обязан донести unwrapApiResponse. По этому
