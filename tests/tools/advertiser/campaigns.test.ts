@@ -385,8 +385,62 @@ describe("campaigns tools", () => {
     expect(result.isError).toBeFalsy();
     const payload = api.createCampaign.mock.calls[0]![0] as Record<string, unknown>;
     expect(payload.isDirectTrafficPriority).toBe(1);
-    expect(payload).not.toHaveProperty("hasCorrectPostback");
+    // Nobody confirmed the postback, so the new campaign is explicitly "not verified":
+    // the API column is NOT NULL and a missing flag used to fail the insert.
+    expect(payload.hasCorrectPostback).toBe(0);
     expect(payload).not.toHaveProperty("allowMultiAds");
+  });
+
+  it("impersonation create keeps an explicit hasCorrectPostback=true", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 8 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "Verified",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 10,
+        countries: "US",
+        hasCorrectPostback: true,
+      },
+    });
+
+    const payload = api.createCampaign.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.hasCorrectPostback).toBe(1);
+  });
+
+  it("client create never sends hasCorrectPostback, even as a default", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 9 } as never);
+    api.validateCampaign.mockResolvedValue({} as never);
+
+    const args = {
+      type: "push",
+      name: "Client",
+      url: "https://example.com",
+      folderId: 1,
+      pricingModel: "cpc",
+      bid: 0.05,
+      dailyBudget: 10,
+      countries: "US",
+    };
+    await client.callTool({ name: "kadam_adv_create_campaign", arguments: args });
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: { ...args, dryRun: true },
+    });
+
+    // A client token is answered 422 "unknown field" for any manager flag, so the
+    // default must stay impersonation-only — on create and on dryRun alike.
+    expect(api.createCampaign.mock.calls[0]![0]).not.toHaveProperty("hasCorrectPostback");
+    expect(api.validateCampaign.mock.calls[0]![0]).not.toHaveProperty("hasCorrectPostback");
   });
 
   it("update_campaign keeps manager-only fields an impersonating token does see", async () => {

@@ -620,7 +620,11 @@ const managerCampaignFields = {
   hasCorrectPostback: z
     .boolean()
     .optional()
-    .describe("Manager-only: mark the advertiser's postback as verified so CPA conversions count"),
+    .describe(
+      "Manager-only: the advertiser's postback is verified, so CPA conversions count. " +
+        "Omit unless you have actually confirmed the postback — on create an omitted flag means " +
+        "'not verified' (false); on update an omitted flag keeps the stored value.",
+    ),
   isDirectTrafficPriority: z
     .boolean()
     .optional()
@@ -752,6 +756,11 @@ export const campaignsModule: ToolModule = {
         delete mappedArgs.dryRun;
         if (args.categories) {
           mappedArgs.categories = parseCategoryInput(args.categories);
+        }
+        // The flag column is NOT NULL and only a manager may write it: a new campaign
+        // whose postback nobody confirmed is "not verified", not "unknown".
+        if (wrapper.impersonation && mappedArgs.hasCorrectPostback == null) {
+          mappedArgs.hasCorrectPostback = false;
         }
         const mappedData = await mapCampaignFields(mappedArgs, ctx.adv.options);
 
