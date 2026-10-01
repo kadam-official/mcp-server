@@ -1,6 +1,7 @@
 import {
   createToolClient,
   getTextFromResult,
+  IMPERSONATION,
   type MockPartnersClient,
 } from "../../helpers/tool-client.js";
 import { campaignsModule } from "../../../src/tools/advertiser/campaigns.js";
@@ -265,7 +266,12 @@ describe("campaigns tools", () => {
     expect(payload.status).toBeUndefined();
   });
 
-  it("update_campaign drops manager-only fields the token cannot see", async () => {
+  /**
+   * A client token reads manager-only fields as null and the API accepts that null back
+   * as "not provided" (CampaignManagerFieldsBearerCest on the backend proves it), so the
+   * read-modify-write echoes the card as is — no special-casing by field name.
+   */
+  it("update_campaign echoes the null manager-only fields a client token reads", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
     api.getCampaign.mockResolvedValue({
@@ -291,18 +297,100 @@ describe("campaigns tools", () => {
     });
 
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.name).toBe("Updated Name");
     for (const field of [
       "proxies",
       "hasCorrectPostback",
       "isDirectTrafficPriority",
       "allowMultiAds",
     ]) {
-      expect(payload).not.toHaveProperty(field);
+      expect(payload[field]).toBeNull();
     }
   });
 
+  it("client session cannot set manager-only flags: they are not in the schema", async () => {
+    const { client } = await createToolClient(campaignsModule);
+
+    const { tools } = await client.listTools();
+    for (const name of ["kadam_adv_create_campaign", "kadam_adv_update_campaign"]) {
+      const tool = tools.find((t) => t.name === name);
+      expect(tool).toBeDefined();
+      const properties = tool!.inputSchema.properties as Record<string, unknown>;
+      expect(Object.keys(properties).length).toBeGreaterThan(5);
+      expect(properties).not.toHaveProperty("hasCorrectPostback");
+      expect(properties).not.toHaveProperty("isDirectTrafficPriority");
+      expect(properties).not.toHaveProperty("allowMultiAds");
+    }
+  });
+
+  it("impersonation session gets the manager-only flags and writes them as 0/1", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+
+    const { tools } = await client.listTools();
+    const update = tools.find((t) => t.name === "kadam_adv_update_campaign")!;
+    const properties = update.inputSchema.properties as Record<string, unknown>;
+    expect(properties).toHaveProperty("hasCorrectPostback");
+    expect(properties).toHaveProperty("isDirectTrafficPriority");
+    expect(properties).toHaveProperty("allowMultiAds");
+
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      hasCorrectPostback: false,
+      isDirectTrafficPriority: false,
+      allowMultiAds: true,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, hasCorrectPostback: true, allowMultiAds: false },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.hasCorrectPostback).toBe(1);
+    expect(payload.allowMultiAds).toBe(0);
+    expect(payload.isDirectTrafficPriority).toBe(false); // untouched → echoed from the card
+  });
+
+  it("impersonation session passes manager-only flags on create as 0/1", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 7 } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "Managed",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 10,
+        countries: "US",
+        isDirectTrafficPriority: true,
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = api.createCampaign.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.isDirectTrafficPriority).toBe(1);
+    expect(payload).not.toHaveProperty("hasCorrectPostback");
+    expect(payload).not.toHaveProperty("allowMultiAds");
+  });
+
   it("update_campaign keeps manager-only fields an impersonating token does see", async () => {
-    const { client, mockApi } = await createToolClient(campaignsModule);
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
     const api = mockApi as MockPartnersClient;
     api.getCampaign.mockResolvedValue({
       id: 42,

@@ -131,18 +131,19 @@ const CAMPAIGN_WRITABLE_FIELDS = new Set<string>([
 ]);
 
 /**
- * Manager-level campaign settings. The API returns them as null for an ordinary bearer
- * token and answers 422 ("unknown field") when such a token sends them, so a null value
- * means "this token may not touch it" and the key has to be dropped from the payload —
- * echoing it back would turn every read-modify-write into a validation error. Under
- * impersonation the same read returns real values, which then round-trip normally.
+ * Manager-level campaign switches. The API returns them as null for a client token and
+ * accepts that null back unchanged (the field is treated as "not provided"), so a
+ * read-modify-write never has to special-case them. The tools only *ask* for them under
+ * impersonation — see {@link managerCampaignFields} — because a client token that sends
+ * a real value gets 422 "unknown field".
  */
-const MANAGER_ONLY_FIELDS = new Set<string>([
-  "proxies",
+const MANAGER_CAMPAIGN_FLAGS = [
   "hasCorrectPostback",
   "isDirectTrafficPriority",
   "allowMultiAds",
-]);
+] as const;
+
+type ManagerCampaignFlag = (typeof MANAGER_CAMPAIGN_FLAGS)[number];
 
 /**
  * Fields the campaign detail returns in a different shape than the update accepts, so
@@ -157,7 +158,6 @@ function pickWritable(current: Record<string, unknown>): Record<string, unknown>
   const out: Record<string, unknown> = {};
   for (const key of CAMPAIGN_WRITABLE_FIELDS) {
     if (current[key] === undefined) continue;
-    if (current[key] === null && MANAGER_ONLY_FIELDS.has(key)) continue;
     if (NON_ROUND_TRIP_FIELDS.has(key)) continue;
     out[key] = current[key];
   }
@@ -186,6 +186,12 @@ async function mapField(
       break;
     case "evenDistribution":
       mapped.isEvenDistribution = value;
+      break;
+    case "hasCorrectPostback":
+    case "isDirectTrafficPriority":
+    case "allowMultiAds":
+      // Only present under impersonation; the API stores these as 0/1 like the other flags.
+      mapped[key] = value ? 1 : 0;
       break;
     case "bid": {
       const bidVal = value as number;
@@ -260,9 +266,9 @@ const FULL_WEEK_SCHEDULE = {
 };
 
 /**
- * Values the API expects on create but the tools do not ask the agent for. Nothing from
- * {@link MANAGER_ONLY_FIELDS} belongs here: sending such a key — even with a falsy value —
- * is a 422 for an ordinary token, and the API applies its own default when it is absent.
+ * Values the API expects on create but the tools do not ask the agent for. None of the
+ * {@link MANAGER_CAMPAIGN_FLAGS} belongs here: sending such a key — even with a falsy
+ * value — is a 422 for a client token, and the API applies its own default when absent.
  */
 const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   connectionType: 3,
@@ -606,9 +612,50 @@ const postConversionFields = {
     .describe("Comma-separated audience IDs for post-conversion retargeting"),
 };
 
+/**
+ * Input fields that exist only in an impersonation session. A client session's create /
+ * update schema does not mention them at all, so the model cannot be tempted into a 422.
+ */
+const managerCampaignFields = {
+  hasCorrectPostback: z
+    .boolean()
+    .optional()
+    .describe("Manager-only: mark the advertiser's postback as verified so CPA conversions count"),
+  isDirectTrafficPriority: z
+    .boolean()
+    .optional()
+    .describe("Manager-only: prefer direct (non-SSP) traffic for this campaign"),
+  allowMultiAds: z
+    .boolean()
+    .optional()
+    .describe("Manager-only: allow several creatives of this campaign in one ad block"),
+};
+
+/**
+ * Shape to spread into the campaign write schemas for this session's role. The static
+ * type keeps the keys in both cases — every one is optional, and for a client session
+ * they are simply never present — while the runtime schema omits them entirely.
+ */
+function managerFieldsFor(wrapper: ToolWrapper): typeof managerCampaignFields {
+  return (wrapper.impersonation ? managerCampaignFields : {}) as typeof managerCampaignFields;
+}
+
+/** Copy the manager flags the agent set into the merged update payload as 0/1. */
+function applyManagerFlags(
+  changes: Partial<Record<ManagerCampaignFlag, boolean>>,
+  merged: Record<string, unknown>,
+): void {
+  for (const flag of MANAGER_CAMPAIGN_FLAGS) {
+    const value = changes[flag];
+    if (value != null) merged[flag] = value ? 1 : 0;
+  }
+}
+
 export const campaignsModule: ToolModule = {
   product: "advertiser",
   register(wrapper: ToolWrapper) {
+    const managerFields = managerFieldsFor(wrapper);
+
     wrapper.register(
       {
         name: "kadam_adv_list_campaigns",
@@ -692,6 +739,7 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
+        ...managerFields,
         countries: z
           .string()
           .describe(
@@ -748,6 +796,7 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
+        ...managerFields,
       },
       async (args, ctx) => {
         const { id, ...changes } = args;
@@ -756,6 +805,8 @@ export const campaignsModule: ToolModule = {
 
         const cpType = merged.cpType as number | undefined;
         const registry = ctx.adv.options;
+
+        applyManagerFlags(changes, merged);
 
         if (changes.name != null) merged.name = changes.name;
         if (changes.url != null) merged.url = changes.url;

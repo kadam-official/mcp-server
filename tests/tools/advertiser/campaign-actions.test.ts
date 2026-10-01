@@ -1,6 +1,7 @@
 import {
   createToolClient,
   getTextFromResult,
+  IMPERSONATION,
   type MockPartnersClient,
 } from "../../helpers/tool-client.js";
 import { campaignActionsModule } from "../../../src/tools/advertiser/campaign-actions.js";
@@ -167,8 +168,34 @@ describe("campaign-actions tools", () => {
     expect(api.copyCampaign).not.toHaveBeenCalled();
   });
 
+  /**
+   * These three answer 403 to a plain client token, so a client session must not list
+   * them at all; only an impersonation session gets them.
+   */
+  it("manager-only tools exist only in an impersonation session", async () => {
+    const managerOnly = [
+      "kadam_adv_bulk_replace_urls",
+      "kadam_adv_set_easy_start",
+      "kadam_adv_get_blocked_traffic_sources",
+    ];
+
+    const client = await createToolClient(campaignActionsModule);
+    const clientNames = (await client.client.listTools()).tools.map((t) => t.name);
+    expect(clientNames).toContain("kadam_adv_copy_campaign");
+    for (const name of managerOnly) expect(clientNames).not.toContain(name);
+
+    const manager = await createToolClient(campaignActionsModule, undefined, IMPERSONATION);
+    const managerNames = (await manager.client.listTools()).tools.map((t) => t.name);
+    for (const name of managerOnly) expect(managerNames).toContain(name);
+    expect(managerNames.length).toBe(clientNames.length + managerOnly.length);
+  });
+
   it("bulk_replace_urls sends the defaults the backend expects and previews on dryRun", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.bulkReplaceCampaignUrls.mockResolvedValue({
       mode: "substring",
@@ -210,7 +237,11 @@ describe("campaign-actions tools", () => {
   });
 
   it("bulk_replace_urls reports a real run as applied", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.bulkReplaceCampaignUrls.mockResolvedValue({
       mode: "substring",
@@ -232,7 +263,11 @@ describe("campaign-actions tools", () => {
   });
 
   it("bulk_replace_urls refuses a request that would replace nothing", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
 
     const result = await client.callTool({
@@ -252,7 +287,11 @@ describe("campaign-actions tools", () => {
   });
 
   it("bulk_replace_urls rejects duplicate campaign IDs", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
 
     const result = await client.callTool({
@@ -362,7 +401,11 @@ describe("campaign-actions tools", () => {
   });
 
   it("set_easy_start reports which inventory the campaign can buy after the change", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.setCampaignEasyStart.mockResolvedValue({ id: 31, isEasyStart: true } as never);
 
@@ -388,7 +431,11 @@ describe("campaign-actions tools", () => {
   });
 
   it("get_blocked_traffic_sources separates category blocks from tag blocks", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.getCampaignBlockedSsps.mockResolvedValue({
       category: "Dating",
@@ -421,7 +468,11 @@ describe("campaign-actions tools", () => {
   });
 
   it("get_blocked_traffic_sources says so when nothing blocks the campaign", async () => {
-    const { client, mockApi } = await createToolClient(campaignActionsModule);
+    const { client, mockApi } = await createToolClient(
+      campaignActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.getCampaignBlockedSsps.mockResolvedValue({
       category: "Dating",

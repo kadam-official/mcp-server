@@ -7,6 +7,7 @@ import { advToolModules } from "./tools/advertiser/index.js";
 import { pubToolModules } from "./tools/publisher/index.js";
 import { getConfig } from "./config.js";
 import type { ServerProducts } from "./types/products.js";
+import { CLIENT_ACCESS, type SessionAccess } from "./types/access.js";
 
 export type { ServerProducts } from "./types/products.js";
 
@@ -22,14 +23,20 @@ export type { ServerProducts } from "./types/products.js";
  * The advertiser OptionsRegistry is derived from the same pooled client the
  * tools use (resolve is cached by key) and is bound to the caller's
  * credentials, so resource reads stay per-tenant and lazy.
+ *
+ * `access` is the role the bearer was resolved to (GET /access). Tool modules
+ * read it from the wrapper: tools gated by `requires` are skipped for client
+ * sessions and campaign schemas drop manager-only fields. Defaults to the
+ * client catalog, which is always safe to show.
  */
 export function assembleServer(
   server: McpServer,
   pool: ClientPool,
   credentials: ToolCredentials,
   products: ServerProducts,
+  access: SessionAccess = CLIENT_ACCESS,
 ): void {
-  const wrapper = new ToolWrapper(server, pool, credentials);
+  const wrapper = new ToolWrapper(server, pool, credentials, access);
 
   // Static-only mode: skip live API enrichment so reference resources are served
   // from the static reference text (fast, no upstream calls).

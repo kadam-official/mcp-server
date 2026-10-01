@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { creativeActionsModule } from "../../../src/tools/advertiser/creative-actions.js";
-import { createToolClient, getTextFromResult } from "../../helpers/tool-client.js";
+import { createToolClient, getTextFromResult, IMPERSONATION } from "../../helpers/tool-client.js";
 import type { MockPartnersClient } from "../../helpers/tool-client.js";
 
 describe("creative actions", () => {
@@ -217,8 +217,21 @@ describe("creative actions", () => {
     expect(text).toContain("Creative identifiers must be unique");
   });
 
+  it("get_creative_blocked_sources is hidden from a client session", async () => {
+    const { client } = await createToolClient(creativeActionsModule);
+
+    const names = (await client.listTools()).tools.map((t) => t.name);
+
+    expect(names).toContain("kadam_adv_copy_creatives");
+    expect(names).not.toContain("kadam_adv_get_creative_blocked_sources");
+  });
+
   it("get_creative_blocked_sources splits the blocks by cause", async () => {
-    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const { client, mockApi } = await createToolClient(
+      creativeActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.getCreativeBlockedSsps.mockResolvedValue({
       category: "Dating",
@@ -252,7 +265,11 @@ describe("creative actions", () => {
   });
 
   it("get_creative_blocked_sources says plainly that nothing blocks the creative", async () => {
-    const { client, mockApi } = await createToolClient(creativeActionsModule);
+    const { client, mockApi } = await createToolClient(
+      creativeActionsModule,
+      undefined,
+      IMPERSONATION,
+    );
     const api = mockApi as MockPartnersClient;
     api.getCreativeBlockedSsps.mockResolvedValue({
       category: "Dating",

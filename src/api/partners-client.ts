@@ -15,6 +15,7 @@ import {
   financeRowSchema,
   accountProfileSchema,
   accountBalanceSchema,
+  accountAccessSchema,
   campaignBulkActionSchema,
   campaignCopyResultSchema,
   campaignBlockedSspsSchema,
@@ -56,6 +57,7 @@ import type {
   FinanceRow,
   AccountProfile,
   AccountBalance,
+  AccountAccess,
   PaymentSystems,
   DayMoneyLimit,
   DictionaryResult,
@@ -386,6 +388,16 @@ export class PartnersClient extends ExtendedStatsApiClient {
   async getAccountBalance(): Promise<AccountBalance> {
     const raw = await this.http.get("/finances/balance");
     return accountBalanceSchema.parse(raw);
+  }
+
+  /**
+   * Role of the bearer. Doubles as the cheapest authenticated probe: a rejected key
+   * fails here exactly like anywhere else, and a valid one tells us whether the
+   * session may see the manager-only catalog.
+   */
+  async getAccess(): Promise<AccountAccess> {
+    const raw = await this.http.get("/access");
+    return accountAccessSchema.parse(raw);
   }
 
   async listPaymentSystems(): Promise<PaymentSystems> {

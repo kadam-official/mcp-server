@@ -3,8 +3,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolWrapper } from "../../src/middleware/tool-wrapper.js";
 import type { ToolModule } from "../../src/types/tool-module.js";
+import { CLIENT_ACCESS, type SessionAccess } from "../../src/types/access.js";
 import { ClientPool } from "../../src/api/client-pool.js";
 import { vi } from "vitest";
+
+/** Session role for a test client; the default mirrors production (client catalog). */
+export const IMPERSONATION: SessionAccess = { impersonation: true };
 
 export function createMockClientPool(): ClientPool {
   const pool = new ClientPool({
@@ -135,6 +139,7 @@ export function createMockPartnersClient() {
     listFinanceOperations: vi.fn(),
     getAccountProfile: vi.fn(),
     getAccountBalance: vi.fn(),
+    getAccess: vi.fn(),
     listPaymentSystems: vi.fn(),
     getDayMoneyLimit: vi.fn(),
     setDayMoneyLimit: vi.fn(),
@@ -194,6 +199,7 @@ export type MockPubClient = ReturnType<typeof createMockPubClient>;
 export async function createToolClient(
   module: ToolModule,
   mockApi?: MockPartnersClient | MockPubClient,
+  access: SessionAccess = CLIENT_ACCESS,
 ) {
   const pool = createMockClientPool();
 
@@ -210,7 +216,7 @@ export async function createToolClient(
   });
 
   const server = new McpServer({ name: "test", version: "0.0.1" });
-  const wrapper = new ToolWrapper(server, pool, { advKey: "test-key", pubKey: "test-key" });
+  const wrapper = new ToolWrapper(server, pool, { advKey: "test-key", pubKey: "test-key" }, access);
   module.register(wrapper);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

@@ -16,7 +16,10 @@ vi.mock("../src/logger.js", () => ({
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-async function connectServer(envOverrides: Record<string, string | undefined>) {
+async function connectServer(
+  envOverrides: Record<string, string | undefined>,
+  access?: { impersonation: boolean },
+) {
   const originalEnv = { ...process.env };
   for (const [key, value] of Object.entries(envOverrides)) {
     if (value === undefined) {
@@ -32,7 +35,7 @@ async function connectServer(envOverrides: Record<string, string | undefined>) {
     pubBaseUrl: "https://pub.kadam.net/api",
   });
 
-  const server = createMcpServer(pool);
+  const server = createMcpServer(pool, access);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.1" });
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -96,6 +99,30 @@ describe("createMcpServer", () => {
       expect(pubTools.length).toBeGreaterThan(0);
     } finally {
       cleanup();
+    }
+  });
+
+  it("defaults to the client catalog and widens it only for an impersonation access", async () => {
+    const asClient = await connectServer({ KADAM_ADV_API_KEY: "test-adv" });
+    let clientCount: number;
+    try {
+      const names = (await asClient.client.listTools()).tools.map((t) => t.name);
+      clientCount = names.length;
+      expect(names).not.toContain("kadam_adv_set_easy_start");
+    } finally {
+      asClient.cleanup();
+    }
+
+    const asManager = await connectServer(
+      { KADAM_ADV_API_KEY: "test-adv" },
+      { impersonation: true },
+    );
+    try {
+      const names = (await asManager.client.listTools()).tools.map((t) => t.name);
+      expect(names).toContain("kadam_adv_set_easy_start");
+      expect(names.length).toBeGreaterThan(clientCount);
+    } finally {
+      asManager.cleanup();
     }
   });
 

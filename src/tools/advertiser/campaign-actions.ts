@@ -183,11 +183,12 @@ export const campaignActionsModule: ToolModule = {
         name: "kadam_adv_bulk_replace_urls",
         description:
           "Find and replace a fragment of the landing URL across several campaigns and their creatives at once. " +
-          "Only available to a token that impersonates an administrator; a plain client token is refused with 403. " +
+          "A manager-side instrument: the client cabinet has no equivalent. " +
           "The replacement cannot be undone and sends the touched creatives back to moderation, so call it with " +
           "dryRun=true first and show the preview before writing.",
         product: "advertiser",
         annotations: { title: "Bulk replace campaign URLs", destructiveHint: true },
+        requires: "impersonation",
       },
       {
         campaignIds: z.string().min(1).describe("Comma-separated campaign IDs (max 100)"),
@@ -369,10 +370,11 @@ export const campaignActionsModule: ToolModule = {
         description:
           "Turn Easy Start on or off for a campaign: it restricts delivery to a curated site set " +
           "instead of the whole inventory, which is the usual first step for a new advertiser. " +
-          "Requires a token impersonating an administrator (plain client tokens get 403). " +
+          "A manager-side switch; the client cannot toggle it from the cabinet. " +
           "Read the current state from the campaign card field isEasyStart.",
         product: "advertiser",
         annotations: { title: "Set Easy Start", idempotentHint: true },
+        requires: "impersonation",
       },
       {
         campaignId: z.number().int().positive().describe("Campaign ID"),
@@ -393,10 +395,10 @@ export const campaignActionsModule: ToolModule = {
         description:
           "Explain why a campaign is not reaching part of the inventory: which traffic sources reject it " +
           "over the creative's category, which over a moderation tag, and how much traffic each of them holds. " +
-          "Requires a token impersonating an administrator (plain client tokens get 403), because the cabinet " +
-          "does not show the source breakdown to advertisers.",
+          "The cabinet does not show the source breakdown to advertisers, so this is a manager-side view.",
         product: "advertiser",
         annotations: { title: "Blocked traffic sources", readOnlyHint: true },
+        requires: "impersonation",
       },
       {
         campaignId: z

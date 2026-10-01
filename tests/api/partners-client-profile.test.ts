@@ -24,6 +24,23 @@ describe("PartnersClient account endpoints", () => {
     expect(profile).not.toHaveProperty("dayLimit");
   });
 
+  it("getAccess calls GET /access and keeps only the flag the API promises", async () => {
+    const get = vi.fn().mockResolvedValue({ impersonation: true });
+    const client = createClient({ get });
+
+    const access = await client.getAccess();
+
+    expect(get).toHaveBeenCalledWith("/access");
+    expect(access.impersonation).toBe(true);
+  });
+
+  it("getAccess rejects a payload without the flag instead of guessing a role", async () => {
+    const get = vi.fn().mockResolvedValue({});
+    const client = createClient({ get });
+
+    await expect(client.getAccess()).rejects.toThrow();
+  });
+
   it("getAccountBalance calls GET /finances/balance", async () => {
     const get = vi.fn().mockResolvedValue({
       balance: 3698.99,

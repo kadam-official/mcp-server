@@ -204,10 +204,10 @@ export const creativeActionsModule: ToolModule = {
         description:
           "Explain why one creative is not reaching part of the inventory: which traffic sources reject it " +
           "over its category, which over a moderation tag, and how much traffic each of them holds. " +
-          "Requires a token impersonating an administrator (plain client tokens get 403), because the cabinet " +
-          "does not show the source breakdown to advertisers. Use kadam_adv_get_blocked_traffic_sources for " +
-          "the campaign-wide picture.",
+          "The cabinet does not show the source breakdown to advertisers, so this is a manager-side view. " +
+          "Use kadam_adv_get_blocked_traffic_sources for the campaign-wide picture.",
         product: "advertiser",
+        requires: "impersonation",
         annotations: { title: "Blocked sources of a creative", readOnlyHint: true },
       },
       {

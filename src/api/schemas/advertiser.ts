@@ -160,6 +160,15 @@ export const accountBalanceSchema = z
 
 export type AccountBalance = z.infer<typeof accountBalanceSchema>;
 
+/** GET /access — what the bearer may do; the only role signal the API exposes. */
+export const accountAccessSchema = z
+  .object({
+    impersonation: z.boolean(),
+  })
+  .passthrough();
+
+export type AccountAccess = z.infer<typeof accountAccessSchema>;
+
 export const paymentSystemCurrencySchema = z
   .object({
     currency: z.string(),

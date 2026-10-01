@@ -1,6 +1,7 @@
 import {
   createToolClient,
   getTextFromResult,
+  IMPERSONATION,
   type MockPartnersClient,
 } from "../../helpers/tool-client.js";
 import { audiencesModule } from "../../../src/tools/advertiser/audiences.js";
@@ -327,8 +328,17 @@ describe("audience params", () => {
 });
 
 describe("filtered audience sources and dry run", () => {
+  it("get_filtered_audience_sources is hidden from a client session", async () => {
+    const { client } = await createToolClient(audiencesModule);
+
+    const names = (await client.listTools()).tools.map((t) => t.name);
+
+    expect(names).toContain("kadam_adv_list_audiences");
+    expect(names).not.toContain("kadam_adv_get_filtered_audience_sources");
+  });
+
   it("get_filtered_audience_sources lists what a filter can be built on", async () => {
-    const { client, mockApi } = await createToolClient(audiencesModule);
+    const { client, mockApi } = await createToolClient(audiencesModule, undefined, IMPERSONATION);
     const api = mockApi as MockPartnersClient;
     api.getFilteredAudienceSources.mockResolvedValue([
       { id: 100, name: "Pixel" },

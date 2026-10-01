@@ -3,6 +3,18 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { resetConfig } from "../../src/config.js";
 import { ClientPool } from "../../src/api/client-pool.js";
 import { createMcpServer } from "../../src/server-factory.js";
+import type { SessionAccess } from "../../src/types/access.js";
+
+/** Tools the API answers 403 to for a client token; they exist only under impersonation. */
+const MANAGER_ONLY_TOOLS = [
+  "kadam_adv_bulk_replace_urls",
+  "kadam_adv_set_easy_start",
+  "kadam_adv_get_blocked_traffic_sources",
+  "kadam_adv_get_creative_blocked_sources",
+  "kadam_adv_get_filtered_audience_sources",
+];
+const FULL_CATALOG = 80;
+const CLIENT_CATALOG = FULL_CATALOG - MANAGER_ONLY_TOOLS.length;
 
 vi.mock("../../src/logger.js", () => ({
   logger: {
@@ -16,13 +28,13 @@ vi.mock("../../src/logger.js", () => ({
   createToolLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-async function createFullServer() {
+async function createFullServer(access?: SessionAccess) {
   const pool = new ClientPool({
     advBaseUrl: "https://partners.kadam.net/api/v1",
     pubBaseUrl: "https://pub.kadam.net/api",
   });
 
-  const server = createMcpServer(pool);
+  const server = createMcpServer(pool, access);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.1" });
@@ -47,11 +59,21 @@ describe("Tool listing integration", () => {
     resetConfig();
   });
 
-  it("all 80 tools are listed", async () => {
+  it(`a client session lists ${CLIENT_CATALOG} tools — none of the manager-only ones`, async () => {
     const { client } = await createFullServer();
     const result = await client.listTools();
     expect(result.tools).toBeDefined();
-    expect(result.tools!.length).toBe(80);
+    expect(result.tools!.length).toBe(CLIENT_CATALOG);
+    const names = result.tools!.map((t) => t.name);
+    for (const name of MANAGER_ONLY_TOOLS) expect(names).not.toContain(name);
+  });
+
+  it(`an impersonation session lists all ${FULL_CATALOG} tools`, async () => {
+    const { client } = await createFullServer({ impersonation: true });
+    const result = await client.listTools();
+    expect(result.tools!.length).toBe(FULL_CATALOG);
+    const names = result.tools!.map((t) => t.name);
+    for (const name of MANAGER_ONLY_TOOLS) expect(names).toContain(name);
   });
 
   it("all advertiser tools have names starting with kadam_adv_", async () => {

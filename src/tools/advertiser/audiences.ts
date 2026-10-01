@@ -254,10 +254,10 @@ export const audiencesModule: ToolModule = {
         description:
           "Audiences that can be used as sources of a filtered audience: own and shared ones, minus the " +
           "filtered ones — a filter cannot be built on top of another filter. Filtered audiences are an " +
-          "internal instrument, so this list is only available to an impersonating token; a plain client " +
-          "token is refused.",
+          "internal instrument, so this list is a manager-side view.",
         product: "advertiser",
         annotations: { title: "Filtered audience sources", readOnlyHint: true },
+        requires: "impersonation",
       },
       {
         searchQuery: z.string().min(2).optional().describe("Filter the list by name"),
