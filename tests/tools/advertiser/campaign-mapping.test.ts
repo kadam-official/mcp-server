@@ -481,7 +481,7 @@ describe("mapCampaignFields", () => {
       },
       createMockRegistry(),
     );
-    expect(result.conversion).toEqual({ id: 5, approved: "", hold: "", reject: "" });
+    expect(result.conversion).toEqual({ id: 5 });
   });
 
   it("maps custom conversion with approved/hold/reject strings", async () => {
@@ -495,10 +495,10 @@ describe("mapCampaignFields", () => {
       },
       createMockRegistry(),
     );
-    expect(result.conversion).toEqual({ id: 0, approved: "dep", hold: "reg", reject: "trash" });
+    expect(result.conversion).toEqual({ approved: "dep", hold: "reg", reject: "trash" });
   });
 
-  it("maps conversionApproved without templateId (defaults id to 0)", async () => {
+  it("maps conversionApproved without templateId and omits id", async () => {
     const result = await mapCampaignFields(
       {
         type: "push",
@@ -506,7 +506,7 @@ describe("mapCampaignFields", () => {
       },
       createMockRegistry(),
     );
-    expect(result.conversion).toEqual({ id: 0, approved: "sale", hold: "", reject: "" });
+    expect(result.conversion).toEqual({ approved: "sale", hold: "", reject: "" });
   });
 
   it("does not set conversion when no conversion fields provided", async () => {

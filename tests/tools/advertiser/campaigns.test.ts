@@ -1058,7 +1058,7 @@ describe("campaigns tools", () => {
     });
 
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
-    expect(payload.conversion).toEqual({ id: 0, approved: "dep", hold: "reg", reject: "" });
+    expect(payload.conversion).toEqual({ approved: "dep", hold: "reg", reject: "" });
   });
 
   it("update_campaign preserves conversion.id when not changing conversion", async () => {

@@ -346,6 +346,35 @@ function validateCpType(typeId: number, cpTypeId: number, opts: CampaignOptions)
   }
 }
 
+/**
+ * CampaignConversion. A positive template id is sent alone. Custom mapping
+ * (tool argument 0, or no id) sends approved/hold/reject and omits id —
+ * id 0 is not a template and the API rejects it.
+ */
+function buildConversionPayload(
+  fields: Record<string, unknown>,
+  current?: Record<string, unknown>,
+): Record<string, unknown> {
+  const rawId =
+    fields.conversionTemplateId !== undefined ? fields.conversionTemplateId : current?.id;
+  const templateId = rawId == null || rawId === "" ? 0 : Number(rawId);
+  if (Number.isFinite(templateId) && templateId > 0) {
+    return { id: templateId };
+  }
+
+  const status = (field: unknown, fallback: unknown): string => {
+    if (typeof field === "string") return field;
+    if (typeof fallback === "string") return fallback;
+    return "";
+  };
+
+  return {
+    approved: status(fields.conversionApproved, current?.approved),
+    hold: status(fields.conversionHold, current?.hold),
+    reject: status(fields.conversionReject, current?.reject),
+  };
+}
+
 function buildPostConversion(fields: Record<string, unknown>): Record<string, unknown> | undefined {
   const pvWindow = fields.postViewWindow as number | undefined;
   const pcWindow = fields.postClickWindow as number | undefined;
@@ -454,13 +483,13 @@ export async function mapCampaignFields(
     };
   }
 
-  if (fields.conversionTemplateId != null || fields.conversionApproved != null) {
-    mapped.conversion = {
-      id: (fields.conversionTemplateId as number) ?? 0,
-      approved: (fields.conversionApproved as string) ?? "",
-      hold: (fields.conversionHold as string) ?? "",
-      reject: (fields.conversionReject as string) ?? "",
-    };
+  if (
+    fields.conversionTemplateId != null ||
+    fields.conversionApproved != null ||
+    fields.conversionHold != null ||
+    fields.conversionReject != null
+  ) {
+    mapped.conversion = buildConversionPayload(fields);
   }
 
   const customPostConversion = buildPostConversion(fields);
@@ -563,22 +592,26 @@ const campaignBudgetFields = {
     .number()
     .optional()
     .describe(
-      "Conversion template ID (from campaign options). Use 0 for custom mapping via conversionApproved/Hold/Reject",
+      "Conversion template id from conversion-templates. Omit or pass 0 for a custom mapping: approved/hold/reject are sent and id is not. A positive id selects that template; the status names are then taken from the template and are not sent.",
     ),
   conversionApproved: z
     .string()
     .optional()
     .describe(
-      "Postback status name for 'Approved' conversions (e.g. 'dep'); used with conversionTemplateId=0",
+      "Custom postback status name for Approved (e.g. 'dep'). Sent only for a custom mapping, without a template id.",
     ),
   conversionHold: z
     .string()
     .optional()
-    .describe("Postback status name for 'Hold' conversions (e.g. 'reg')"),
+    .describe(
+      "Custom postback status name for Hold (e.g. 'reg'). Sent only for a custom mapping, without a template id.",
+    ),
   conversionReject: z
     .string()
     .optional()
-    .describe("Postback status name for 'Rejected' conversions"),
+    .describe(
+      "Custom postback status name for Rejected. Sent only for a custom mapping, without a template id.",
+    ),
 };
 
 const postConversionFields = {
@@ -962,12 +995,7 @@ export const campaignsModule: ToolModule = {
           changes.conversionReject != null
         ) {
           const currentConv = (merged.conversion ?? {}) as Record<string, unknown>;
-          merged.conversion = {
-            id: changes.conversionTemplateId ?? currentConv.id ?? 0,
-            approved: changes.conversionApproved ?? currentConv.approved ?? "",
-            hold: changes.conversionHold ?? currentConv.hold ?? "",
-            reject: changes.conversionReject ?? currentConv.reject ?? "",
-          };
+          merged.conversion = buildConversionPayload(changes, currentConv);
         }
 
         // id/status are read-only view keys; pickWritable already excludes them.
