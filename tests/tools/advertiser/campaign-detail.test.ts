@@ -158,6 +158,62 @@ describe("kadam_adv_get_campaign", () => {
     expect(text).toContain("BR (40)");
   });
 
+  it("renders Traffic Sources and Audience Engagement labels in Targeting", async () => {
+    const { client, mockApi } = await createToolClient(campaignDetailModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      ...FULL_CAMPAIGN,
+      trafficSources: "all",
+      audienceEngagementLevels: ["very_high", "high", "medium"],
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_campaign",
+      arguments: { id: 906074 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("Traffic Sources: All Sources");
+    expect(text).toContain("Audience Engagement: Very High, High, Medium");
+    // Handled keys must not leak into the raw tail.
+    expect(text).not.toContain("trafficSources:");
+    expect(text).not.toContain("audienceEngagementLevels:");
+  });
+
+  it("renders Proven Sources and 'none enabled' for an empty levels array", async () => {
+    const { client, mockApi } = await createToolClient(campaignDetailModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      ...FULL_CAMPAIGN,
+      trafficSources: "proven",
+      audienceEngagementLevels: [],
+    });
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_campaign",
+      arguments: { id: 906074 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("Traffic Sources: Proven Sources");
+    expect(text).toContain("Audience Engagement: none enabled");
+  });
+
+  it("prints no Traffic Sources / Audience Engagement lines when the API omits the keys", async () => {
+    const { client, mockApi } = await createToolClient(campaignDetailModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue(FULL_CAMPAIGN);
+
+    const result = await client.callTool({
+      name: "kadam_adv_get_campaign",
+      arguments: { id: 906074 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).not.toContain("Traffic Sources");
+    expect(text).not.toContain("Audience Engagement");
+  });
+
   it("API 404 returns Resource not found", async () => {
     const { client, mockApi } = await createToolClient(campaignDetailModule);
     const api = mockApi as MockPartnersClient;
