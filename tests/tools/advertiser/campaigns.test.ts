@@ -1148,6 +1148,145 @@ describe("campaigns tools", () => {
     expect(payload.state).toBeUndefined(); // read-only, dropped
   });
 
+  it("create_campaign sends trafficSources and parsed audienceEngagementLevels", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 103 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "popunder",
+        name: "AE create",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 50,
+        countries: "US",
+        trafficSources: "all",
+        audienceEngagementLevels: "high,very_high",
+      },
+    });
+
+    expect(api.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trafficSources: "all",
+        audienceEngagementLevels: ["very_high", "high"],
+      }),
+    );
+  });
+
+  it("update_campaign overrides round-tripped trafficSources and audienceEngagementLevels", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 100,
+      type: 40,
+      cpType: 0,
+      name: "AE override test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      trafficSources: "all",
+      audienceEngagementLevels: ["very_high"],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 100, trafficSources: "proven", audienceEngagementLevels: "medium,high" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.trafficSources).toBe("proven");
+    expect(payload.audienceEngagementLevels).toEqual(["high", "medium"]);
+  });
+
+  it("update_campaign round-trips current trafficSources/levels on unrelated edits", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 101,
+      type: 40,
+      cpType: 0,
+      name: "AE round-trip test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      trafficSources: "all",
+      audienceEngagementLevels: ["very_high", "low"],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 101, name: "Renamed" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.trafficSources).toBe("all");
+    expect(payload.audienceEngagementLevels).toEqual(["very_high", "low"]);
+  });
+
+  it("update_campaign drops a round-tripped empty audienceEngagementLevels array", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 102,
+      type: 40,
+      cpType: 0,
+      name: "AE all-banned test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      trafficSources: "all",
+      audienceEngagementLevels: [],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 102, name: "Renamed" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.trafficSources).toBe("all");
+    expect(payload.audienceEngagementLevels).toBeUndefined();
+  });
+
+  it("update_campaign sends neither key when the API omits them (unsupported format)", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 104,
+      type: 30,
+      cpType: 0,
+      name: "No AE test",
+      url: "https://example.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 104, name: "Renamed" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("trafficSources");
+    expect(payload).not.toHaveProperty("audienceEngagementLevels");
+  });
+
   it("update_site_bids sends PUT /stats/sites/bids with zones and bid", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;

@@ -16,6 +16,19 @@ const CONNECTION_TYPE_NAME: Record<number, string> = {
   3: "All",
 };
 
+const TRAFFIC_SOURCES_NAME: Record<string, string> = {
+  all: "All Sources",
+  proven: "Proven Sources",
+};
+
+const AUDIENCE_ENGAGEMENT_NAME: Record<string, string> = {
+  very_high: "Very High",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  not_rated: "Not rated",
+};
+
 /** Keys rendered by the dedicated sections below; everything else goes to the raw tail. */
 const HANDLED_KEYS = new Set([
   "id",
@@ -58,6 +71,8 @@ const HANDLED_KEYS = new Set([
   "maxCpm",
   "videoFormats",
   "autorules",
+  "trafficSources",
+  "audienceEngagementLevels",
 ]);
 
 interface LabelMaps {
@@ -295,6 +310,20 @@ export async function formatCampaignDetail(
       if (Array.isArray(list) && list.length > 0)
         targeting.push(`Site groups ${key}: ${list.join(", ")}`);
     }
+  }
+  if (typeof c.trafficSources === "string")
+    targeting.push(
+      `Traffic Sources: ${TRAFFIC_SOURCES_NAME[c.trafficSources] ?? c.trafficSources}`,
+    );
+  if (Array.isArray(c.audienceEngagementLevels)) {
+    const levels = c.audienceEngagementLevels as unknown[];
+    targeting.push(
+      levels.length === 0
+        ? "Audience Engagement: none enabled"
+        : `Audience Engagement: ${levels
+            .map((slug) => AUDIENCE_ENGAGEMENT_NAME[String(slug)] ?? String(slug))
+            .join(", ")}`,
+    );
   }
   if (c.disableProxy != null) targeting.push(`Proxy/VPN blocked: ${c.disableProxy ? "yes" : "no"}`);
   if (c.impTracker) targeting.push(`Impression tracker: ${c.impTracker}`);
