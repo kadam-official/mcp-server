@@ -1,6 +1,7 @@
 import {
   createToolClient,
   getTextFromResult,
+  IMPERSONATION,
   type MockPartnersClient,
 } from "../../helpers/tool-client.js";
 import { campaignsModule } from "../../../src/tools/advertiser/campaigns.js";
@@ -18,6 +19,17 @@ afterEach(() => {
   delete process.env.KADAM_ADV_API_KEY;
   resetConfig();
 });
+
+function bulkActionResult(applied: number[], refused: number[] = []) {
+  return {
+    campaigns: [
+      ...applied.map((id) => ({ id, success: true })),
+      ...refused.map((id) => ({ id, success: false })),
+    ],
+    totalCampaigns: applied.length + refused.length,
+    processedCampaigns: applied.length,
+  };
+}
 
 describe("campaigns tools", () => {
   it("list_campaigns returns formatted list with [ID: 1] and Test", async () => {
@@ -121,6 +133,38 @@ describe("campaigns tools", () => {
     expect(api.listCampaigns).toHaveBeenCalledWith({ page: 1, perPage: 25 });
   });
 
+  it("create_campaign with dryRun validates and creates nothing", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.validateCampaign.mockResolvedValue({} as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_create_campaign",
+        arguments: {
+          type: "push",
+          name: "Draft",
+          url: "https://example.com",
+          folderId: 1,
+          pricingModel: "cpc",
+          bid: 0.5,
+          dailyBudget: 100,
+          countries: "US",
+          dryRun: true,
+        },
+      }),
+    );
+
+    expect(api.createCampaign).not.toHaveBeenCalled();
+    expect(api.validateCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 30, cpType: 0 }),
+    );
+    expect(api.validateCampaign).toHaveBeenCalledWith(
+      expect.not.objectContaining({ dryRun: expect.anything() }),
+    );
+    expect(text).toContain("Nothing was created");
+  });
+
   it("create_campaign calls api with type 30 (push) and cpType 0 (cpc)", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
@@ -220,6 +264,242 @@ describe("campaigns tools", () => {
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
     expect(payload.id).toBeUndefined();
     expect(payload.status).toBeUndefined();
+  });
+
+  /**
+   * A client token reads manager-only fields as null and the API accepts that null back
+   * as "not provided" (CampaignManagerFieldsBearerCest on the backend proves it), so the
+   * read-modify-write echoes the card as is — no special-casing by field name.
+   */
+  it("update_campaign echoes the null manager-only fields a client token reads", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      proxies: null,
+      hasCorrectPostback: null,
+      isDirectTrafficPriority: null,
+      allowMultiAds: null,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, name: "Updated Name" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.name).toBe("Updated Name");
+    for (const field of [
+      "proxies",
+      "hasCorrectPostback",
+      "isDirectTrafficPriority",
+      "allowMultiAds",
+    ]) {
+      expect(payload[field]).toBeNull();
+    }
+  });
+
+  it("client session cannot set manager-only flags: they are not in the schema", async () => {
+    const { client } = await createToolClient(campaignsModule);
+
+    const { tools } = await client.listTools();
+    for (const name of ["kadam_adv_create_campaign", "kadam_adv_update_campaign"]) {
+      const tool = tools.find((t) => t.name === name);
+      expect(tool).toBeDefined();
+      const properties = tool!.inputSchema.properties as Record<string, unknown>;
+      expect(Object.keys(properties).length).toBeGreaterThan(5);
+      expect(properties).not.toHaveProperty("hasCorrectPostback");
+      expect(properties).not.toHaveProperty("isDirectTrafficPriority");
+      expect(properties).not.toHaveProperty("allowMultiAds");
+    }
+  });
+
+  it("impersonation session gets the manager-only flags and writes them as 0/1", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+
+    const { tools } = await client.listTools();
+    const update = tools.find((t) => t.name === "kadam_adv_update_campaign")!;
+    const properties = update.inputSchema.properties as Record<string, unknown>;
+    expect(properties).toHaveProperty("hasCorrectPostback");
+    expect(properties).toHaveProperty("isDirectTrafficPriority");
+    expect(properties).toHaveProperty("allowMultiAds");
+
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      hasCorrectPostback: false,
+      isDirectTrafficPriority: false,
+      allowMultiAds: true,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, hasCorrectPostback: true, allowMultiAds: false },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.hasCorrectPostback).toBe(1);
+    expect(payload.allowMultiAds).toBe(0);
+    expect(payload.isDirectTrafficPriority).toBe(false); // untouched → echoed from the card
+  });
+
+  it("impersonation session passes manager-only flags on create as 0/1", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 7 } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "Managed",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 10,
+        countries: "US",
+        isDirectTrafficPriority: true,
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = api.createCampaign.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.isDirectTrafficPriority).toBe(1);
+    // Nobody confirmed the postback, so the new campaign is explicitly "not verified":
+    // the API column is NOT NULL and a missing flag used to fail the insert.
+    expect(payload.hasCorrectPostback).toBe(0);
+    expect(payload).not.toHaveProperty("allowMultiAds");
+  });
+
+  it("impersonation create keeps an explicit hasCorrectPostback=true", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 8 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: {
+        type: "push",
+        name: "Verified",
+        url: "https://example.com",
+        folderId: 1,
+        pricingModel: "cpc",
+        bid: 0.05,
+        dailyBudget: 10,
+        countries: "US",
+        hasCorrectPostback: true,
+      },
+    });
+
+    const payload = api.createCampaign.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.hasCorrectPostback).toBe(1);
+  });
+
+  it("client create never sends hasCorrectPostback, even as a default", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCampaign.mockResolvedValue({ id: 9 } as never);
+    api.validateCampaign.mockResolvedValue({} as never);
+
+    const args = {
+      type: "push",
+      name: "Client",
+      url: "https://example.com",
+      folderId: 1,
+      pricingModel: "cpc",
+      bid: 0.05,
+      dailyBudget: 10,
+      countries: "US",
+    };
+    await client.callTool({ name: "kadam_adv_create_campaign", arguments: args });
+    await client.callTool({
+      name: "kadam_adv_create_campaign",
+      arguments: { ...args, dryRun: true },
+    });
+
+    // A client token is answered 422 "unknown field" for any manager flag, so the
+    // default must stay impersonation-only — on create and on dryRun alike.
+    expect(api.createCampaign.mock.calls[0]![0]).not.toHaveProperty("hasCorrectPostback");
+    expect(api.validateCampaign.mock.calls[0]![0]).not.toHaveProperty("hasCorrectPostback");
+  });
+
+  it("update_campaign keeps manager-only fields an impersonating token does see", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      proxies: [1, 4],
+      hasCorrectPostback: true,
+      isDirectTrafficPriority: false,
+      allowMultiAds: true,
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, name: "Updated Name" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload.proxies).toEqual([1, 4]);
+    expect(payload.hasCorrectPostback).toBe(true);
+    expect(payload.isDirectTrafficPriority).toBe(false);
+    expect(payload.allowMultiAds).toBe(true);
+  });
+
+  it("update_campaign does not echo autorule ids back as rule definitions", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue({
+      id: 42,
+      type: 30,
+      cpType: 0,
+      name: "Old Name",
+      url: "https://old.com",
+      dayMoneyLimit: 50,
+      bids: [{ bid: 0.01, leadCost: 0, countries: [34] }],
+      categories: ["mainstream"],
+      status: 10,
+      autorules: [7, 9],
+    });
+    api.updateCampaign.mockResolvedValue({} as never);
+
+    await client.callTool({
+      name: "kadam_adv_update_campaign",
+      arguments: { id: 42, name: "Updated Name" },
+    });
+
+    const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("autorules");
+    expect(payload.name).toBe("Updated Name");
   });
 
   it("update_campaign resolves ISO country codes for bids", async () => {
@@ -366,7 +646,7 @@ describe("campaigns tools", () => {
   it("set_campaign_status with ids 1,2,3 and active calls api with activate", async () => {
     const { client, mockApi } = await createToolClient(campaignsModule);
     const api = mockApi as MockPartnersClient;
-    api.setCampaignStatus.mockResolvedValue(undefined as never);
+    api.setCampaignStatus.mockResolvedValue(bulkActionResult([1, 2, 3]) as never);
 
     const result = await client.callTool({
       name: "kadam_adv_set_campaign_status",
@@ -375,7 +655,160 @@ describe("campaigns tools", () => {
     const text = getTextFromResult(result);
 
     expect(api.setCampaignStatus).toHaveBeenCalledWith([1, 2, 3], "activate");
-    expect(text).toContain("3 campaigns set to active");
+    expect(text).toContain("3/3 campaigns set to active");
+    expect(text).toContain("#1, #2, #3");
+  });
+
+  it.each([
+    ["paused", "pause"],
+    ["archived", "archive"],
+    ["restored", "restore"],
+  ])("set_campaign_status with %s calls api with %s", async (status, action) => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignStatus.mockResolvedValue(bulkActionResult([7]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_status",
+      arguments: { ids: "7", status },
+    });
+
+    expect(api.setCampaignStatus).toHaveBeenCalledWith([7], action);
+    expect(getTextFromResult(result)).toContain(`1/1 campaigns set to ${status}`);
+  });
+
+  it("set_campaign_status reports campaigns the backend refused", async () => {
+    // Partial failures arrive with HTTP 200, so the refused IDs must reach the model.
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCampaignStatus.mockResolvedValue(bulkActionResult([1], [2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_status",
+      arguments: { ids: "1,2", status: "archived" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("1/2 campaigns set to archived");
+    expect(text).toContain("Applied: #1");
+    expect(text).toContain("#2");
+  });
+
+  it("delete_campaigns requires confirm", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_campaigns",
+      arguments: { ids: "1" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(api.deleteCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("delete_campaigns with confirm deletes the listed campaigns", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.deleteCampaigns.mockResolvedValue(bulkActionResult([1, 2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_campaigns",
+      arguments: { ids: "1, 2", confirm: true },
+    });
+
+    expect(api.deleteCampaigns).toHaveBeenCalledWith([1, 2]);
+    expect(getTextFromResult(result)).toContain("2/2 campaigns deleted");
+  });
+
+  it("move_campaigns calls API with campaign IDs and target folder", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.moveCampaigns.mockResolvedValue(bulkActionResult([1, 2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "1, 2", folderId: 7 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.moveCampaigns).toHaveBeenCalledWith([1, 2], 7);
+    expect(text).toContain("2/2 campaigns moved to campaign group #7");
+    expect(text).toContain("Applied: #1, #2");
+  });
+
+  it("move_campaigns does not blame the campaign state for a refused move", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+    api.moveCampaigns.mockResolvedValue(bulkActionResult([1], [2]) as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "1, 2", folderId: 7 },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("the backend refused the move");
+    expect(text).not.toContain("current campaign state does not allow it");
+  });
+
+  it("move_campaigns rejects input without a valid campaign ID", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "not-an-id", folderId: 7 },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("At least one valid campaign ID");
+    expect(api.moveCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("move_campaigns rejects more than 100 campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: {
+        ids: Array.from({ length: 101 }, (_, index) => index + 1).join(","),
+        folderId: 7,
+      },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("No more than 100 campaigns");
+    expect(api.moveCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("move_campaigns rejects duplicate campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_move_campaigns",
+      arguments: { ids: "1,1", folderId: 7 },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("must be unique");
+    expect(api.moveCampaigns).not.toHaveBeenCalled();
+  });
+
+  it("set_campaign_status rejects duplicate campaign IDs", async () => {
+    const { client, mockApi } = await createToolClient(campaignsModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_campaign_status",
+      arguments: { ids: "1,1", status: "paused" },
+    });
+
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(getTextFromResult(result)).toContain("must be unique");
+    expect(api.setCampaignStatus).not.toHaveBeenCalled();
   });
 
   it("list_campaigns with empty data handles gracefully", async () => {
@@ -625,7 +1058,7 @@ describe("campaigns tools", () => {
     });
 
     const payload = api.updateCampaign.mock.calls[0]![1] as Record<string, unknown>;
-    expect(payload.conversion).toEqual({ id: 0, approved: "dep", hold: "reg", reject: "" });
+    expect(payload.conversion).toEqual({ approved: "dep", hold: "reg", reject: "" });
   });
 
   it("update_campaign preserves conversion.id when not changing conversion", async () => {

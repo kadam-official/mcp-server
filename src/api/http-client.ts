@@ -26,6 +26,15 @@ export interface RequestOptions {
 const RETRY_DELAYS = [1000, 2000, 4000];
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
+/**
+ * Methods we may replay after a timeout, a dropped connection or a 5xx. Repeating any of
+ * these lands on the same row, so at worst the second call is a no-op. POST does not:
+ * a create that timed out may well have succeeded, and replaying it bills the advertiser
+ * for a second campaign. A 429 is different — the rate limiter rejects before the request
+ * is processed — so that one is retried for every method.
+ */
+const REPLAYABLE_METHODS = new Set(["GET", "HEAD", "PUT", "DELETE", "OPTIONS"]);
+
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -55,9 +64,15 @@ export class HttpClient {
     return this.request<T>("PUT", url, body);
   }
 
-  async delete<T = unknown>(path: string): Promise<T> {
+  async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
     const url = this.buildUrl(path);
-    return this.request<T>("DELETE", url);
+    return this.request<T>("PATCH", url, body);
+  }
+
+  /** Body is optional because Kadam deletes collections by id list (DELETE /campaigns). */
+  async delete<T = unknown>(path: string, body?: unknown): Promise<T> {
+    const url = this.buildUrl(path);
+    return this.request<T>("DELETE", url, body);
   }
 
   async postFormData<T = unknown>(path: string, formData: FormData): Promise<T> {
@@ -90,6 +105,7 @@ export class HttpClient {
   ): Promise<T> {
     return this.executeWithRetry<T>(
       url,
+      method,
       (signal) =>
         fetch(url, {
           method,
@@ -106,7 +122,7 @@ export class HttpClient {
   }
 
   private async requestFormData<T>(url: string, formData: FormData): Promise<T> {
-    return this.executeWithRetry<T>(url, (signal) =>
+    return this.executeWithRetry<T>(url, "POST", (signal) =>
       fetch(url, {
         method: "POST",
         headers: {
@@ -121,10 +137,12 @@ export class HttpClient {
 
   private async executeWithRetry<T>(
     url: string,
+    method: string,
     doFetch: (signal: AbortSignal) => Promise<Response>,
     maxRetries: number = this.maxRetries,
   ): Promise<T> {
     let lastError: Error | null = null;
+    const mayReplay = REPLAYABLE_METHODS.has(method);
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       if (attempt > 0) {
@@ -159,7 +177,7 @@ export class HttpClient {
           const responseBody = await response.text().catch(() => "");
           const parsed = tryParseJson(responseBody);
 
-          if (RETRYABLE_STATUSES.has(response.status) && attempt < maxRetries) {
+          if (mayReplay && RETRYABLE_STATUSES.has(response.status) && attempt < maxRetries) {
             lastError = new ApiError(
               `API returned ${response.status}: ${responseBody.slice(0, 200)}`,
               response.status,
@@ -182,12 +200,13 @@ export class HttpClient {
 
         if (error instanceof DOMException && error.name === "AbortError") {
           lastError = new Error(`Request timed out after ${this.timeout}ms: ${url}`);
-          if (attempt < maxRetries) continue;
-          throw lastError;
+          if (mayReplay && attempt < maxRetries) continue;
+          break;
         }
 
         lastError = error instanceof Error ? error : new Error(String(error));
-        if (attempt < maxRetries) continue;
+        if (mayReplay && attempt < maxRetries) continue;
+        break;
       }
     }
 
@@ -213,7 +232,9 @@ function tryParseJson(text: string): unknown {
  * - string                         -> the string
  * - array (of strings/{message})   -> "a; b"
  * - field map {field: [msgs]|str}  -> "field: a, b; field2: c" (bare string vals
- *   are emitted as-is, so e.g. {exception:"..."} keeps the BearerValidator signal)
+ *   are emitted as-is, so e.g. {exception:"..."} keeps the BearerValidator signal).
+ *   Array items that are objects are flattened too: {limitException:"..."} must
+ *   not collapse to "[object Object]" via Array.join.
  * Returns undefined when there is nothing meaningful to show.
  */
 function flattenFieldErrors(value: unknown): string | undefined {
@@ -239,8 +260,12 @@ function flattenFieldErrors(value: unknown): string | undefined {
   if (typeof value === "object") {
     const parts: string[] = [];
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      if (Array.isArray(val)) parts.push(`${key}: ${val.join(", ")}`);
-      else if (typeof val === "string") parts.push(val);
+      if (Array.isArray(val)) {
+        const rendered = val
+          .map((item) => flattenFieldErrors(item))
+          .filter((item): item is string => Boolean(item));
+        if (rendered.length) parts.push(`${key}: ${rendered.join(", ")}`);
+      } else if (typeof val === "string") parts.push(val);
       else parts.push(`${key}: ${JSON.stringify(val)}`);
     }
     return parts.length ? parts.join("; ") : undefined;

@@ -177,6 +177,23 @@ describe("mapCampaignFields", () => {
     expect(result.timezone).toBe(0);
   });
 
+  it("leaves the bid ceiling to the API, which knows the token tier", async () => {
+    const result = await mapCampaignFields(
+      { type: "push", pricingModel: "cpc", bid: 500 },
+      createMockRegistry(),
+    );
+    const bids = result.bids as Array<Record<string, unknown>>;
+    expect(bids[0]!.bid).toBe(500);
+  });
+
+  it("never defaults the manager-only fields, which a client token may not send", async () => {
+    const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
+    expect(result).not.toHaveProperty("allowMultiAds");
+    expect(result).not.toHaveProperty("proxies");
+    expect(result).not.toHaveProperty("isDirectTrafficPriority");
+    expect(result).not.toHaveProperty("hasCorrectPostback");
+  });
+
   it("flattens category tree from options (push-like with mainstream)", async () => {
     const result = await mapCampaignFields({ type: "push" }, createMockRegistry());
     expect(result.categories).toEqual([1001, "mainstream"]);
@@ -464,7 +481,7 @@ describe("mapCampaignFields", () => {
       },
       createMockRegistry(),
     );
-    expect(result.conversion).toEqual({ id: 5, approved: "", hold: "", reject: "" });
+    expect(result.conversion).toEqual({ id: 5 });
   });
 
   it("maps custom conversion with approved/hold/reject strings", async () => {
@@ -478,10 +495,10 @@ describe("mapCampaignFields", () => {
       },
       createMockRegistry(),
     );
-    expect(result.conversion).toEqual({ id: 0, approved: "dep", hold: "reg", reject: "trash" });
+    expect(result.conversion).toEqual({ approved: "dep", hold: "reg", reject: "trash" });
   });
 
-  it("maps conversionApproved without templateId (defaults id to 0)", async () => {
+  it("maps conversionApproved without templateId and omits id", async () => {
     const result = await mapCampaignFields(
       {
         type: "push",
@@ -489,7 +506,7 @@ describe("mapCampaignFields", () => {
       },
       createMockRegistry(),
     );
-    expect(result.conversion).toEqual({ id: 0, approved: "sale", hold: "", reject: "" });
+    expect(result.conversion).toEqual({ approved: "sale", hold: "", reject: "" });
   });
 
   it("does not set conversion when no conversion fields provided", async () => {

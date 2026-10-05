@@ -3,7 +3,9 @@
 import { statSync } from "node:fs";
 
 const BUNDLE = "dist/index.js";
-const MAX_BYTES = 256 * 1024; // 256 KB (current ~146 KB)
+// 39 -> 72 инструментов в эпике KUI-6770: старый потолок 256 KB стал ниже честного
+// размера сборки, порог поднят до 384 KB (сейчас ~264 KB) и снова ловит только рост.
+const MAX_BYTES = 384 * 1024;
 
 let size;
 try {

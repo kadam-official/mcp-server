@@ -2,9 +2,14 @@ import { z } from "zod";
 import { listResponseSchema, reportConfigSchema } from "../../src/api/schemas/common.js";
 import {
   campaignRowSchema,
+  campaignBulkActionSchema,
   audienceRowSchema_,
   audienceDetailSchema,
   financeRowSchema,
+  accountProfileSchema,
+  accountBalanceSchema,
+  paymentSystemsSchema,
+  dayMoneyLimitSchema,
 } from "../../src/api/schemas/advertiser.js";
 import {
   sourceDetailSchema,
@@ -76,6 +81,26 @@ describe("campaignRowSchema", () => {
 
   it("rejects missing required fields", () => {
     expect(() => campaignRowSchema.parse({ campaign: { id: 1 } })).toThrow(z.ZodError);
+  });
+});
+
+describe("campaignBulkActionSchema", () => {
+  it("parses per-campaign move results", () => {
+    const result = campaignBulkActionSchema.parse({
+      campaigns: [
+        { id: 1, success: true },
+        { id: 2, success: false },
+      ],
+      totalCampaigns: 2,
+      processedCampaigns: 1,
+    });
+
+    expect(result.campaigns).toHaveLength(2);
+    expect(result.processedCampaigns).toBe(1);
+  });
+
+  it("rejects a bare boolean response", () => {
+    expect(() => campaignBulkActionSchema.parse(true)).toThrow(z.ZodError);
   });
 });
 
@@ -289,5 +314,151 @@ describe("financeRowSchema", () => {
       totalRows: 2,
     });
     expect(result.rows).toHaveLength(2);
+  });
+});
+
+describe("accountProfileSchema", () => {
+  it("parses the KUI-6966 profile payload", () => {
+    const result = accountProfileSchema.parse({
+      id: 127296,
+      balance: 3698.99,
+      currency: "usd",
+      registeredAt: "2021-01-01T00:00:00Z",
+      timezone: 3,
+    });
+    expect(result.id).toBe(127296);
+    expect(result.balance).toBe(3698.99);
+    expect(result.timezone).toBe(3);
+  });
+
+  it("strips nothing extra but still keeps known fields if PII is present", () => {
+    const result = accountProfileSchema.parse({
+      id: 1,
+      balance: 0,
+      currency: "rub",
+      registeredAt: "1970-01-01T00:00:00Z",
+      timezone: 0,
+      email: "secret@example.com",
+    });
+    expect(result.id).toBe(1);
+    expect((result as { email?: string }).email).toBe("secret@example.com");
+  });
+
+  it("rejects a payload without id", () => {
+    expect(() =>
+      accountProfileSchema.parse({
+        balance: 0,
+        currency: "rub",
+        registeredAt: "1970-01-01T00:00:00Z",
+        timezone: 0,
+      }),
+    ).toThrow(z.ZodError);
+  });
+
+  it("rejects a timezone outside -12..12", () => {
+    expect(() =>
+      accountProfileSchema.parse({
+        id: 1,
+        balance: 0,
+        currency: "usd",
+        registeredAt: "1970-01-01T00:00:00Z",
+        timezone: 13,
+      }),
+    ).toThrow(z.ZodError);
+  });
+});
+
+describe("accountBalanceSchema", () => {
+  it("parses the lightweight balance payload", () => {
+    const result = accountBalanceSchema.parse({ balance: 3698.99, currency: "usd" });
+    expect(result.balance).toBe(3698.99);
+    expect(result.currency).toBe("usd");
+  });
+
+  it("rejects a payload without balance", () => {
+    expect(() => accountBalanceSchema.parse({ currency: "usd" })).toThrow(z.ZodError);
+  });
+});
+
+describe("paymentSystemsSchema", () => {
+  const currency = {
+    currency: "usd",
+    currencyId: 20,
+    commission: 3,
+    constCommission: 0.5,
+    min: 50,
+    max: 10000,
+    exchangeRateToAccountCurrency: 1,
+  };
+  const system = {
+    id: 38,
+    name: "paypal",
+    isManualThroughManager: false,
+    isPromocodeAvailable: true,
+    taxPercent: 0,
+    currencies: [currency],
+  };
+
+  it("parses a system with its currency conditions", () => {
+    const result = paymentSystemsSchema.parse({ paymentSystems: [system] });
+
+    expect(result.paymentSystems).toHaveLength(1);
+    expect(result.paymentSystems[0]!.currencies[0]!.currencyId).toBe(20);
+    expect(result.paymentSystems[0]!.currencies[0]!.max).toBe(10000);
+  });
+
+  it("accepts a null max and a null exchange rate", () => {
+    const result = paymentSystemsSchema.parse({
+      paymentSystems: [
+        {
+          ...system,
+          currencies: [{ ...currency, max: null, exchangeRateToAccountCurrency: null }],
+        },
+      ],
+    });
+
+    expect(result.paymentSystems[0]!.currencies[0]!.max).toBeNull();
+    expect(result.paymentSystems[0]!.currencies[0]!.exchangeRateToAccountCurrency).toBeNull();
+  });
+
+  it("keeps unknown fields so a new API field does not break the client", () => {
+    const result = paymentSystemsSchema.parse({
+      paymentSystems: [{ ...system, someFutureFlag: true }],
+    });
+
+    expect(result.paymentSystems[0]).toHaveProperty("someFutureFlag", true);
+  });
+
+  it("rejects a system whose currencies are missing", () => {
+    const { currencies: _omitted, ...withoutCurrencies } = system;
+
+    expect(() => paymentSystemsSchema.parse({ paymentSystems: [withoutCurrencies] })).toThrow();
+  });
+});
+
+describe("dayMoneyLimitSchema", () => {
+  it("parses a limit with its minimum", () => {
+    const result = dayMoneyLimitSchema.parse({
+      limit: 500,
+      minimum: 50,
+      currency: "usd",
+    });
+
+    expect(result.limit).toBe(500);
+    expect(result.minimum).toBe(50);
+  });
+
+  it("accepts a null minimum, which marks the limit as not changeable", () => {
+    const result = dayMoneyLimitSchema.parse({
+      limit: 0,
+      minimum: null,
+      currency: "rub",
+    });
+
+    expect(result.minimum).toBeNull();
+  });
+
+  it("rejects a payload without a limit", () => {
+    expect(() => dayMoneyLimitSchema.parse({ minimum: 50, currency: "usd" })).toThrow();
   });
 });

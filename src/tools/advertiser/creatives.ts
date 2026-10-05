@@ -1,18 +1,19 @@
 import { z } from "zod";
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
 import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
 import {
+  formatMaterialBulkResult,
   ADV_STATUS_ACTION_MAP,
   MATERIAL_LIST_STATUS_FILTER,
   parseCommaSeparatedIds,
+  requireUniqueIds,
 } from "../../utils/status-actions.js";
 import type { CreativeRow } from "../../api/schemas/advertiser.js";
 import type { OptionsRegistry } from "../../api/options-registry.js";
 import { logger } from "../../logger.js";
+import { loadFile } from "../../utils/files.js";
 
 async function validateSizeId(sizeId: number, registry: OptionsRegistry): Promise<void> {
   try {
@@ -43,74 +44,6 @@ function formatCreativeRow(row: CreativeRow, index: number): string {
   const status = ad?.status?.label ?? ad?.status?.id ?? "—";
   const campaignInfo = campaign ? `Campaign: "${campaign.name}" (#${campaign.id})` : "";
   return `${index + 1}. [ID: ${id}] "${title}" | ${campaignInfo} | Status: ${status} | Views: ${row.views} | Clicks: ${row.clicks}`;
-}
-
-interface LoadedFile {
-  blob: Blob;
-  filename: string;
-  width: number;
-  height: number;
-}
-
-function isLocalPath(source: string): boolean {
-  return source.startsWith("/") || source.startsWith("~") || source.startsWith("file://");
-}
-
-async function loadFile(source: string): Promise<LoadedFile> {
-  let buffer: ArrayBuffer;
-  let filename: string;
-
-  if (isLocalPath(source)) {
-    const filePath = source.startsWith("file://")
-      ? new URL(source).pathname
-      : source.startsWith("~")
-        ? source.replace("~", process.env.HOME || "")
-        : source;
-    const nodeBuffer = await readFile(filePath).catch(() => {
-      throw new Error(`File not found or unreadable: ${filePath}`);
-    });
-    buffer = nodeBuffer.buffer.slice(
-      nodeBuffer.byteOffset,
-      nodeBuffer.byteOffset + nodeBuffer.byteLength,
-    );
-    filename = basename(filePath);
-  } else {
-    const response = await fetch(source);
-    if (!response.ok) {
-      throw new Error(`Failed to download file from ${source}: HTTP ${response.status}`);
-    }
-    buffer = await response.arrayBuffer();
-    const urlPath = new URL(source).pathname;
-    filename = urlPath.split("/").pop() || "file";
-  }
-
-  const blob = new Blob([buffer]);
-  const { width, height } = parseImageDimensions(new Uint8Array(buffer));
-  return { blob, filename, width, height };
-}
-
-export function parseImageDimensions(data: Uint8Array): { width: number; height: number } {
-  if (data[0] === 0x89 && data[1] === 0x50) {
-    const view = new DataView(data.buffer, data.byteOffset);
-    return { width: view.getUint32(16), height: view.getUint32(20) };
-  }
-  if (data[0] === 0xff && data[1] === 0xd8) {
-    let offset = 2;
-    while (offset < data.length - 9) {
-      if (data[offset] !== 0xff) {
-        offset++;
-        continue;
-      }
-      const marker = data[offset + 1]!;
-      if (marker === 0xc0 || marker === 0xc2) {
-        const view = new DataView(data.buffer, data.byteOffset);
-        return { width: view.getUint16(offset + 7), height: view.getUint16(offset + 5) };
-      }
-      const segLen = (data[offset + 2]! << 8) | data[offset + 3]!;
-      offset += 2 + segLen;
-    }
-  }
-  return { width: 0, height: 0 };
 }
 
 function buildCreativeFormData(args: Record<string, unknown>): FormData {
@@ -172,7 +105,9 @@ export const creativesModule: ToolModule = {
 - Push / In-Page Push: title, text, url, imageUrl (icon), mainImageUrl
 - Native: title, url, imageUrl (icon), mainImageUrl
 - Banner: url, imageUrl, sizeId
-- Video: title, url, videoUrl (MP4)
+- Banner as an HTML5 archive: url, html5ArchiveUrl (.zip), sizeId — needs the HTML5 grant
+- Video: title, url, videoUrl (MP4) — uploading a video file is an internal grant; advertisers deliver video as a VAST tag
+- Video as a VAST tag: title, vastTagUrl (https) in a video campaign — needs the VAST grant, nothing is uploaded
 - Popunder: none (campaign URL is the ad)
 See kadam://reference/creative-formats for sizes and exact dimensions.`,
         product: "advertiser",
@@ -207,6 +142,16 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
           .string()
           .optional()
           .describe("Video source: URL or local file path to MP4 (video campaigns only)"),
+        vastTagUrl: z
+          .string()
+          .optional()
+          .describe(
+            "https VAST tag URL (video campaigns only). The tag is fetched and parsed on save, so a tag that does not answer with a usable VAST document is refused right away.",
+          ),
+        html5ArchiveUrl: z
+          .string()
+          .optional()
+          .describe("HTML5 archive (.zip): URL or local file path (banner campaigns only)"),
         sizeId: z
           .number()
           .optional()
@@ -275,6 +220,19 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
         if (args.videoUrl) {
           const file = await loadFile(args.videoUrl);
           fd.set("image", file.blob, file.filename);
+          // Без этого флага бэкенд сохранит загруженный файл как обычный баннер.
+          fd.set("isVideo", "1");
+        }
+
+        if (args.html5ArchiveUrl) {
+          const file = await loadFile(args.html5ArchiveUrl);
+          fd.set("image", file.blob, file.filename);
+          fd.set("isHtml5", "1");
+        }
+
+        if (args.vastTagUrl) {
+          fd.set("url", args.vastTagUrl);
+          fd.set("isVast", "1");
         }
 
         const c = await ctx.adv.createCreative(args.campaignId, fd);
@@ -348,20 +306,48 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
       {
         name: "kadam_adv_set_creative_status",
         description:
-          "Set status for multiple creatives. Pass comma-separated IDs and status: active, paused, or archived.",
+          "Set status for multiple creatives. Pass comma-separated IDs and status: active, paused, archived, " +
+          "or restored (take out of the archive). The API answers per creative, so some IDs can be refused " +
+          "while others succeed. restored is rejected for the whole call if the creative's campaign is itself " +
+          "archived — restore the campaign first.",
         product: "advertiser",
         annotations: { title: "Set creative status", idempotentHint: true },
       },
       {
         ids: z.string().min(1),
-        status: z.enum(["active", "paused", "archived"]),
+        status: z.enum(["active", "paused", "archived", "restored"]),
       },
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds, "Creative");
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await ctx.adv.setCreativeStatus(parsedIds, action);
-        const idList = parsedIds.map((id) => `#${id}`).join(", ");
-        return `${parsedIds.length} creatives set to ${args.status}: ${idList}`;
+        const result = await ctx.adv.setCreativeStatus(parsedIds, action);
+
+        return formatMaterialBulkResult(result, `set to ${args.status}`);
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_delete_creatives",
+        description:
+          "Permanently delete creatives. Requires confirm=true. A creative must be archived first " +
+          "(use set_creative_status with status=archived), otherwise the whole call is rejected. " +
+          "Retrying a call that already deleted the creatives is rejected too, since deleted creatives " +
+          "are no longer addressable.",
+        product: "advertiser",
+        annotations: { title: "Delete creatives", destructiveHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated creative IDs"),
+        confirm: z.literal(true),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds, "Creative");
+        const result = await ctx.adv.deleteCreatives(parsedIds);
+
+        return formatMaterialBulkResult(result, "deleted");
       },
     );
   },

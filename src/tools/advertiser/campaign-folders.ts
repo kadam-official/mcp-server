@@ -1,14 +1,40 @@
 import { z } from "zod";
 import type { ToolWrapper } from "../../middleware/tool-wrapper.js";
 import type { ToolModule } from "../../types/tool-module.js";
-import type { FolderRow } from "../../api/schemas/advertiser.js";
+import type { FolderRow, FolderView } from "../../api/schemas/advertiser.js";
 import { formatEntityList, clampPerPage } from "../../output-formatter.js";
 import { extractPagination } from "../../utils/pagination.js";
+import { parseCommaSeparatedIds } from "../../utils/status-actions.js";
 
 function formatFolderRow(row: FolderRow, index: number): string {
   const f = row.folder;
   return `${index + 1}. [ID: ${f.id}] "${f.name}" (${f.state?.label ?? f.state?.id}) — ${f.campaignsCount} campaigns (${f.activeCampaignsCount} active)`;
 }
+
+function formatFolderView(f: FolderView): string {
+  const lines = [
+    `Campaign group [ID: ${f.id}] "${f.name}"`,
+    `Default: ${f.isDefault ? "yes" : "no"} | Archived: ${f.isArchived ? "yes" : "no"}`,
+    `Limits: ${f.limitsEnabled ? "enabled" : "disabled"}`,
+  ];
+  if (f.limitsEnabled) {
+    lines.push(
+      `Daily budget: ${f.groupDailyLimit} | Total budget: ${f.groupTotalLimit} | Even distribution: ${f.groupSpendingEvenly ? "yes" : "no"}`,
+    );
+  }
+  return lines.join("\n");
+}
+
+/**
+ * `restore` is its own action, mirroring campaigns: archiving a folder soft-deletes it,
+ * so `activate` cannot bring it back — it only moves the state of live campaigns.
+ */
+const FOLDER_STATUS_ACTION_MAP = {
+  activate: "activate",
+  pause: "pause",
+  archive: "archive",
+  restore: "restore",
+} as const;
 
 export const campaignFoldersModule: ToolModule = {
   product: "advertiser",
@@ -64,14 +90,34 @@ export const campaignFoldersModule: ToolModule = {
 
     wrapper.register(
       {
+        name: "kadam_adv_get_campaign_folder",
+        description:
+          "Get a single campaign group by ID: name, archived state, budgets and distribution " +
+          "(campaign group = the UI term for a folder).",
+        product: "advertiser",
+        annotations: { title: "Get campaign group", readOnlyHint: true },
+      },
+      {
+        id: z.number().describe("Campaign group ID"),
+      },
+      async (args, ctx) => {
+        const folder = await ctx.adv.getCampaignFolder(args.id);
+        return formatFolderView(folder);
+      },
+    );
+
+    wrapper.register(
+      {
         name: "kadam_adv_update_campaign_folder",
         description:
-          "Update campaign group settings: budgets and distribution (campaign group = the UI term for a folder).",
+          "Partially update a campaign group: rename and/or change budgets and distribution. " +
+          "Only the provided fields are changed (campaign group = the UI term for a folder).",
         product: "advertiser",
         annotations: { title: "Update campaign group", readOnlyHint: false },
       },
       {
         id: z.number(),
+        name: z.string().min(1).max(50).optional().describe("New campaign group name"),
         limitsEnabled: z.boolean().optional(),
         totalBudget: z.number().optional(),
         dailyBudget: z.number().optional(),
@@ -80,14 +126,51 @@ export const campaignFoldersModule: ToolModule = {
       async (args, ctx) => {
         const { id, ...rest } = args;
         const data: Record<string, unknown> = {};
+        if (rest.name != null) data.name = rest.name;
         if (rest.totalBudget != null) data.groupTotalLimit = rest.totalBudget;
         if (rest.dailyBudget != null) data.groupDailyLimit = rest.dailyBudget;
         if (rest.evenDistribution != null) data.groupSpendingEvenly = rest.evenDistribution;
-        data.limitsEnabled =
-          rest.limitsEnabled ?? (rest.totalBudget != null || rest.dailyBudget != null);
+        if (rest.limitsEnabled != null) {
+          data.limitsEnabled = rest.limitsEnabled;
+        } else if (rest.totalBudget != null || rest.dailyBudget != null) {
+          data.limitsEnabled = true;
+        }
+        if (Object.keys(data).length === 0) {
+          return `Nothing to update for campaign group #${id}: provide at least one field.`;
+        }
 
         await ctx.adv.updateCampaignFolder(id, data);
         return `Campaign group #${id} updated successfully.`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_set_campaign_folder_status",
+        description:
+          "Bulk action on campaign groups (comma-separated IDs): activate/pause all campaigns in the groups, " +
+          "archive the groups together with their campaigns, or restore archived groups and their campaigns " +
+          "(campaign group = the UI term for a folder). archive and restore are each other's inverse: " +
+          "restore accepts ONLY archived group IDs and rejects the whole call if a live ID is passed.",
+        product: "advertiser",
+        annotations: { title: "Set campaign group status", idempotentHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated campaign group IDs, e.g. '15,16'"),
+        action: z.enum(["activate", "pause", "archive", "restore"]),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        const action = FOLDER_STATUS_ACTION_MAP[args.action];
+        const result = await ctx.adv.setCampaignFolderStatus(parsedIds, action);
+        const lines = result.folders.map(
+          (f) =>
+            `#${f.id}: ${f.success ? "ok" : "FAILED"} (${f.campaignsProcessed}/${f.campaignsTotal} campaigns)`,
+        );
+        return [
+          `${args.action}: ${result.processedFolders}/${result.totalFolders} campaign groups fully processed`,
+          ...lines,
+        ].join("\n");
       },
     );
   },

@@ -61,12 +61,16 @@ const HANDLED_KEYS = new Set([
   "audiences",
   "sites",
   "ssps",
+  "macrosGroups",
   "disableProxy",
   "impTracker",
   "isNeedSecondPush",
   "isPauseAfterModerate",
   "conversion",
   "postConversion",
+  "maxCpm",
+  "videoFormats",
+  "autorules",
   "trafficSources",
   "audienceEngagementLevels",
 ]);
@@ -246,6 +250,7 @@ export async function formatCampaignDetail(
     budget.push(`Daily conversions limit: ${c.dayConversionsLimit}`);
   if (c.totalLossLimit != null && Number(c.totalLossLimit) !== 0)
     budget.push(`Total loss limit: ${c.totalLossLimit}`);
+  if (c.maxCpm != null) budget.push(`CPM ceiling: ${c.maxCpm}`);
   if (budget.length > 0) out.push("", "## Budget & limits", ...budget.map((l) => `- ${l}`));
 
   // Caps
@@ -298,6 +303,14 @@ export async function formatCampaignDetail(
     if (Array.isArray(ssps.list) && ssps.list.length > 0)
       targeting.push(`SSP ${ssps.mode ? "whitelist" : "blacklist"}: ${ssps.list.join(", ")}`);
   }
+  if (c.macrosGroups != null && typeof c.macrosGroups === "object") {
+    const groups = c.macrosGroups as Record<string, unknown>;
+    for (const key of ["include", "exclude", "blocked"]) {
+      const list = groups[key];
+      if (Array.isArray(list) && list.length > 0)
+        targeting.push(`Site groups ${key}: ${list.join(", ")}`);
+    }
+  }
   if (typeof c.trafficSources === "string")
     targeting.push(
       `Traffic Sources: ${TRAFFIC_SOURCES_NAME[c.trafficSources] ?? c.trafficSources}`,
@@ -318,6 +331,16 @@ export async function formatCampaignDetail(
     targeting.push(`Second push: ${c.isNeedSecondPush ? "yes" : "no"}`);
   if (c.isPauseAfterModerate != null)
     targeting.push(`Pause after moderation: ${c.isPauseAfterModerate ? "yes" : "no"}`);
+  if (Array.isArray(c.videoFormats) && c.videoFormats.length > 0)
+    targeting.push(`Video formats: ${c.videoFormats.join(", ")}`);
+  // Only the ids: the rules themselves are read and edited through the autorules tools,
+  // and duplicating their bodies here would drift from them on the first schema change.
+  if (Array.isArray(c.autorules))
+    targeting.push(
+      c.autorules.length > 0
+        ? `Autorule IDs: ${c.autorules.join(", ")} (read them with kadam_adv_list_autorules)`
+        : "Autorules: none",
+    );
   if (targeting.length > 0) out.push("", "## Targeting", ...targeting.map((l) => `- ${l}`));
 
   // Conversion

@@ -1,6 +1,7 @@
 import {
   createToolClient,
   getTextFromResult,
+  IMPERSONATION,
   type MockPartnersClient,
 } from "../../helpers/tool-client.js";
 import { audiencesModule } from "../../../src/tools/advertiser/audiences.js";
@@ -250,5 +251,130 @@ describe("audiences tools", () => {
       }),
     );
     expect(text).toContain("updated");
+  });
+});
+
+describe("audience params", () => {
+  it("get_audience_params reports only the slots that are set", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.getAudienceParams.mockResolvedValue({
+      event: "deposit",
+      paramStr: "campaign_42",
+      paramStr2: null,
+      paramInt: 500,
+      paramInt2: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_get_audience_params", arguments: { id: 27 } }),
+    );
+
+    expect(text).toContain("event: deposit");
+    expect(text).toContain("paramInt: 500");
+    expect(text).not.toContain("paramStr2");
+  });
+
+  /**
+   * Запись заменяет набор целиком, поэтому не переданные аргументы должны уйти на бэкенд
+   * явными null — иначе «оставил как было» и «стёр» стали бы неразличимы.
+   */
+  it("set_audience_params sends every slot, clearing the ones left out", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setAudienceParams.mockResolvedValue({
+      event: "registration",
+      paramStr: null,
+      paramStr2: null,
+      paramInt: null,
+      paramInt2: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_set_audience_params",
+        arguments: { id: 27, event: "registration" },
+      }),
+    );
+
+    expect(api.setAudienceParams).toHaveBeenCalledWith(27, {
+      event: "registration",
+      paramStr: null,
+      paramStr2: null,
+      paramInt: null,
+      paramInt2: null,
+    });
+    expect(text).toContain("Parameters saved for audience #27");
+    expect(text).toContain("event: registration");
+  });
+
+  it("set_audience_params says when the audience was left with no parameters", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setAudienceParams.mockResolvedValue({
+      event: null,
+      paramStr: null,
+      paramStr2: null,
+      paramInt: null,
+      paramInt2: null,
+    } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_set_audience_params", arguments: { id: 27 } }),
+    );
+
+    expect(text).toContain("No parameters left for audience #27");
+  });
+});
+
+describe("filtered audience sources and dry run", () => {
+  it("get_filtered_audience_sources is hidden from a client session", async () => {
+    const { client } = await createToolClient(audiencesModule);
+
+    const names = (await client.listTools()).tools.map((t) => t.name);
+
+    expect(names).toContain("kadam_adv_list_audiences");
+    expect(names).not.toContain("kadam_adv_get_filtered_audience_sources");
+  });
+
+  it("get_filtered_audience_sources lists what a filter can be built on", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule, undefined, IMPERSONATION);
+    const api = mockApi as MockPartnersClient;
+    api.getFilteredAudienceSources.mockResolvedValue([
+      { id: 100, name: "Pixel" },
+      { id: 101, name: "Stat" },
+    ] as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_get_filtered_audience_sources",
+        arguments: {},
+      }),
+    );
+
+    expect(text).toContain("[ID: 100] Pixel");
+    expect(text).toContain("[ID: 101] Stat");
+  });
+
+  it("create_audience with dryRun validates and creates nothing", async () => {
+    const { client, mockApi } = await createToolClient(audiencesModule);
+    const api = mockApi as MockPartnersClient;
+    api.validateAudience.mockResolvedValue({ valid: true } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_create_audience",
+        arguments: {
+          type: "audience_code",
+          name: "Pixel to be",
+          expireDays: 30,
+          dryRun: true,
+        },
+      }),
+    );
+
+    expect(api.validateAudience).toHaveBeenCalledTimes(1);
+    expect(api.createAudience).not.toHaveBeenCalled();
+    expect(text).toContain("Nothing was created");
   });
 });

@@ -7,6 +7,12 @@ import { ApiError } from "../api/http-client.js";
 import type { Product } from "../types/tool-module.js";
 import type { AdvContext, PubContext } from "../context.js";
 import type { ClientPool } from "../api/client-pool.js";
+import {
+  CLIENT_ACCESS,
+  satisfiesRequirement,
+  type AccessRequirement,
+  type SessionAccess,
+} from "../types/access.js";
 
 export type ToolHandler<TArgs, TCtx> = (args: TArgs, ctx: TCtx) => Promise<string>;
 
@@ -15,6 +21,13 @@ export interface ToolDefinition {
   description: string;
   product: Product;
   annotations?: ToolAnnotations;
+  /**
+   * Role the session must have for the tool to exist in its catalog. A tool that the
+   * API answers 403 to for a plain client token declares `"impersonation"` and is then
+   * simply not registered for client sessions — the model never sees a tool it cannot
+   * call. The API keeps enforcing the rule on its side regardless.
+   */
+  requires?: AccessRequirement;
 }
 
 /**
@@ -35,13 +48,23 @@ export class ToolWrapper {
     private readonly server: McpServer,
     private readonly clientPool: ClientPool,
     private readonly credentials: ToolCredentials,
+    readonly access: SessionAccess = CLIENT_ACCESS,
   ) {}
+
+  /** Convenience for modules that shape an input schema by role. */
+  get impersonation(): boolean {
+    return this.access.impersonation;
+  }
 
   register<TShape extends z.ZodRawShape, P extends Product>(
     definition: ToolDefinition & { product: P },
     schema: TShape,
     handler: ToolHandler<z.objectOutputType<TShape, z.ZodTypeAny>, ContextForProduct<P>>,
   ): void {
+    if (!satisfiesRequirement(this.access, definition.requires)) {
+      return;
+    }
+
     const log = createToolLogger(definition.name);
     const { product } = definition;
     const resolveCtx = () => this.resolveProductContext(product);

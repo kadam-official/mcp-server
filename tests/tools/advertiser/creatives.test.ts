@@ -112,10 +112,67 @@ describe("creatives tools", () => {
     expect(api.createCreative).toHaveBeenCalledWith(15, expect.any(FormData));
   });
 
+  /**
+   * Без флага формата бэкенд сохранит загруженный файл как обычный баннер, а VAST-тег —
+   * как ссылку на лендинг: формат теряется молча, поэтому он проверяется отдельно.
+   */
+  it("create_creative marks an uploaded video as a video creative", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 100 } as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(Buffer.from("fake-mp4"), { status: 200 })),
+    );
+
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 16,
+        url: "https://example.com/landing",
+        title: "Video",
+        videoUrl: "https://example.com/clip.mp4",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("isVideo")).toBe("1");
+    expect(fd.get("image")).toBeInstanceOf(Blob);
+    vi.unstubAllGlobals();
+  });
+
+  it("create_creative sends a VAST tag as the creative URL without uploading anything", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 101 } as never);
+
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 16,
+        url: "https://example.com/landing",
+        title: "VAST",
+        vastTagUrl: "https://ads.example.com/vast",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("isVast")).toBe("1");
+    expect(fd.get("url")).toBe("https://ads.example.com/vast");
+    expect(fd.get("image")).toBeNull();
+  });
+
   it("set_creative_status with ids 5,6 and status paused calls api with action pause", async () => {
     const { client, mockApi } = await createToolClient(creativesModule);
     const api = mockApi as MockPartnersClient;
-    api.setCreativeStatus.mockResolvedValue(undefined as never);
+    api.setCreativeStatus.mockResolvedValue({
+      materials: [
+        { id: 5, success: true },
+        { id: 6, success: true },
+      ],
+      totalMaterials: 2,
+      processedMaterials: 2,
+    } as never);
 
     const result = await client.callTool({
       name: "kadam_adv_set_creative_status",
@@ -124,7 +181,102 @@ describe("creatives tools", () => {
     const text = getTextFromResult(result);
 
     expect(api.setCreativeStatus).toHaveBeenCalledWith([5, 6], "pause");
-    expect(text).toContain("2 creatives set to paused");
+    expect(text).toContain("2/2 creatives set to paused");
+    expect(text).toContain("Applied: #5, #6");
+  });
+
+  it("set_creative_status with status restored calls the restore endpoint", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCreativeStatus.mockResolvedValue({
+      materials: [{ id: 42, success: true }],
+      totalMaterials: 1,
+      processedMaterials: 1,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_creative_status",
+      arguments: { ids: "42", status: "restored" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.setCreativeStatus).toHaveBeenCalledWith([42], "restore");
+    expect(text).toContain("1/1 creatives set to restored");
+  });
+
+  /**
+   * The refused IDs are the whole point of the envelope: without them the model would
+   * report five archived creatives when the backend only archived four.
+   */
+  it("set_creative_status surfaces creatives the backend refused", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.setCreativeStatus.mockResolvedValue({
+      materials: [
+        { id: 5, success: true },
+        { id: 6, success: false },
+      ],
+      totalMaterials: 2,
+      processedMaterials: 1,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_creative_status",
+      arguments: { ids: "5,6", status: "archived" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(text).toContain("1/2 creatives set to archived");
+    expect(text).toContain("Applied: #5");
+    expect(text).toContain("#6");
+  });
+
+  it("set_creative_status rejects duplicate ids before calling the api", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_set_creative_status",
+      arguments: { ids: "5,5", status: "paused" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.setCreativeStatus).not.toHaveBeenCalled();
+    expect(text).toContain("Creative identifiers must be unique.");
+  });
+
+  it("delete_creatives requires confirm=true", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_creatives",
+      arguments: { ids: "42" },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.deleteCreatives).not.toHaveBeenCalled();
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(text).toContain("Invalid arguments");
+  });
+
+  it("delete_creatives with confirm=true deletes the archived creatives", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.deleteCreatives.mockResolvedValue({
+      materials: [{ id: 42, success: true }],
+      totalMaterials: 1,
+      processedMaterials: 1,
+    } as never);
+
+    const result = await client.callTool({
+      name: "kadam_adv_delete_creatives",
+      arguments: { ids: "42", confirm: true },
+    });
+    const text = getTextFromResult(result);
+
+    expect(api.deleteCreatives).toHaveBeenCalledWith([42]);
+    expect(text).toContain("1/1 creatives deleted");
   });
 
   it("update_creative does read-modify-write, merging changes with current state", async () => {

@@ -3,6 +3,7 @@ import { hasAdvKey, hasPubKey, getConfig } from "./config.js";
 import { logger } from "./logger.js";
 import { assembleServer } from "./server-assembly.js";
 import type { ClientPool } from "./api/client-pool.js";
+import { CLIENT_ACCESS, type SessionAccess } from "./types/access.js";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -29,9 +30,18 @@ Kadam MCP Server — Ad network management for advertisers and publishers.
 - Image uploads via URL or local file path; max 5MB
 - All list/stats tools: max 100 rows per page; use pagination for large datasets
 - Output hard limit: 50KB per response; use filters to narrow results
+- The tool catalog matches the key's role: manager-only tools (bulk URL replace, Easy Start, blocked traffic sources, filtered audience sources) and manager-only campaign fields (hasCorrectPostback, isDirectTrafficPriority, allowMultiAds) exist only when a Kadam manager acts for the client; a plain client key never sees them
 `;
 
-export function createMcpServer(clientPool: ClientPool): McpServer {
+/**
+ * stdio is single-tenant, so the role is resolved once at startup from the
+ * env-configured advertiser key (see `resolveStdioAccess`). Defaults to the
+ * client catalog, which is always safe.
+ */
+export function createMcpServer(
+  clientPool: ClientPool,
+  access: SessionAccess = CLIENT_ACCESS,
+): McpServer {
   const server = new McpServer(
     {
       name: "@kadam/mcp-server",
@@ -53,12 +63,14 @@ export function createMcpServer(clientPool: ClientPool): McpServer {
     clientPool,
     { advKey: config.KADAM_ADV_API_KEY, pubKey: config.KADAM_PUB_API_KEY },
     { adv: advEnabled, pub: pubEnabled },
+    access,
   );
 
   logger.info(
     {
       advertiserTools: advEnabled ? "enabled" : "no KADAM_ADV_API_KEY",
       publisherTools: pubEnabled ? "enabled" : "no KADAM_PUB_API_KEY",
+      impersonation: access.impersonation,
     },
     "Kadam MCP Server starting",
   );

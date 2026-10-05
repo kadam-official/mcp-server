@@ -9,6 +9,7 @@ import { getConfig, type Config } from "./config.js";
 import { isSessionAuthorized, sessionCredentials, type CabinetType } from "./http-session.js";
 import type { ToolCredentials } from "./middleware/tool-wrapper.js";
 import { assembleServer } from "./server-assembly.js";
+import { CLIENT_ACCESS, type SessionAccess } from "./types/access.js";
 import { logger } from "./logger.js";
 import { createRequire } from "node:module";
 
@@ -60,19 +61,30 @@ export function createSessionServer(
   clientPool: ClientPool,
   cabinet: CabinetType,
   credentials: ToolCredentials,
+  access: SessionAccess = CLIENT_ACCESS,
 ): McpServer {
+  const mode = cabinet === "adv" ? "advertiser" : "publisher";
+  const role = access.impersonation ? "Kadam manager acting for the client" : "client";
   const server = new McpServer(
     { name: "@kadam/mcp-server", version: SERVER_VERSION },
-    { instructions: `Kadam MCP Server (${cabinet === "adv" ? "advertiser" : "publisher"} mode)` },
+    { instructions: `Kadam MCP Server (${mode} mode, ${role})` },
   );
 
   // Shared assembler (same as stdio). The advertiser OptionsRegistry is derived
   // from the session Bearer inside assembleServer, so the creative-formats
   // resource includes Banner Sizes; pub sessions have no advKey -> null.
-  assembleServer(server, clientPool, credentials, {
-    adv: cabinet === "adv",
-    pub: cabinet === "pub",
-  });
+  // `access` was learned from GET /access while validating the bearer, so the
+  // catalog is fixed for the life of the session — same as the token's role.
+  assembleServer(
+    server,
+    clientPool,
+    credentials,
+    {
+      adv: cabinet === "adv",
+      pub: cabinet === "pub",
+    },
+    access,
+  );
 
   return server;
 }
@@ -197,9 +209,12 @@ export async function bootstrapHttp(): Promise<void> {
           return;
         }
 
+        // DELETE only closes a session the bearer already owns; the role is not needed.
+        let access: SessionAccess = CLIENT_ACCESS;
         if (method !== "DELETE") {
-          const valid = await bearerValidator.validate(bearer, cabinet);
-          if (!valid) {
+          const verdict = await bearerValidator.validate(bearer, cabinet);
+          access = verdict.access;
+          if (!verdict.accepted) {
             const rmDomain = mcpDomain(config, cabinet);
             res.writeHead(401, {
               "WWW-Authenticate": `Bearer resource_metadata="${rmDomain}/.well-known/oauth-protected-resource"`,
@@ -251,7 +266,7 @@ export async function bootstrapHttp(): Promise<void> {
             const credentials = sessionCredentials(bearer, cabinet);
             pool.resolve(credentials.advKey, credentials.pubKey);
 
-            const mcpServer = createSessionServer(pool, cabinet, credentials);
+            const mcpServer = createSessionServer(pool, cabinet, credentials, access);
 
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: () => randomUUID(),
@@ -264,7 +279,10 @@ export async function bootstrapHttp(): Promise<void> {
                   cabinet,
                   lastActivity: Date.now(),
                 });
-                logger.info({ sessionId, cabinet }, "New HTTP session created");
+                logger.info(
+                  { sessionId, cabinet, impersonation: access.impersonation },
+                  "New HTTP session created",
+                );
               },
             });
 

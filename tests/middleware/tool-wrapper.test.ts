@@ -325,6 +325,62 @@ describe("ToolWrapper", () => {
     expect(textContent.text).toMatch(/API key|not enabled/i);
   });
 
+  /**
+   * The catalog is per session role. A tool that the API refuses to client tokens is
+   * not registered for them at all — the model must not see tools it cannot call.
+   */
+  describe("role-gated registration", () => {
+    async function listNames(access?: { impersonation: boolean }) {
+      process.env.KADAM_ADV_API_KEY = "test-key";
+      const server = new McpServer({ name: "test", version: "0.0.1" });
+      const wrapper = new ToolWrapper(server, createPool(), { advKey: "test-key" }, access);
+      wrapper.register(
+        { name: "open_tool", description: "Everyone", product: "advertiser" },
+        { input: z.string() },
+        async () => "open",
+      );
+      wrapper.register(
+        {
+          name: "manager_tool",
+          description: "Managers only",
+          product: "advertiser",
+          requires: "impersonation",
+        },
+        { input: z.string() },
+        async () => "manager",
+      );
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "test-client", version: "0.0.1" });
+      await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+      const result = await client.listTools();
+      return { client, names: result.tools.map((t) => t.name).sort(), wrapper };
+    }
+
+    it("defaults to the client catalog when no access is given", async () => {
+      const { names, wrapper } = await listNames();
+      expect(names).toEqual(["open_tool"]);
+      expect(wrapper.impersonation).toBe(false);
+    });
+
+    it("hides impersonation-only tools from a client session", async () => {
+      const { names, client } = await listNames({ impersonation: false });
+      expect(names).toEqual(["open_tool"]);
+
+      const result = await client.callTool({ name: "manager_tool", arguments: { input: "x" } });
+      expect(result.isError).toBe(true);
+    });
+
+    it("registers the full catalog for an impersonation session", async () => {
+      const { names, client, wrapper } = await listNames({ impersonation: true });
+      expect(names).toEqual(["manager_tool", "open_tool"]);
+      expect(wrapper.impersonation).toBe(true);
+
+      const result = await client.callTool({ name: "manager_tool", arguments: { input: "x" } });
+      expect(result.isError).toBeFalsy();
+      expect(result.content![0]).toMatchObject({ type: "text", text: "manager" });
+    });
+  });
+
   it("invalid input args are rejected by MCP SDK", async () => {
     process.env.KADAM_ADV_API_KEY = "test-key";
     const server = new McpServer({ name: "test", version: "0.0.1" });

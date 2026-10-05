@@ -219,5 +219,109 @@ export const bidOptimizationModule: ToolModule = {
         return `Extended bids updated: ${args.bids.length} op(s) across ${affected} campaign(s).`;
       },
     );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_reset_extended_bids",
+        description:
+          "Drop every per-slice bid of the listed campaigns at once, returning them to the campaign-level " +
+          "bid. Blacklisted slices (action=off) are dropped too, so those slices start being bought again. " +
+          "Requires confirm=true: the dropped bids are not recoverable. " +
+          "To remove a single slice use kadam_adv_update_extended_bids with action=remove.",
+        product: "advertiser",
+        annotations: { title: "Reset extended bids", readOnlyHint: false, destructiveHint: true },
+      },
+      {
+        campaignIds: z.string().min(1).describe("Comma-separated campaign IDs"),
+        confirm: z.literal(true),
+      },
+      async (args, ctx) => {
+        const ids = parseCommaSeparatedIds(args.campaignIds);
+        const res = await ctx.adv.resetExtendedBids(ids);
+        const affected = res.affectedCampaigns ?? ids.length;
+
+        return `All extended bids dropped in ${affected} campaign(s): ${ids.map((id) => `#${id}`).join(", ")}.`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_toggle_autorule_slice_block",
+        description:
+          "Exclude a slice from the campaign's bid autorules, or let them back in. This does not stop " +
+          "buying the slice — that is action=off in kadam_adv_update_extended_bids; it only keeps the " +
+          "autorules from rewriting the bid you set by hand. The call toggles, and the answer says which " +
+          "state the slice ended in, so read kadam_adv_get_campaign_autorule_slices first if you need a " +
+          "specific state.",
+        product: "advertiser",
+        annotations: { title: "Toggle autorule slice block", readOnlyHint: false },
+      },
+      {
+        campaignId: z.number().describe("Campaign the slice belongs to"),
+        pathIds: z
+          .array(z.number())
+          .min(2)
+          .describe("Alternating [sliceId, valueId, ...] as shown in a get_extended_stats row"),
+      },
+      async (args, ctx) => {
+        const blocked = await ctx.adv.toggleAutoruleSliceBlock(args.campaignId, args.pathIds);
+
+        return blocked
+          ? `Slice [${args.pathIds.join(", ")}] is now out of reach of the bid autorules of campaign #${args.campaignId}.`
+          : `Bid autorules of campaign #${args.campaignId} may change the bid of slice [${args.pathIds.join(", ")}] again.`;
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_get_campaign_autorule_slices",
+        description:
+          "Slices the campaign's bid autorules act on, one entry per rule. Use it to tell apart a bid you " +
+          "set by hand from one an autorule keeps rewriting.",
+        product: "advertiser",
+        annotations: { title: "Campaign autorule slices", readOnlyHint: true },
+      },
+      {
+        campaignId: z.number(),
+      },
+      async (args, ctx) => {
+        const slices = await ctx.adv.getCampaignAutoruleSlices(args.campaignId);
+
+        if (slices.length === 0) {
+          return `No bid autorule of campaign #${args.campaignId} is bound to a slice.`;
+        }
+
+        return [
+          `Slices managed by bid autorules of campaign #${args.campaignId}:`,
+          ...slices.map((slice, i) => `${i + 1}. ${JSON.stringify(slice)}`),
+        ].join("\n");
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_get_campaign_bid_restrictions",
+        description:
+          "Bid limits of a campaign: the cap a fixed bid must stay under, the largest allowed multiplier, " +
+          "and the campaign bid the multiplier applies to (null when the geo bids differ). Read it before " +
+          "writing bids to know what will pass.",
+        product: "advertiser",
+        annotations: { title: "Campaign bid restrictions", readOnlyHint: true },
+      },
+      {
+        campaignId: z.number(),
+      },
+      async (args, ctx) => {
+        const r = await ctx.adv.getCampaignBidRestrictions(args.campaignId);
+
+        return [
+          `Bid limits of campaign #${args.campaignId}:`,
+          `- Max bid: ${r.maxBid}`,
+          `- Max multiplier: ${r.maxCoefficient}`,
+          `- Base bid: ${r.baseBid ?? "differs between geos"}`,
+          `- Pricing: ${r.isCPATarget ? "target CPA" : "CPC/CPM"}`,
+        ].join("\n");
+      },
+    );
   },
 };

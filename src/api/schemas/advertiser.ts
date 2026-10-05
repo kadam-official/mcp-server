@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Материальные схемы живут отдельным файлом: этот упирался в гейт размера.
+export * from "./materials.js";
+
 export const campaignRowSchema = z
   .object({
     campaign: z
@@ -86,6 +89,15 @@ export const audienceRowSchema_ = z
 
 export type AudienceRow = z.infer<typeof audienceRowSchema_>;
 
+export const audienceParamsSchema = z.object({
+  event: z.string().nullable(),
+  paramStr: z.string().nullable(),
+  paramStr2: z.string().nullable(),
+  paramInt: z.number().nullable(),
+  paramInt2: z.number().nullable(),
+});
+export type AudienceParams = z.infer<typeof audienceParamsSchema>;
+
 export const audienceDetailSchema = z
   .object({
     id: z.number(),
@@ -127,6 +139,87 @@ export const financeRowSchema = z
 
 export type FinanceRow = z.infer<typeof financeRowSchema>;
 
+export const accountProfileSchema = z
+  .object({
+    id: z.number(),
+    balance: z.number(),
+    currency: z.string(),
+    registeredAt: z.string(),
+    timezone: z.number().int().min(-12).max(12),
+  })
+  .passthrough();
+
+export type AccountProfile = z.infer<typeof accountProfileSchema>;
+
+export const accountBalanceSchema = z
+  .object({
+    balance: z.number(),
+    currency: z.string(),
+  })
+  .passthrough();
+
+export type AccountBalance = z.infer<typeof accountBalanceSchema>;
+
+/** GET /access — what the bearer may do; the only role signal the API exposes. */
+export const accountAccessSchema = z
+  .object({
+    impersonation: z.boolean(),
+  })
+  .passthrough();
+
+export type AccountAccess = z.infer<typeof accountAccessSchema>;
+
+export const paymentSystemCurrencySchema = z
+  .object({
+    currency: z.string(),
+    currencyId: z.number(),
+    commission: z.number(),
+    constCommission: z.number(),
+    min: z.number(),
+    // null means the system sets no upper bound on a deposit.
+    max: z.number().nullable(),
+    // null means the platform has no rate for this currency, so the credited
+    // amount cannot be predicted client-side.
+    exchangeRateToAccountCurrency: z.number().nullable(),
+  })
+  .passthrough();
+
+export type PaymentSystemCurrency = z.infer<typeof paymentSystemCurrencySchema>;
+
+export const paymentSystemSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    isManualThroughManager: z.boolean(),
+    isPromocodeAvailable: z.boolean(),
+    taxPercent: z.number(),
+    currencies: z.array(paymentSystemCurrencySchema),
+  })
+  .passthrough();
+
+export type PaymentSystem = z.infer<typeof paymentSystemSchema>;
+
+export const paymentSystemsSchema = z
+  .object({
+    paymentSystems: z.array(paymentSystemSchema),
+  })
+  .passthrough();
+
+export type PaymentSystems = z.infer<typeof paymentSystemsSchema>;
+
+export const dayMoneyLimitSchema = z
+  .object({
+    // 0 means the account has no daily cap. Named `limit` because the endpoint
+    // already scopes it — `dayMoneyLimit` is the per-campaign budget.
+    limit: z.number(),
+    // null means this account may not change the limit at all.
+    minimum: z.number().nullable(),
+    currency: z.string(),
+  })
+  .passthrough();
+
+export type DayMoneyLimit = z.infer<typeof dayMoneyLimitSchema>;
+
 export const creativeCreateResponseSchema = z
   .object({
     id: z.number(),
@@ -144,6 +237,144 @@ export const folderCreateResponseSchema = z
     id: z.number(),
   })
   .passthrough();
+
+export const folderViewSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    isDefault: z.boolean().optional().default(false),
+    isArchived: z.boolean().optional().default(false),
+    limitsEnabled: z.boolean().optional().default(false),
+    groupDailyLimit: z.number().optional().default(0),
+    groupTotalLimit: z.number().optional().default(0),
+    groupSpendingEvenly: z.boolean().optional().default(false),
+    groupBlockStatus: z.number().optional().default(0),
+  })
+  .passthrough();
+
+export type FolderView = z.infer<typeof folderViewSchema>;
+
+export const folderBulkActionResultSchema = z
+  .object({
+    folders: z.array(
+      z
+        .object({
+          id: z.number(),
+          success: z.boolean(),
+          campaignsTotal: z.number(),
+          campaignsProcessed: z.number(),
+        })
+        .passthrough(),
+    ),
+    totalFolders: z.number(),
+    processedFolders: z.number(),
+  })
+  .passthrough();
+
+export type FolderBulkActionResult = z.infer<typeof folderBulkActionResultSchema>;
+
+/**
+ * Bulk campaign actions (activate/pause/archive/restore/delete/move) report each campaign separately:
+ * a campaign the backend refused still arrives inside a 200 with `success: false`.
+ */
+export const campaignBulkActionSchema = z
+  .object({
+    campaigns: z.array(z.object({ id: z.number(), success: z.boolean() }).passthrough()),
+    totalCampaigns: z.number(),
+    processedCampaigns: z.number(),
+  })
+  .passthrough();
+
+export type CampaignBulkAction = z.infer<typeof campaignBulkActionSchema>;
+
+/**
+ * Campaign copy. The campaign is created even when creatives fail to come across, so
+ * `failed`/`errors` describe a partial result, not a rejected request.
+ */
+export const campaignCopyResultSchema = z
+  .object({
+    id: z.number(),
+    successful: z.number(),
+    failed: z.number(),
+    errors: z.array(z.string()).default([]),
+    bidsJobId: z.string().nullable().default(null),
+  })
+  .passthrough();
+
+export type CampaignCopyResult = z.infer<typeof campaignCopyResultSchema>;
+
+/**
+ * Bulk URL replace. Campaigns without a match are absent from `campaigns`, so the list is
+ * the result, not an echo of the request.
+ */
+export const campaignUrlReplaceResultSchema = z
+  .object({
+    mode: z.string(),
+    find: z.string(),
+    replace: z.string(),
+    campaigns: z.array(
+      z
+        .object({
+          campaignId: z.number(),
+          name: z.string(),
+          creativesCount: z.number(),
+          oldValue: z.string().nullable().default(null),
+          newValue: z.string().nullable().default(null),
+          source: z.string().nullable().default(null),
+        })
+        .passthrough(),
+    ),
+    totalCampaigns: z.number(),
+    totalCreatives: z.number(),
+  })
+  .passthrough();
+
+export type CampaignUrlReplaceResult = z.infer<typeof campaignUrlReplaceResultSchema>;
+
+/**
+ * Traffic forecast. An empty curve with `hasEnoughData: false` is a valid answer: yesterday's
+ * auction had too little traffic for this targeting, which is not the same as zero traffic.
+ */
+export const campaignForecastResultSchema = z
+  .object({
+    forecast: z.array(z.object({ bid: z.number(), traffic: z.number() }).passthrough()),
+    hasEnoughData: z.boolean(),
+  })
+  .passthrough();
+
+export type CampaignForecastResult = z.infer<typeof campaignForecastResultSchema>;
+
+const blockedSspSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    visits: z.number(),
+    clicks: z.number(),
+    views: z.number(),
+  })
+  .passthrough();
+
+export const campaignBlockedSspsSchema = z
+  .object({
+    category: z.string().nullish(),
+    payModel: z.string().nullish(),
+    totalClicks: z.number().nullish(),
+    totalViews: z.number().nullish(),
+    byCategory: z.array(blockedSspSchema),
+    byTags: z.array(
+      z
+        .object({
+          id: z.number(),
+          name: z.string(),
+          description: z.string().nullish(),
+          ssps: z.array(blockedSspSchema),
+        })
+        .passthrough(),
+    ),
+  })
+  .passthrough();
+
+export type CampaignBlockedSsps = z.infer<typeof campaignBlockedSspsSchema>;
 
 // --- Autorules (CPC campaign automation) ---
 export const autoruleConditionSchema = z
@@ -204,3 +435,60 @@ export const extendedBidsResultSchema = z
 export const extendedBidsUpdateResponseSchema = z
   .object({ affectedCampaigns: z.number().optional() })
   .passthrough();
+
+// --- Dictionaries ---
+
+/**
+ * One reference entry from GET /dictionaries/{type}.
+ * `id` is an integer everywhere except the pseudo category `mainstream`.
+ * `slug` is campaign-types only; `countryId`/`countryLabel` are isps only;
+ * `children` is present on the tree dictionaries (platforms, devices, categories).
+ */
+export interface DictionaryItem {
+  id: number | string;
+  label: string;
+  slug?: string;
+  countryId?: number;
+  countryLabel?: string | null;
+  /** countries only: ISO 3166-1 alpha-2 code. */
+  geoCountry?: string;
+  /** regions only: ISO 3166-2 subdivision code. */
+  isoCode?: string;
+  /** cities only: the region the city belongs to. */
+  regionId?: number;
+  /** conversion-templates only: postback status strings a campaign's `conversion` field needs. */
+  approved?: string;
+  hold?: string;
+  reject?: string;
+  children?: DictionaryItem[];
+}
+
+export const dictionaryItemSchema: z.ZodType<DictionaryItem> = z.lazy(() =>
+  z
+    .object({
+      id: z.union([z.number(), z.string()]),
+      label: z.string(),
+      slug: z.string().optional(),
+      countryId: z.number().optional(),
+      countryLabel: z.string().nullable().optional(),
+      geoCountry: z.string().optional(),
+      isoCode: z.string().optional(),
+      regionId: z.number().optional(),
+      approved: z.string().optional(),
+      hold: z.string().optional(),
+      reject: z.string().optional(),
+      children: z.array(dictionaryItemSchema).optional(),
+    })
+    .passthrough(),
+);
+
+/** `total` ignores pagination, so for `isps` it can exceed `items.length`. */
+export const dictionaryResultSchema = z
+  .object({
+    type: z.string(),
+    total: z.number().default(0),
+    items: z.array(dictionaryItemSchema).default([]),
+  })
+  .passthrough();
+
+export type DictionaryResult = z.infer<typeof dictionaryResultSchema>;

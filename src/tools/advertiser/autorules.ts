@@ -183,7 +183,11 @@ export const autorulesModule: ToolModule = {
       {
         name: "kadam_adv_create_autorule",
         description:
-          "Create an autorule on a CPC campaign (autorules are CPC-only). Campaigns usually carry several rules (a strategy); call once per rule. bidChange rules require slices + bidRate + bidMax and a spend/clicks condition.",
+          "Create an autorule on a CPC campaign (autorules are CPC-only). Campaigns usually carry " +
+          "several rules (a strategy); call once per rule. bidChange rules require slices + bidRate + " +
+          "bidMax and a spend/clicks condition. A client token holds at most 5 rules per campaign and " +
+          "300 per account — going over either is refused, so delete a rule before adding one. A token " +
+          "issued to Kadam staff for this account is not bound by those two limits.",
         product: "advertiser",
         annotations: { title: "Create autorule", readOnlyHint: false },
       },

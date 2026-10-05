@@ -45,6 +45,10 @@ const FULL_CAMPAIGN = {
   audiences: { mode: 20, include: [555], exclude: [777] },
   sites: { mode: 1, list: [1001, 1002] },
   ssps: { mode: true, list: [42] },
+  macrosGroups: { mode: 1, include: [10101], exclude: [], blocked: [10103] },
+  maxCpm: 1.5,
+  videoFormats: ["instream", "outstream"],
+  autorules: [8, 9],
   disableProxy: 1,
   conversion: { id: 0, approved: "dep", hold: "reg", reject: "" },
   postConversion: {
@@ -81,6 +85,24 @@ describe("kadam_adv_get_campaign", () => {
     expect(text).toContain("Total budget: 5000");
   });
 
+  it("shows the CPM ceiling, video formats and autorule ids without inlining the rules", async () => {
+    const { client, mockApi } = await createToolClient(campaignDetailModule);
+    const api = mockApi as MockPartnersClient;
+    api.getCampaign.mockResolvedValue(FULL_CAMPAIGN);
+
+    const text = getTextFromResult(
+      await client.callTool({ name: "kadam_adv_get_campaign", arguments: { id: 1 } }),
+    );
+
+    expect(text).toContain("CPM ceiling: 1.5");
+    expect(text).toContain("Video formats: instream, outstream");
+    expect(text).toContain("Autorule IDs: 8, 9");
+    // Поля названы явно, а не свалены в passthrough-секцию для неизвестных ключей.
+    const passthrough = text.slice(text.indexOf("## Other fields"));
+    expect(passthrough).not.toContain("maxCpm");
+    expect(passthrough).not.toContain("autorules");
+  });
+
   it("resolves bid countries to ISO codes and targeting IDs to labels", async () => {
     const { client, mockApi } = await createToolClient(campaignDetailModule);
     const api = mockApi as MockPartnersClient;
@@ -100,6 +122,10 @@ describe("kadam_adv_get_campaign", () => {
     expect(text).toContain("Sites whitelist: 1001, 1002");
     expect(text).toContain("Audiences include: 555");
     expect(text).toContain("Audiences exclude: 777");
+    expect(text).toContain("Site groups include: 10101");
+    expect(text).toContain("Site groups blocked: 10103");
+    // An empty list is not a setting; printing it would read as a restriction.
+    expect(text).not.toContain("Site groups exclude");
   });
 
   it("summarizes schedule, caps, and conversion settings", async () => {

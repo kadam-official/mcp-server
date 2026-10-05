@@ -3,8 +3,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolWrapper } from "../../src/middleware/tool-wrapper.js";
 import type { ToolModule } from "../../src/types/tool-module.js";
+import { CLIENT_ACCESS, type SessionAccess } from "../../src/types/access.js";
 import { ClientPool } from "../../src/api/client-pool.js";
 import { vi } from "vitest";
+
+/** Session role for a test client; the default mirrors production (client catalog). */
+export const IMPERSONATION: SessionAccess = { impersonation: true };
 
 export function createMockClientPool(): ClientPool {
   const pool = new ClientPool({
@@ -89,14 +93,26 @@ export function createMockPartnersClient() {
     listCampaigns: vi.fn(),
     getCampaign: vi.fn(),
     createCampaign: vi.fn(),
+    validateCampaign: vi.fn(),
     updateCampaign: vi.fn(),
     setCampaignStatus: vi.fn(),
+    deleteCampaigns: vi.fn(),
+    moveCampaigns: vi.fn(),
+    copyCampaign: vi.fn(),
+    bulkReplaceCampaignUrls: vi.fn(),
+    getCampaignForecast: vi.fn(),
+    getCampaignBlockedSsps: vi.fn(),
+    setCampaignEasyStart: vi.fn(),
+    setCampaignRss: vi.fn(),
     updateCampaignBid: vi.fn(),
     bulkUpdateCampaignBids: vi.fn(),
     updateSiteBids: vi.fn(),
+    blockStatsSites: vi.fn(),
     listCampaignFolders: vi.fn(),
     createCampaignFolder: vi.fn(),
+    getCampaignFolder: vi.fn(),
     updateCampaignFolder: vi.fn(),
+    setCampaignFolderStatus: vi.fn(),
     listAudiences: vi.fn(),
     getAudience: vi.fn(),
     createAudience: vi.fn(),
@@ -107,7 +123,26 @@ export function createMockPartnersClient() {
     createCreative: vi.fn(),
     updateCreative: vi.fn(),
     setCreativeStatus: vi.fn(),
+    deleteCreatives: vi.fn(),
+    copyCreatives: vi.fn(),
+    moveCreatives: vi.fn(),
+    setCreativeBids: vi.fn(),
+    getCreativeBlockedSsps: vi.fn(),
+    uploadBulkImages: vi.fn(),
+    createBulkCreatives: vi.fn(),
+    getBulkJob: vi.fn(),
+    getCreativeTestConversion: vi.fn(),
+    getAudienceParams: vi.fn(),
+    getFilteredAudienceSources: vi.fn(),
+    validateAudience: vi.fn(),
+    setAudienceParams: vi.fn(),
     listFinanceOperations: vi.fn(),
+    getAccountProfile: vi.fn(),
+    getAccountBalance: vi.fn(),
+    getAccess: vi.fn(),
+    listPaymentSystems: vi.fn(),
+    getDayMoneyLimit: vi.fn(),
+    setDayMoneyLimit: vi.fn(),
     getReportConfig: vi.fn(),
     getReportData: vi.fn(),
     getSiteStats: vi.fn(),
@@ -122,6 +157,11 @@ export function createMockPartnersClient() {
     getExtendedStats: vi.fn(),
     listExtendedBids: vi.fn(),
     updateExtendedBids: vi.fn(),
+    resetExtendedBids: vi.fn(),
+    toggleAutoruleSliceBlock: vi.fn(),
+    getCampaignAutoruleSlices: vi.fn(),
+    getCampaignBidRestrictions: vi.fn(),
+    getDictionary: vi.fn(),
   };
 }
 
@@ -159,6 +199,7 @@ export type MockPubClient = ReturnType<typeof createMockPubClient>;
 export async function createToolClient(
   module: ToolModule,
   mockApi?: MockPartnersClient | MockPubClient,
+  access: SessionAccess = CLIENT_ACCESS,
 ) {
   const pool = createMockClientPool();
 
@@ -175,7 +216,7 @@ export async function createToolClient(
   });
 
   const server = new McpServer({ name: "test", version: "0.0.1" });
-  const wrapper = new ToolWrapper(server, pool, { advKey: "test-key", pubKey: "test-key" });
+  const wrapper = new ToolWrapper(server, pool, { advKey: "test-key", pubKey: "test-key" }, access);
   module.register(wrapper);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

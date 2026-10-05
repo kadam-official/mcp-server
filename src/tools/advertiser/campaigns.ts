@@ -8,10 +8,34 @@ import {
   ADV_STATUS_ACTION_MAP,
   CAMPAIGN_LIST_STATUS_FILTER,
   parseCommaSeparatedIds,
+  requireUniqueIds,
 } from "../../utils/status-actions.js";
-import type { CampaignRow } from "../../api/schemas/advertiser.js";
+import type { CampaignBulkAction, CampaignRow } from "../../api/schemas/advertiser.js";
 import { flattenCategoryIds } from "../../api/options-registry.js";
 import type { OptionsRegistry, CampaignOptions } from "../../api/options-registry.js";
+
+/**
+ * Bulk actions answer with HTTP 200 even when the backend refused some campaigns, so the
+ * refused IDs have to be surfaced — otherwise the model reports work that never happened.
+ */
+const STATE_REFUSAL_REASON = "current campaign state does not allow it";
+
+function formatBulkActionResult(
+  result: CampaignBulkAction,
+  actionLabel: string,
+  refusalReason: string = STATE_REFUSAL_REASON,
+): string {
+  const applied = result.campaigns.filter((c) => c.success).map((c) => `#${c.id}`);
+  const refused = result.campaigns.filter((c) => !c.success).map((c) => `#${c.id}`);
+
+  const lines = [`${applied.length}/${result.totalCampaigns} campaigns ${actionLabel}`];
+  if (applied.length) lines.push(`Applied: ${applied.join(", ")}`);
+  if (refused.length) {
+    lines.push(`Not ${actionLabel} (${refusalReason}): ${refused.join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
 
 function formatCampaignRow(row: CampaignRow, index: number): string {
   const c = row.campaign;
@@ -108,6 +132,29 @@ const CAMPAIGN_WRITABLE_FIELDS = new Set<string>([
   "audienceEngagementLevels",
 ]);
 
+/**
+ * Manager-level campaign switches. The API returns them as null for a client token and
+ * accepts that null back unchanged (the field is treated as "not provided"), so a
+ * read-modify-write never has to special-case them. The tools only *ask* for them under
+ * impersonation — see {@link managerCampaignFields} — because a client token that sends
+ * a real value gets 422 "unknown field".
+ */
+const MANAGER_CAMPAIGN_FLAGS = [
+  "hasCorrectPostback",
+  "isDirectTrafficPriority",
+  "allowMultiAds",
+] as const;
+
+type ManagerCampaignFlag = (typeof MANAGER_CAMPAIGN_FLAGS)[number];
+
+/**
+ * Fields the campaign detail returns in a different shape than the update accepts, so
+ * they must not be echoed back. `autorules` is the case: the card lists rule IDs, while
+ * the update expects full rule definitions — sending the IDs back fails validation on
+ * every read-modify-write. Rules are managed through the autorule tools instead.
+ */
+const NON_ROUND_TRIP_FIELDS = new Set<string>(["autorules"]);
+
 /** Canonical Audience Engagement slugs in canonical (highest-first) order. */
 const AUDIENCE_ENGAGEMENT_SLUGS = ["very_high", "high", "medium", "low", "not_rated"] as const;
 
@@ -137,7 +184,9 @@ function parseAudienceEngagementLevels(raw: string): string[] {
 function pickWritable(current: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of CAMPAIGN_WRITABLE_FIELDS) {
-    if (current[key] !== undefined) out[key] = current[key];
+    if (current[key] === undefined) continue;
+    if (NON_ROUND_TRIP_FIELDS.has(key)) continue;
+    out[key] = current[key];
   }
   return out;
 }
@@ -164,6 +213,12 @@ async function mapField(
       break;
     case "evenDistribution":
       mapped.isEvenDistribution = value;
+      break;
+    case "hasCorrectPostback":
+    case "isDirectTrafficPriority":
+    case "allowMultiAds":
+      // Only present under impersonation; the API stores these as 0/1 like the other flags.
+      mapped[key] = value ? 1 : 0;
       break;
     case "bid": {
       const bidVal = value as number;
@@ -244,6 +299,11 @@ const FULL_WEEK_SCHEDULE = {
   })),
 };
 
+/**
+ * Values the API expects on create but the tools do not ask the agent for. None of the
+ * {@link MANAGER_CAMPAIGN_FLAGS} belongs here: sending such a key — even with a falsy
+ * value — is a 422 for a client token, and the API applies its own default when absent.
+ */
 const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   connectionType: 3,
   disableProxy: 1,
@@ -270,13 +330,11 @@ const CAMPAIGN_DEFAULTS: Record<string, unknown> = {
   dayClickLimit: 0,
   dayConversionsLimit: 0,
   isConversionFromPostback: 0,
-  allowMultiAds: 0,
   time: FULL_WEEK_SCHEDULE,
   timezone: 0,
   startDate: null,
   stopDate: null,
   autorules: [],
-  proxies: [],
   conversion: null,
   platformVersions: null,
   devices: null,
@@ -320,6 +378,35 @@ function validateCpType(typeId: number, cpTypeId: number, opts: CampaignOptions)
       `Pricing model ${cpTypeId} is not available for this campaign type. Available: ${available}`,
     );
   }
+}
+
+/**
+ * CampaignConversion. A positive template id is sent alone. Custom mapping
+ * (tool argument 0, or no id) sends approved/hold/reject and omits id —
+ * id 0 is not a template and the API rejects it.
+ */
+function buildConversionPayload(
+  fields: Record<string, unknown>,
+  current?: Record<string, unknown>,
+): Record<string, unknown> {
+  const rawId =
+    fields.conversionTemplateId !== undefined ? fields.conversionTemplateId : current?.id;
+  const templateId = rawId == null || rawId === "" ? 0 : Number(rawId);
+  if (Number.isFinite(templateId) && templateId > 0) {
+    return { id: templateId };
+  }
+
+  const status = (field: unknown, fallback: unknown): string => {
+    if (typeof field === "string") return field;
+    if (typeof fallback === "string") return fallback;
+    return "";
+  };
+
+  return {
+    approved: status(fields.conversionApproved, current?.approved),
+    hold: status(fields.conversionHold, current?.hold),
+    reject: status(fields.conversionReject, current?.reject),
+  };
 }
 
 function buildPostConversion(fields: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -403,20 +490,11 @@ export async function mapCampaignFields(
     validateCpType(typeId, mapped.cpType as number, opts);
   }
 
-  const bids = mapped.bids as Array<Record<string, unknown>> | undefined;
-  if (bids?.[0]) {
-    const bidVal = (bids[0].bid ?? bids[0].leadCost) as number | undefined;
-    if (bidVal != null && opts.bidCoefficients) {
-      const cpType = mapped.cpType as number;
-      const maxKey = cpType === 2 ? "maxWithoutStatCPM" : "maxWithoutStatCPC";
-      const maxBid = opts.bidCoefficients[maxKey];
-      if (maxBid != null && bidVal > maxBid) {
-        throw new Error(
-          `Bid ${bidVal} exceeds maximum ${maxBid} for this account. Reduce bid or contact support.`,
-        );
-      }
-    }
-  }
+  // The bid ceiling is not a property of the account: it depends on the token. An ordinary
+  // token is held to the forecast-derived cap, a token impersonating a manager only to the
+  // currency cap, and an admin-tier one to nothing but a positive bid. This server forwards
+  // the bearer untouched and cannot tell which it is, so the cap is left to the API, which
+  // answers 422 with the applicable maximum in the message.
 
   mapped.audiences = buildAudiences(fields);
 
@@ -439,13 +517,13 @@ export async function mapCampaignFields(
     };
   }
 
-  if (fields.conversionTemplateId != null || fields.conversionApproved != null) {
-    mapped.conversion = {
-      id: (fields.conversionTemplateId as number) ?? 0,
-      approved: (fields.conversionApproved as string) ?? "",
-      hold: (fields.conversionHold as string) ?? "",
-      reject: (fields.conversionReject as string) ?? "",
-    };
+  if (
+    fields.conversionTemplateId != null ||
+    fields.conversionApproved != null ||
+    fields.conversionHold != null ||
+    fields.conversionReject != null
+  ) {
+    mapped.conversion = buildConversionPayload(fields);
   }
 
   const customPostConversion = buildPostConversion(fields);
@@ -548,22 +626,26 @@ const campaignBudgetFields = {
     .number()
     .optional()
     .describe(
-      "Conversion template ID (from campaign options). Use 0 for custom mapping via conversionApproved/Hold/Reject",
+      "Conversion template id from conversion-templates. Omit or pass 0 for a custom mapping: approved/hold/reject are sent and id is not. A positive id selects that template; the status names are then taken from the template and are not sent.",
     ),
   conversionApproved: z
     .string()
     .optional()
     .describe(
-      "Postback status name for 'Approved' conversions (e.g. 'dep'); used with conversionTemplateId=0",
+      "Custom postback status name for Approved (e.g. 'dep'). Sent only for a custom mapping, without a template id.",
     ),
   conversionHold: z
     .string()
     .optional()
-    .describe("Postback status name for 'Hold' conversions (e.g. 'reg')"),
+    .describe(
+      "Custom postback status name for Hold (e.g. 'reg'). Sent only for a custom mapping, without a template id.",
+    ),
   conversionReject: z
     .string()
     .optional()
-    .describe("Postback status name for 'Rejected' conversions"),
+    .describe(
+      "Custom postback status name for Rejected. Sent only for a custom mapping, without a template id.",
+    ),
 };
 
 const trafficSourceFields = {
@@ -616,9 +698,54 @@ const postConversionFields = {
     .describe("Comma-separated audience IDs for post-conversion retargeting"),
 };
 
+/**
+ * Input fields that exist only in an impersonation session. A client session's create /
+ * update schema does not mention them at all, so the model cannot be tempted into a 422.
+ */
+const managerCampaignFields = {
+  hasCorrectPostback: z
+    .boolean()
+    .optional()
+    .describe(
+      "Manager-only: the advertiser's postback is verified, so CPA conversions count. " +
+        "Omit unless you have actually confirmed the postback — on create an omitted flag means " +
+        "'not verified' (false); on update an omitted flag keeps the stored value.",
+    ),
+  isDirectTrafficPriority: z
+    .boolean()
+    .optional()
+    .describe("Manager-only: prefer direct (non-SSP) traffic for this campaign"),
+  allowMultiAds: z
+    .boolean()
+    .optional()
+    .describe("Manager-only: allow several creatives of this campaign in one ad block"),
+};
+
+/**
+ * Shape to spread into the campaign write schemas for this session's role. The static
+ * type keeps the keys in both cases — every one is optional, and for a client session
+ * they are simply never present — while the runtime schema omits them entirely.
+ */
+function managerFieldsFor(wrapper: ToolWrapper): typeof managerCampaignFields {
+  return (wrapper.impersonation ? managerCampaignFields : {}) as typeof managerCampaignFields;
+}
+
+/** Copy the manager flags the agent set into the merged update payload as 0/1. */
+function applyManagerFlags(
+  changes: Partial<Record<ManagerCampaignFlag, boolean>>,
+  merged: Record<string, unknown>,
+): void {
+  for (const flag of MANAGER_CAMPAIGN_FLAGS) {
+    const value = changes[flag];
+    if (value != null) merged[flag] = value ? 1 : 0;
+  }
+}
+
 export const campaignsModule: ToolModule = {
   product: "advertiser",
   register(wrapper: ToolWrapper) {
+    const managerFields = managerFieldsFor(wrapper);
+
     wrapper.register(
       {
         name: "kadam_adv_list_campaigns",
@@ -678,7 +805,9 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_create_campaign",
         description:
-          "Create a new advertiser campaign. Required: type, name, url, folderId (campaign group ID), pricingModel, bid, dailyBudget.",
+          "Create a new advertiser campaign. Required: type, name, url, folderId (campaign group ID), pricingModel, bid, dailyBudget. " +
+          "Pass dryRun: true to only check the payload — nothing is created and the same field errors are reported, " +
+          "which is the cheap way to find out whether bids, targeting and limits are acceptable before committing.",
         product: "advertiser",
         annotations: { title: "Create campaign", readOnlyHint: false },
       },
@@ -700,19 +829,33 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
+        ...managerFields,
         ...trafficSourceFields,
         countries: z
           .string()
           .describe(
             "Comma-separated ISO country codes for bid targeting (e.g. 'US,DE,BR'). Required.",
           ),
+        dryRun: z.boolean().default(false).describe("Validate the payload and create nothing"),
       },
       async (args, ctx) => {
         const mappedArgs = { ...args } as Record<string, unknown>;
+        delete mappedArgs.dryRun;
         if (args.categories) {
           mappedArgs.categories = parseCategoryInput(args.categories);
         }
+        // The flag column is NOT NULL and only a manager may write it: a new campaign
+        // whose postback nobody confirmed is "not verified", not "unknown".
+        if (wrapper.impersonation && mappedArgs.hasCorrectPostback == null) {
+          mappedArgs.hasCorrectPostback = false;
+        }
         const mappedData = await mapCampaignFields(mappedArgs, ctx.adv.options);
+
+        if (args.dryRun) {
+          await ctx.adv.validateCampaign(mappedData);
+          return `Payload for "${args.name}" is valid. Nothing was created — re-run without dryRun to create the campaign.`;
+        }
+
         const result = await ctx.adv.createCampaign(mappedData);
         return `Campaign created: [ID: ${result.id}] "${args.name}" in campaign group #${args.folderId}`;
       },
@@ -749,6 +892,7 @@ export const campaignsModule: ToolModule = {
         ...campaignTargetingFields,
         ...campaignBudgetFields,
         ...postConversionFields,
+        ...managerFields,
         ...trafficSourceFields,
       },
       async (args, ctx) => {
@@ -758,6 +902,8 @@ export const campaignsModule: ToolModule = {
 
         const cpType = merged.cpType as number | undefined;
         const registry = ctx.adv.options;
+
+        applyManagerFlags(changes, merged);
 
         if (changes.name != null) merged.name = changes.name;
         if (changes.url != null) merged.url = changes.url;
@@ -904,12 +1050,7 @@ export const campaignsModule: ToolModule = {
           changes.conversionReject != null
         ) {
           const currentConv = (merged.conversion ?? {}) as Record<string, unknown>;
-          merged.conversion = {
-            id: changes.conversionTemplateId ?? currentConv.id ?? 0,
-            approved: changes.conversionApproved ?? currentConv.approved ?? "",
-            hold: changes.conversionHold ?? currentConv.hold ?? "",
-            reject: changes.conversionReject ?? currentConv.reject ?? "",
-          };
+          merged.conversion = buildConversionPayload(changes, currentConv);
         }
 
         if (changes.trafficSources != null) merged.trafficSources = changes.trafficSources;
@@ -944,20 +1085,81 @@ export const campaignsModule: ToolModule = {
       {
         name: "kadam_adv_set_campaign_status",
         description:
-          "Set status for multiple campaigns. Pass comma-separated IDs and status: active, paused, or archived.",
+          "Set status for multiple campaigns. Pass comma-separated IDs and status: active, paused, archived, " +
+          "or restored (take out of the archive). The API answers per campaign, so some IDs can be refused " +
+          "while others succeed.",
         product: "advertiser",
         annotations: { title: "Set campaign status", idempotentHint: true },
       },
       {
         ids: z.string().min(1),
-        status: z.enum(["active", "paused", "archived"]),
+        status: z.enum(["active", "paused", "archived", "restored"]),
       },
       async (args, ctx) => {
         const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds);
         const action = ADV_STATUS_ACTION_MAP[args.status];
-        await ctx.adv.setCampaignStatus(parsedIds, action);
-        const idList = parsedIds.map((id) => `#${id}`).join(", ");
-        return `${parsedIds.length} campaigns set to ${args.status}: ${idList}`;
+        const result = await ctx.adv.setCampaignStatus(parsedIds, action);
+
+        return formatBulkActionResult(result, `set to ${args.status}`);
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_delete_campaigns",
+        description:
+          "Permanently delete campaigns together with their creatives. Requires confirm=true. " +
+          "A campaign must be archived first (use set_campaign_status with status=archived), otherwise " +
+          "the whole call is rejected. Retrying a call that already deleted the campaigns is rejected too, " +
+          "since deleted campaigns are no longer addressable.",
+        product: "advertiser",
+        annotations: { title: "Delete campaigns", destructiveHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated campaign IDs"),
+        confirm: z.literal(true),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        requireUniqueIds(parsedIds);
+        const result = await ctx.adv.deleteCampaigns(parsedIds);
+
+        return formatBulkActionResult(result, "deleted");
+      },
+    );
+
+    wrapper.register(
+      {
+        name: "kadam_adv_move_campaigns",
+        description:
+          "Move one or more campaigns to a campaign group. Pass comma-separated campaign IDs and the target campaign group ID. Validation errors reject the whole request; a successful response means every requested campaign was moved.",
+        product: "advertiser",
+        annotations: { title: "Move campaigns to group", idempotentHint: true },
+      },
+      {
+        ids: z.string().min(1).describe("Comma-separated campaign IDs"),
+        folderId: z.number().int().positive().describe("Target campaign group ID"),
+      },
+      async (args, ctx) => {
+        const parsedIds = parseCommaSeparatedIds(args.ids);
+        if (parsedIds.length === 0) {
+          throw new Error("At least one valid campaign ID is required.");
+        }
+        if (parsedIds.length > 100) {
+          throw new Error("No more than 100 campaigns can be moved at once.");
+        }
+        requireUniqueIds(parsedIds);
+        const result = await ctx.adv.moveCampaigns(parsedIds, args.folderId);
+
+        // Move is all-or-nothing on the backend: an id the account does not own rejects the
+        // whole request with 422. A per-id refusal inside a 200 would mean the move itself
+        // failed, not that the campaign state forbids it.
+        return formatBulkActionResult(
+          result,
+          `moved to campaign group #${args.folderId}`,
+          "the backend refused the move",
+        );
       },
     );
 

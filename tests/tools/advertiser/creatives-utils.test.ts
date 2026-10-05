@@ -1,4 +1,4 @@
-import { parseImageDimensions } from "../../../src/tools/advertiser/creatives.js";
+import { parseImageDimensions } from "../../../src/utils/files.js";
 
 describe("parseImageDimensions", () => {
   it("parses PNG dimensions from IHDR chunk", () => {

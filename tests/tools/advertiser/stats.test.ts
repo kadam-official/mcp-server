@@ -300,3 +300,37 @@ describe("advertiser stats tools", () => {
     expect(params.sort).toEqual({ conversionTime: "asc" });
   });
 });
+
+describe("kadam_adv_block_sites", () => {
+  it("blocks the listed sites in every listed campaign", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.blockStatsSites.mockResolvedValue({ campaignsCount: 2, sitesCount: 2 } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_block_sites",
+        arguments: { campaignIds: "10,11", zones: "100,200", blocked: true },
+      }),
+    );
+
+    expect(api.blockStatsSites).toHaveBeenCalledWith([10, 11], [100, 200], true);
+    expect(text).toContain("Blocked 2 site(s) in 2 campaign(s)");
+  });
+
+  it("unblocks when blocked=false", async () => {
+    const { client, mockApi } = await createToolClient(statsModule);
+    const api = mockApi as MockPartnersClient;
+    api.blockStatsSites.mockResolvedValue({ campaignsCount: 1, sitesCount: 1 } as never);
+
+    const text = getTextFromResult(
+      await client.callTool({
+        name: "kadam_adv_block_sites",
+        arguments: { campaignIds: "10", zones: "100", blocked: false },
+      }),
+    );
+
+    expect(api.blockStatsSites).toHaveBeenCalledWith([10], [100], false);
+    expect(text).toContain("Unblocked 1 site(s)");
+  });
+});

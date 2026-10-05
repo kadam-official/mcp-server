@@ -6,6 +6,7 @@ import { createSessionServer } from "../src/http-bootstrap.js";
 import { getCreativeFormatsContent } from "../src/resources/creative-formats.js";
 import type { CabinetType } from "../src/http-session.js";
 import type { ToolCredentials } from "../src/middleware/tool-wrapper.js";
+import type { SessionAccess } from "../src/types/access.js";
 
 vi.mock("../src/logger.js", () => ({
   logger: {
@@ -37,6 +38,7 @@ async function withSession<T>(
   cabinet: CabinetType,
   credentials: ToolCredentials,
   fn: (client: Client) => Promise<T>,
+  access?: SessionAccess,
 ): Promise<T> {
   const pool = new ClientPool({
     advBaseUrl: "https://partners.kadam.net/api/v1",
@@ -46,7 +48,7 @@ async function withSession<T>(
     adv: { options: mockRegistry() } as never,
     pub: null,
   });
-  const server = createSessionServer(pool, cabinet, credentials);
+  const server = createSessionServer(pool, cabinet, credentials, access);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test", version: "0.0.1" });
   await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -141,6 +143,44 @@ describe("resource cabinet scoping", () => {
     expect(ov).toContain("pub.kadam.net");
     expect(ov).not.toContain("partners.kadam.net");
     expect(ov).not.toContain("Advertisers:");
+  });
+});
+
+/**
+ * The HTTP session is built with the role the bearer resolved to; without one it
+ * must fall back to the client catalog (the safe side), never the manager one.
+ */
+describe("HTTP session catalog by role", () => {
+  const listNames = (access?: SessionAccess) =>
+    withSession(
+      "adv",
+      { advKey: "b" },
+      async (client) => (await client.listTools()).tools.map((t) => t.name),
+      access,
+    );
+
+  it("defaults to the client catalog", async () => {
+    const names = await listNames();
+    expect(names).toContain("kadam_adv_list_campaigns");
+    expect(names).not.toContain("kadam_adv_set_easy_start");
+    expect(names).not.toContain("kadam_adv_bulk_replace_urls");
+  });
+
+  it("registers manager-only tools for an impersonation session", async () => {
+    const names = await listNames({ impersonation: true });
+    expect(names).toContain("kadam_adv_set_easy_start");
+    expect(names).toContain("kadam_adv_bulk_replace_urls");
+  });
+
+  it("a publisher session never gets advertiser manager tools, whatever the access", async () => {
+    const names = await withSession(
+      "pub",
+      { pubKey: "b" },
+      async (client) => (await client.listTools()).tools.map((t) => t.name),
+      { impersonation: true },
+    );
+    expect(names.length).toBeGreaterThan(0);
+    expect(names.every((n) => n.startsWith("kadam_pub_"))).toBe(true);
   });
 });
 

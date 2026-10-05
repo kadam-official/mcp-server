@@ -75,10 +75,10 @@
   "overrides": {
     "hono": "^4.13.5",
     "@hono/node-server": "^1.19.15",
-    "body-parser": "^2.2.3",
+    "body-parser": "^2.3.0",
     "fast-uri": "^3.1.6",
     "ip-address": "^10.3.1",
-    "qs": "^6.15.4"
+    "qs": "^6.16.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
