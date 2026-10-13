@@ -162,6 +162,151 @@ describe("creatives tools", () => {
     expect(fd.get("image")).toBeNull();
   });
 
+  function allowBannerSize(api: MockPartnersClient, sizeId: number): void {
+    api.options.getMaterialOptions.mockResolvedValue({
+      sizes: [{ id: sizeId, label: "300x250", width: 300, height: 250 }],
+    });
+  }
+
+  it("create_creative sends an iframe banner as a frame url without uploading a file", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 102 } as never);
+    allowBannerSize(api, 20);
+
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 17,
+        isIframe: true,
+        url: "https://ads.example.com/frame?geo={country}",
+        sizeId: 20,
+        name: "Grid white",
+        text: "ignored when name is set",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("isIframe")).toBe("1");
+    expect(fd.get("url")).toBe("https://ads.example.com/frame?geo={country}");
+    expect(fd.get("sizeId")).toBe("20");
+    expect(fd.get("name")).toBe("Grid white");
+    expect(fd.get("image")).toBeNull();
+    expect(fd.get("isHtmlTag")).toBeNull();
+    expect(fd.get("htmlTagCode")).toBeNull();
+  });
+
+  it("create_creative sends an HTML-tag banner without a landing url or a file", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 103 } as never);
+    allowBannerSize(api, 20);
+
+    const markup = '<a href="{click_url}"><img src="https://cdn.example.com/b.gif"></a>';
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 17,
+        isHtmlTag: true,
+        htmlTagCode: markup,
+        sizeId: 20,
+        name: "Mosaic",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("isHtmlTag")).toBe("1");
+    expect(fd.get("htmlTagCode")).toBe(markup);
+    expect(fd.get("sizeId")).toBe("20");
+    expect(fd.get("name")).toBe("Mosaic");
+    expect(fd.get("url")).toBeNull();
+    expect(fd.get("image")).toBeNull();
+    expect(fd.get("isIframe")).toBeNull();
+  });
+
+  it("create_creative refuses an HTML-tag banner without htmlTagCode before calling the api", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    allowBannerSize(api, 20);
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 17,
+        isHtmlTag: true,
+        sizeId: 20,
+      },
+    });
+
+    expect(api.createCreative).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("htmlTagCode");
+  });
+
+  it("create_creative refuses an iframe banner whose url is not https", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    allowBannerSize(api, 20);
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 17,
+        isIframe: true,
+        url: "http://ads.example.com/frame",
+        sizeId: 20,
+      },
+    });
+
+    expect(api.createCreative).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("https");
+  });
+
+  it("create_creative refuses an iframe banner combined with an HTML5 archive", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    allowBannerSize(api, 20);
+
+    const result = await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 17,
+        isIframe: true,
+        url: "https://ads.example.com/frame",
+        sizeId: 20,
+        html5ArchiveUrl: "https://cdn.example.com/banner.zip",
+      },
+    });
+
+    expect(api.createCreative).not.toHaveBeenCalled();
+    expect(getTextFromResult(result)).toContain("only one creative format");
+  });
+
+  it("create_creative does not mark an uploaded image as iframe or HTML tag", async () => {
+    const { client, mockApi } = await createToolClient(creativesModule);
+    const api = mockApi as MockPartnersClient;
+    api.createCreative.mockResolvedValue({ id: 104 } as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(Buffer.from("fake-png"), { status: 200 })),
+    );
+
+    await client.callTool({
+      name: "kadam_adv_create_creative",
+      arguments: {
+        campaignId: 18,
+        url: "https://example.com/landing",
+        imageUrl: "https://cdn.example.com/banner.png",
+      },
+    });
+
+    const fd = api.createCreative.mock.calls[0]![1] as FormData;
+    expect(fd.get("image")).toBeInstanceOf(Blob);
+    expect(fd.get("isIframe")).toBeNull();
+    expect(fd.get("isHtmlTag")).toBeNull();
+    expect(fd.get("url")).toBe("https://example.com/landing");
+    vi.unstubAllGlobals();
+  });
+
   it("set_creative_status with ids 5,6 and status paused calls api with action pause", async () => {
     const { client, mockApi } = await createToolClient(creativesModule);
     const api = mockApi as MockPartnersClient;

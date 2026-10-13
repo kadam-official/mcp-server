@@ -46,15 +46,90 @@ function formatCreativeRow(row: CreativeRow, index: number): string {
   return `${index + 1}. [ID: ${id}] "${title}" | ${campaignInfo} | Status: ${status} | Views: ${row.views} | Clicks: ${row.clicks}`;
 }
 
+const HTML_TAG_CODE_MAX_LENGTH = 32_768;
+
+interface CreateCreativeFormat {
+  url?: string;
+  isIframe?: boolean;
+  isHtmlTag?: boolean;
+  htmlTagCode?: string;
+  html5ArchiveUrl?: string;
+  videoUrl?: string;
+  vastTagUrl?: string;
+  imageUrl?: string;
+  mainImageUrl?: string;
+  sizeId?: number;
+}
+
+/**
+ * Один креатив — один формат. Иначе более поздняя ветка затирает флаг
+ * (isVast переписывает url, isHtml5 переписывает файл) и subtype теряется.
+ */
+function assertSingleCreativeFormat(args: CreateCreativeFormat): void {
+  const chosen: string[] = [];
+  if (args.isIframe) chosen.push("isIframe");
+  if (args.isHtmlTag) chosen.push("isHtmlTag");
+  if (args.html5ArchiveUrl) chosen.push("html5ArchiveUrl");
+  if (args.videoUrl) chosen.push("videoUrl");
+  if (args.vastTagUrl) chosen.push("vastTagUrl");
+
+  if (chosen.length > 1) {
+    throw new Error(`Use only one creative format at a time: ${chosen.join(", ")}.`);
+  }
+
+  if ((args.isIframe || args.isHtmlTag) && (args.imageUrl || args.mainImageUrl)) {
+    throw new Error("An iframe or HTML-tag banner does not take an image.");
+  }
+
+  if (args.isIframe) {
+    if (args.sizeId == null) {
+      throw new Error("An iframe banner requires sizeId.");
+    }
+    if (!args.url || !isHttpsFrameUrl(args.url)) {
+      throw new Error("An iframe banner requires an https url.");
+    }
+    return;
+  }
+
+  if (args.isHtmlTag) {
+    if (args.sizeId == null) {
+      throw new Error("An HTML-tag banner requires sizeId.");
+    }
+    if (!args.htmlTagCode || args.htmlTagCode.trim() === "") {
+      throw new Error("An HTML-tag banner requires htmlTagCode.");
+    }
+    return;
+  }
+
+  if (!args.url) {
+    throw new Error("url is required.");
+  }
+}
+
+function isHttpsFrameUrl(url: string): boolean {
+  // Макрос вроде {country} ломает разбор URL; бэкенд подставляет заглушку так же.
+  const urlForParse = url.replace(/\{[a-z_]+\}/gi, "MACROSTUB");
+  try {
+    const parsed = new URL(urlForParse);
+    return parsed.protocol === "https:" && parsed.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function buildCreativeFormData(args: Record<string, unknown>): FormData {
   const fd = new FormData();
 
-  fd.set("url", String(args.url));
+  if (typeof args.url === "string" && args.url.length > 0) {
+    fd.set("url", args.url);
+  }
   fd.set("isPauseAfterModer", args.pauseAfterModeration ? "1" : "0");
   fd.set("bids", JSON.stringify(args.bids ?? []));
 
   if (args.title != null) fd.set("title", String(args.title));
-  if (args.text != null) fd.set("name", String(args.text));
+  // text — описание push; name — имя креатива. Если заданы оба, в API уходит name.
+  if (args.name != null) fd.set("name", String(args.name));
+  else if (args.text != null) fd.set("name", String(args.text));
   if (args.sizeId != null) fd.set("sizeId", String(args.sizeId));
   if (args.startDate != null) fd.set("startDate", String(args.startDate));
   if (args.stopDate != null) fd.set("stopDate", String(args.stopDate));
@@ -106,16 +181,49 @@ export const creativesModule: ToolModule = {
 - Native: title, url, imageUrl (icon), mainImageUrl
 - Banner: url, imageUrl, sizeId
 - Banner as an HTML5 archive: url, html5ArchiveUrl (.zip), sizeId — needs the HTML5 grant
+- Banner as an iframe: isIframe, url (https frame src), sizeId — needs the HTML5 grant, nothing is uploaded
+- Banner as an HTML tag: isHtmlTag, htmlTagCode, sizeId — needs the HTML5 grant, no landing url; put {click_url} where the click should go
 - Video: title, url, videoUrl (MP4) — uploading a video file is an internal grant; advertisers deliver video as a VAST tag
 - Video as a VAST tag: title, vastTagUrl (https) in a video campaign — needs the VAST grant, nothing is uploaded
 - Popunder: none (campaign URL is the ad)
-See kadam://reference/creative-formats for sizes and exact dimensions.`,
+Use only one format per call. See kadam://reference/creative-formats for sizes and exact dimensions.`,
         product: "advertiser",
         annotations: { title: "Create creative", readOnlyHint: false },
       },
       {
         campaignId: z.number().describe("Campaign ID to add creative to"),
-        url: z.string().url().describe("Landing page URL for the creative"),
+        url: z
+          .string()
+          .url()
+          .optional()
+          .describe(
+            "Landing page URL. Required except for an HTML-tag banner. For an iframe banner this is the https frame src (macros such as {country} are allowed).",
+          ),
+        isIframe: z
+          .boolean()
+          .optional()
+          .describe(
+            "Banner iframe creative: render url in a sandboxed frame. Needs the HTML5 grant. Mutually exclusive with other formats.",
+          ),
+        isHtmlTag: z
+          .boolean()
+          .optional()
+          .describe(
+            "Banner HTML-tag creative: the markup is htmlTagCode and there is no landing url. Needs the HTML5 grant. Put {click_url} where the click should go.",
+          ),
+        htmlTagCode: z
+          .string()
+          .max(HTML_TAG_CODE_MAX_LENGTH)
+          .optional()
+          .describe(
+            "Ad markup for an HTML-tag banner (required when isHtmlTag is true, max 32768 characters). Sent as-is, without a wrapper.",
+          ),
+        name: z
+          .string()
+          .optional()
+          .describe(
+            "Creative name shown in the cabinet. Optional for an iframe or HTML-tag banner. When both name and text are set, name is sent.",
+          ),
         title: z
           .string()
           .optional()
@@ -172,6 +280,8 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
         stopDate: z.string().optional().describe("Creative stop date (YYYY-MM-DD HH:MM:SS)"),
       },
       async (args, ctx) => {
+        assertSingleCreativeFormat(args);
+
         if (args.sizeId != null) {
           await validateSizeId(args.sizeId, ctx.adv.options);
         }
@@ -185,9 +295,10 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
         }
 
         const fd = buildCreativeFormData({
-          url: args.url,
+          url: args.isHtmlTag ? undefined : args.url,
           title: args.title,
           text: args.text,
+          name: args.name,
           sizeId: args.sizeId,
           pauseAfterModeration: args.pauseAfterModeration,
           bids,
@@ -195,44 +306,54 @@ See kadam://reference/creative-formats for sizes and exact dimensions.`,
           stopDate: args.stopDate,
         });
 
-        if (args.imageUrl) {
-          const file = await loadFile(args.imageUrl);
-          fd.set("image", file.blob, file.filename);
-          if (file.width > 0) {
-            fd.set(
-              "imageCrop",
-              JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }),
-            );
+        if (args.isIframe) {
+          fd.set("isIframe", "1");
+        } else if (args.isHtmlTag) {
+          if (!args.htmlTagCode) {
+            throw new Error("An HTML-tag banner requires htmlTagCode.");
           }
-        }
-
-        if (args.mainImageUrl) {
-          const file = await loadFile(args.mainImageUrl);
-          fd.set("rectangleImage", file.blob, file.filename);
-          if (file.width > 0) {
-            fd.set(
-              "rectangleImageCrop",
-              JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }),
-            );
+          fd.set("isHtmlTag", "1");
+          fd.set("htmlTagCode", args.htmlTagCode);
+        } else {
+          if (args.imageUrl) {
+            const file = await loadFile(args.imageUrl);
+            fd.set("image", file.blob, file.filename);
+            if (file.width > 0) {
+              fd.set(
+                "imageCrop",
+                JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }),
+              );
+            }
           }
-        }
 
-        if (args.videoUrl) {
-          const file = await loadFile(args.videoUrl);
-          fd.set("image", file.blob, file.filename);
-          // Без этого флага бэкенд сохранит загруженный файл как обычный баннер.
-          fd.set("isVideo", "1");
-        }
+          if (args.mainImageUrl) {
+            const file = await loadFile(args.mainImageUrl);
+            fd.set("rectangleImage", file.blob, file.filename);
+            if (file.width > 0) {
+              fd.set(
+                "rectangleImageCrop",
+                JSON.stringify({ x: 0, y: 0, width: file.width, height: file.height }),
+              );
+            }
+          }
 
-        if (args.html5ArchiveUrl) {
-          const file = await loadFile(args.html5ArchiveUrl);
-          fd.set("image", file.blob, file.filename);
-          fd.set("isHtml5", "1");
-        }
+          if (args.videoUrl) {
+            const file = await loadFile(args.videoUrl);
+            fd.set("image", file.blob, file.filename);
+            // Без этого флага бэкенд сохранит загруженный файл как обычный баннер.
+            fd.set("isVideo", "1");
+          }
 
-        if (args.vastTagUrl) {
-          fd.set("url", args.vastTagUrl);
-          fd.set("isVast", "1");
+          if (args.html5ArchiveUrl) {
+            const file = await loadFile(args.html5ArchiveUrl);
+            fd.set("image", file.blob, file.filename);
+            fd.set("isHtml5", "1");
+          }
+
+          if (args.vastTagUrl) {
+            fd.set("url", args.vastTagUrl);
+            fd.set("isVast", "1");
+          }
         }
 
         const c = await ctx.adv.createCreative(args.campaignId, fd);
