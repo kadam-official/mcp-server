@@ -16,9 +16,12 @@ Native (Teaser):
   Required images: imageUrl (icon, min 500x500), mainImageUrl (min 492x328)
   Optional: bid, startDate, stopDate
 
-Banner:
-  Required: url, imageUrl (must match exact banner dimensions), sizeId
-  Optional: bid, startDate, stopDate
+Banner (send only one of image, HTML5 archive, iframe, or HTML tag):
+  Image: url, imageUrl (must match exact banner dimensions), sizeId
+  HTML5 archive: url, html5ArchiveUrl (.zip), sizeId — needs the HTML5 grant
+  iframe: isIframe, url (https frame source), sizeId — needs the HTML5 grant, nothing is uploaded
+  HTML tag: isHtmlTag, htmlTagCode (markup, max 32768 characters), sizeId — needs the HTML5 grant, no url. Put {click_url} where the click should go.
+  Optional: name, bid, startDate, stopDate
 
 Video:
   Required: title (max 30 chars), url, videoUrl (MP4 file, max 30MB)

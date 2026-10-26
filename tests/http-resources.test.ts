@@ -194,6 +194,11 @@ describe("getCreativeFormatsContent", () => {
   it("returns only static content when registry is null", async () => {
     const text = await getCreativeFormatsContent(null);
     expect(text).not.toContain("Banner Sizes (sizeId values)");
-    expect(text).toContain("Banner:");
+    expect(text).toContain("Banner");
+    expect(text).toContain("html5ArchiveUrl");
+    expect(text).toContain("isIframe");
+    expect(text).toContain("isHtmlTag");
+    expect(text).toContain("htmlTagCode");
+    expect(text).toContain("{click_url}");
   });
 });
